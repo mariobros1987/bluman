@@ -30,6 +30,13 @@ import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.sch
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
+import {
+  abbinaManuale,
+  elencaComunicazioniMicrovoce,
+  mappaAbbinamentiDelProgetto,
+  microvoceDiProgetto,
+  rimuoviAbbinamento,
+} from '../services/comunicazioniMicrovoci.js';
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -46,6 +53,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       where: { progettoId: req.params.id },
       orderBy: { createdAt: 'asc' },
     });
+    // Gli abbinamenti alle micro-voci, in una query sola per l'intero fascicolo: la chat si apre
+    // spesso e con molti messaggi, e una lettura per messaggio sarebbe una per riga.
+    //
+    // Viaggiano con il messaggio e non in una chiamata separata perché la bolla deve poter dire
+    // *perché* quel messaggio è lì — `origine` distingue un abbinamento che qualcuno ha dichiarato
+    // da uno che il contesto ha dedotto, ed è la differenza che permette di correggere il secondo.
+    const abbinamenti = await mappaAbbinamentiDelProgetto(req.tenantId, req.params.id);
     return msgs.map((m) => {
       const meta = leggiMetaComunicazione(m.externalId);
       // `null` quando la riga non dichiara uno stato — e non `'consegnato'`, che era il ripiego
@@ -68,6 +82,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         lettoAt: meta.lettoAt,
         consegnatoAt: meta.consegnatoAt ?? (stato === 'consegnato' && inEntrata ? m.createdAt : null),
         errore: meta.errore,
+        microvoci: abbinamenti.get(m.id) ?? [],
       };
     });
   });
@@ -219,6 +234,134 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       }
       throw err;
     }
+  });
+
+  /**
+   * Abbina un messaggio a una micro-voce, o lo toglie.
+   *
+   * Sono il livello «a mano» dell'abbinamento: la rete che non fallisce mai, e l'unico modo per
+   * correggere un abbinamento che il contesto ha dedotto e che era sbagliato. Per questo l'`origine`
+   * si riscrive in `manuale` quando l'operatore conferma un legame già presente: da quel momento il
+   * legame è suo, e dirlo è più onesto che lasciare scritto «contesto».
+   *
+   * Vietate al ruolo cliente. Il cliente può **dichiarare** la micro-voce toccando il link — quella
+   * è la sua parte, e resta tracciata come `contesto`. Ma scegliere a mano dentro il fascicolo è un
+   * atto dell'operatore: il portale non ha né il selettore né la vista dei moduli, e una rotta
+   * aperta al token del portale sarebbe una superficie che l'interfaccia non mostra a nessuno.
+   */
+  const RUOLI_ABBINAMENTO = ['super_admin', 'advisor', 'collaboratore_interno', 'operator'];
+
+  server.post<{ Params: { id: string; msgId: string }; Body: { microvoceProgettoId?: string } }>(
+    '/progetti/:id/comunicazioni/:msgId/microvoci',
+    async (req, reply) => {
+      const ruolo = req.ruolo as string | undefined;
+      if (!RUOLI_ABBINAMENTO.includes(ruolo ?? '')) {
+        return reply.code(403).send({ errore: 'Non autorizzato ad abbinare i messaggi alle micro-voci.' });
+      }
+      const microvoceId = String(req.body?.microvoceProgettoId ?? '').trim();
+      if (!microvoceId) {
+        return reply.code(400).send({ errore: 'microvoceProgettoId è obbligatorio.' });
+      }
+
+      const esito = await abbinaManuale(req.tenantId, req.params.id, req.params.msgId, microvoceId);
+      if (!esito.ok) {
+        return reply.code(404).send({
+          errore: esito.motivo === 'comunicazione_non_trovata'
+            ? 'Messaggio non trovato in questa pratica.'
+            : 'Micro-voce non trovata in questa pratica.',
+        });
+      }
+
+      await recordAudit({
+        tenantId: req.tenantId,
+        userId: req.user?.userId,
+        userEmail: req.user?.email,
+        ruolo,
+        azione: 'COMUNICAZIONE_ABBINATA_MICROVOCE',
+        entita: 'Progetto',
+        dettagli: `Messaggio ${req.params.msgId} abbinato alla micro-voce ${microvoceId} della pratica ${req.params.id}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({ ok: true, microvoceId: esito.microvoceId });
+    },
+  );
+
+  server.delete<{ Params: { id: string; msgId: string; mvId: string } }>(
+    '/progetti/:id/comunicazioni/:msgId/microvoci/:mvId',
+    async (req, reply) => {
+      const ruolo = req.ruolo as string | undefined;
+      if (!RUOLI_ABBINAMENTO.includes(ruolo ?? '')) {
+        return reply.code(403).send({ errore: 'Non autorizzato ad abbinare i messaggi alle micro-voci.' });
+      }
+
+      const rimosso = await rimuoviAbbinamento(req.tenantId, req.params.id, req.params.msgId, req.params.mvId);
+      // `false` con 200 e non con 404: togliere un abbinamento che non c'è più è il risultato voluto,
+      // e un doppio clic non deve insegnare a non fidarsi del tasto.
+      if (rimosso) {
+        await recordAudit({
+          tenantId: req.tenantId,
+          userId: req.user?.userId,
+          userEmail: req.user?.email,
+          ruolo,
+          azione: 'COMUNICAZIONE_SBINATA_MICROVOCE',
+          entita: 'Progetto',
+          dettagli: `Messaggio ${req.params.msgId} slegato dalla micro-voce ${req.params.mvId} della pratica ${req.params.id}`,
+          ipAddress: req.ip,
+        });
+      }
+
+      return reply.send({ ok: true, rimosso });
+    },
+  );
+
+  /**
+   * I messaggi abbinati a una micro-voce, dal più vecchio al più nuovo.
+   *
+   * È la vista che risponde alla domanda per cui questa feature esiste: «cosa ha scritto il cliente
+   * che riguarda questa voce?». L'`origine` viaggia con ogni messaggio.
+   */
+  server.get<{ Params: { id: string } }>('/microvoci/:id/comunicazioni', async (req, reply) => {
+    const microvoce = await microvoceDiProgetto(req.tenantId, req.params.id);
+    if (!microvoce) return reply.code(404).send({ errore: 'Micro-voce non trovata in questo studio.' });
+
+    const messaggi = await elencaComunicazioniMicrovoce(req.tenantId, req.params.id);
+    return reply.send({ ok: true, microvoce: { id: microvoce.id, nome: microvoce.nome }, messaggi });
+  });
+
+  /**
+   * Le micro-voci di una pratica, piatte, con il modulo a cui appartengono.
+   *
+   * Serve al selettore dell'abbinamento, che deve poter nominare una micro-voce dentro una chat
+   * senza avere in mano l'albero dei moduli: la chat è un elenco di messaggi, non una griglia di
+   * moduli, e ricostruire l'albero nel browser per farsi dire un id sarebbe una copia in più da
+   * tenere allineata. Una voce **condivisa** compare una volta sola — è una riga sola, e il modulo
+   * qui accanto è quello che la possiede, che è lo stesso criterio con cui `microvoceDiProgetto`
+   * decide a quale pratica appartiene.
+   */
+  server.get<{ Params: { id: string } }>('/progetti/:id/microvoci', async (req, reply) => {
+    // Si parte dai **moduli** e non dalle voci: `modulo_progetto` non ha una colonna d'ordine, e
+    // ordinare le voci per `moduloProgettoId` metterebbe i gruppi in fila per uuid — cioè in un
+    // ordine che non vuol dire niente per chi legge il selettore. Scendendo dai moduli, i gruppi
+    // restano nell'ordine in cui i moduli esistono, e dentro ciascuno le voci sono ordinate.
+    const moduli = await prisma.moduloProgetto.findMany({
+      where: { tenantId: req.tenantId, progettoId: req.params.id },
+      select: {
+        id: true,
+        nome: true,
+        microvoci: { select: { id: true, nome: true, stato: true }, orderBy: { ordine: 'asc' } },
+      },
+    });
+    const microvoci = moduli.flatMap((modulo) =>
+      modulo.microvoci.map((voce) => ({
+        id: voce.id,
+        nome: voce.nome,
+        stato: voce.stato,
+        moduloId: modulo.id,
+        moduloNome: modulo.nome,
+      })),
+    );
+    return reply.send({ ok: true, microvoci });
   });
 
   server.get('/progetti', async (req, reply) => {

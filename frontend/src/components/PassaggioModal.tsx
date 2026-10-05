@@ -16,12 +16,14 @@ import {
   urlFileArchivio,
 } from '../api/client';
 import type { Progetto, Passaggio } from '../types';
+import { fetchComunicazioniMicrovoceApi, type MessaggioDiMicrovoce } from '../api/progetti';
 import { ALL_STUDIO_TEMPLATES, getSmartDocumentRecommendation } from './passaggio/catalogoModelliStudio';
 import { getDefaultPassaggi } from './passaggio/passaggioUtils';
 import type { ConfigFirmaModalState, DocumentoEntry, NoteEntry } from './passaggio/types';
 import { TabPassaggi } from './passaggio/TabPassaggi';
 import { TabNote } from './passaggio/TabNote';
 import { TabDocumenti } from './passaggio/TabDocumenti';
+import { TabMessaggi } from './passaggio/TabMessaggi';
 import { ModaleCatalogo } from './passaggio/ModaleCatalogo';
 import { ModaleConfigFirma } from './passaggio/ModaleConfigFirma';
 import { closeBtnStyle } from './passaggio/passaggioStyles';
@@ -45,7 +47,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const voce = mod.v[vidx];
   const effMicrovoceId = microvoceDbId || (voce as any)?.dbId;
   const [view, setView] = useState<'operatore' | 'cliente'>('operatore');
-  const [activeTab, setActiveTab] = useState<'passaggi' | 'note' | 'documenti'>('passaggi');
+  const [activeTab, setActiveTab] = useState<'passaggi' | 'note' | 'documenti' | 'messaggi'>('passaggi');
   const [steps, setSteps] = useState<Passaggio[]>(() => voce.proc || getDefaultPassaggi(voce));
 
   // Note operative persistite
@@ -328,6 +330,41 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const [versionTargetDocId, setVersionTargetDocId] = useState<string | null>(null);
   const versionInputRef = useRef<HTMLInputElement>(null);
 
+  // I messaggi abbinati a questa micro-voce. Si caricano qui e non dentro la scheda «Messaggi»
+  // perché il conteggio va scritto sulla linguetta, e una linguetta che si popola solo quando la
+  // apri direbbe «0» a una voce che ha messaggi — cioè direbbe il falso per un momento, che è
+  // abbastanza per non fidarsi.
+  //
+  // `effMicrovoceId` può mancare (una voce mai salvata a database): in quel caso non c'è niente da
+  // chiedere, e la scheda resta vuota con la sua spiegazione.
+  const [messaggiMicrovoce, setMessaggiMicrovoce] = useState<MessaggioDiMicrovoce[]>([]);
+  const [erroreMessaggi, setErroreMessaggi] = useState<string | null>(null);
+  const [caricandoMessaggi, setCaricandoMessaggi] = useState(false);
+
+  useEffect(() => {
+    if (!effMicrovoceId) {
+      setMessaggiMicrovoce([]);
+      setErroreMessaggi(null);
+      return;
+    }
+    let montato = true;
+    setCaricandoMessaggi(true);
+    fetchComunicazioniMicrovoceApi(effMicrovoceId)
+      .then((r) => {
+        if (!montato) return;
+        setMessaggiMicrovoce(r.messaggi);
+        setErroreMessaggi(null);
+      })
+      .catch((err) => {
+        if (!montato) return;
+        // Il motivo vero e non una lista vuota: una lista vuota direbbe «non ha scritto niente»,
+        // che è una cosa diversa da «non sono riuscito a leggerlo» (regola 7).
+        setErroreMessaggi(err instanceof Error ? err.message : 'Messaggi della micro-voce non disponibili.');
+      })
+      .finally(() => { if (montato) setCaricandoMessaggi(false); });
+    return () => { montato = false; };
+  }, [effMicrovoceId]);
+
   const ricaricaDocumentiDb = async () => {
     if (!effProgettoId) return;
     try {
@@ -592,6 +629,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             >
               📎 Documenti & Workflow ({documents.length})
             </button>
+            <button
+              onClick={() => setActiveTab('messaggi')}
+              title="I messaggi scambiati con il cliente che riguardano questa voce"
+              style={tabBtnStyle(activeTab === 'messaggi')}
+            >
+              💬 Messaggi ({caricandoMessaggi ? '…' : messaggiMicrovoce.length})
+            </button>
           </div>
         </div>
 
@@ -644,6 +688,17 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             handleSbloccaDocumento={handleSbloccaDocumento}
             uploadingDoc={uploadingDoc}
             handleFileUploadPassaggio={handleFileUploadPassaggio}
+          />
+        )}
+
+        {/* Body TAB 4: Messaggi del cliente su questa micro-voce (sola lettura) */}
+        {activeTab === 'messaggi' && (
+          <TabMessaggi
+            messaggi={messaggiMicrovoce}
+            errore={erroreMessaggi}
+            progettoId={effProgettoId ? String(effProgettoId) : undefined}
+            microvoceId={effMicrovoceId ? String(effMicrovoceId) : undefined}
+            microvoceNome={voce.n}
           />
         )}
 

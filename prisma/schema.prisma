@@ -628,6 +628,8 @@ model MicrovoceProgetto {
   accessiRisorsa   AccessoRisorsa[]    @relation("AccessoMicrovoce")
   eventiCalendario EventoCalendario[]  @relation("EventiMicrovoce")
   condivisioni     MicrovoceModuloCondiviso[] @relation("MicrovoceCondivisa")
+  comunicazioni    ComunicazioneMicrovoce[]   @relation("MicrovoceComunicazione")
+  contestiChat     ContestoMicrovoceChat[]    @relation("ContestoMicrovoce")
 
   // FK verso il modulo padre: risolve la include annidata della lista progetti.
   @@index([moduloProgettoId])
@@ -1470,7 +1472,16 @@ model ComunicazioneProgetto {
   testo        String
   allegatiJson String?  @map("allegati_json")
   externalId   String?  @map("external_id")
+  // Da quale chat viene il messaggio. È la chiave con cui `contesto_microvoce_chat` sa a quale
+  // conversazione appartiene un contesto armato: per Telegram è l'id della chat, per WhatsApp il
+  // numero normalizzato del cliente, per Signal il mittente. Si conserva perché senza di esso
+  // l'operatore potrebbe armare il contesto solo sulle chat Telegram (le uniche enumerabili da
+  // `collegamento_chat_progetto`), mentre il cliente può scrivere su qualunque canale.
+  // `null` per le righe scritte a mano dal portale, che non vengono da una chat.
+  chatId       String?  @map("chat_id")
   createdAt    DateTime @default(now()) @map("created_at")
+
+  microvoci    ComunicazioneMicrovoce[]
 
   // Indici aggiunti con l'audit 21/09/2026: la tabella non ne aveva NESSUNO. La lista del
   // fascicolo (`where progettoId order by createdAt`) faceva seq scan a ogni apertura chat, e
@@ -1479,6 +1490,40 @@ model ComunicazioneProgetto {
   @@index([tenantId, progettoId, createdAt], map: "idx_comunicazione_progetto_tenant_progetto_data")
   @@index([tenantId, externalId], map: "idx_comunicazione_progetto_tenant_external")
   @@map("comunicazione_progetto")
+}
+
+/// Il legame fra un messaggio del fascicolo e una micro-voce.
+///
+/// Perché esiste. Un messaggio sapeva a quale **pratica** apparteneva e nient'altro: la micro-voce
+/// — dove il lavoro accade davvero — non sapeva che il cliente aveva scritto qualcosa che la
+/// riguardava, e per scoprirlo bisognava rileggere la chat a mano. `collegamento_chat_progetto`
+/// aveva già risolto lo stesso problema un livello sopra (a chi appartiene un messaggio) con il
+/// collegamento **esplicito** invece dell'euristica; indovinare *di cosa parla* è più difficile che
+/// indovinare *a chi appartiene*, quindi la stessa scelta vale a maggior ragione.
+///
+/// Tabella di join e non una FK singola su `comunicazione_progetto`: un messaggio che riguarda due
+/// moduli («ho caricato i documenti per la costituzione e per la partita IVA») è realistico in
+/// questo dominio, ed è il precedente di `microvoce_modulo_condiviso`.
+///
+/// `origine` dice **perché** il messaggio è lì, e non è decorazione: senza, un abbinamento
+/// automatico sbagliato sarebbe indistinguibile da uno giusto, e l'interfaccia mostrerebbe un
+/// legame senza motivo. È la stessa logica per cui `GET /progetti/:id/comunicazioni` rifiuta di
+/// inventare lo stato di consegna di una riga che non lo dichiara.
+model ComunicazioneMicrovoce {
+  id                  String                @id @default(uuid())
+  tenantId            String                @map("tenant_id")
+  comunicazioneId     String                @map("comunicazione_id")
+  comunicazione       ComunicazioneProgetto @relation(fields: [comunicazioneId], references: [id], onDelete: Cascade)
+  microvoceProgettoId String                @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto     @relation("MicrovoceComunicazione", fields: [microvoceProgettoId], references: [id], onDelete: Cascade)
+  origine             String // contesto | manuale | eredita
+  creatoAt            DateTime              @default(now()) @map("creato_at")
+
+  // Nomi espliciti come per `comunicazione_progetto`: senza `map:` Prisma tronca gli
+  // identificatori a 63 caratteri e la troncatura non è qualcosa da indovinare a mano.
+  @@unique([comunicazioneId, microvoceProgettoId], map: "idx_comunicazione_microvoce_unica")
+  @@index([tenantId, microvoceProgettoId], map: "idx_comunicazione_microvoce_tenant_microvoce")
+  @@map("comunicazione_microvoce")
 }
 
 /// La chat di un canale agganciata a una pratica.
@@ -1519,6 +1564,56 @@ model CollegamentoChatProgetto {
   @@unique([tenantId, canale, chatId])
   @@index([tenantId, progettoId])
   @@map("collegamento_chat_progetto")
+}
+
+/// La micro-voce di cui si sta parlando in una chat, adesso.
+///
+/// Perché è una tabella a parte e non una colonna di `collegamento_chat_progetto`. Il collegamento
+/// chat→pratica è **stabile**: una chat scrive in una pratica, e la chiave unica è sulla chat. Il
+/// contesto è **mobile**: la stessa chat parla della costituzione e poi della partita IVA, e la
+/// micro-voce cambia senza che cambi la pratica. Metterlo nella stessa riga avrebbe voluto dire
+/// scegliere fra due mali — spostare il collegamento (e far saltellare la chat fra le pratiche) o
+/// non poter mai cambiare micro-voce.
+///
+/// Chi lo arma. Sia il **cliente**, toccando il link della micro-voce (`/start z…`, il payload
+/// firmato che porta solo la micro-voce: la pratica si ricava da lì), sia l'**operatore**, dalla
+/// scheda della micro-voce. `armatoDa` dice quale dei due, e serve alla stessa cosa che serve
+/// `origine` su `comunicazione_microvoce`: sapere perché una cosa è come è.
+///
+/// Perché scade. Un contesto armato tre settimane fa non descrive più la conversazione, e da lì in
+/// poi abbinerebbe in silenzio i messaggi sbagliati — cioè mentirebbe sul fascicolo. `scadeAt` si
+/// rinnova a ogni messaggio abbinato e la lettura lo verifica: scaduto, è come se non ci fosse.
+///
+/// La chiave unica è sulla chat, come per il collegamento: una chat ha **un** contesto armato alla
+/// volta, e armarne un altro sostituisce quello precedente.
+model ContestoMicrovoceChat {
+  id                  String            @id @default(uuid())
+  tenantId            String            @map("tenant_id")
+  canale              String // telegram | whatsapp | signal
+  chatId              String            @map("chat_id")
+  microvoceProgettoId String            @map("microvoce_progetto_id")
+  microvoceProgetto   MicrovoceProgetto @relation("ContestoMicrovoce", fields: [microvoceProgettoId], references: [id], onDelete: Cascade)
+  /// La pratica della micro-voce, ridondante di proposito.
+  ///
+  /// È derivabile (`microvoce → modulo → progetto`) e non cambia mai: il modulo proprietario di una
+  /// micro-voce è immutabile, quindi non c'è niente da tenere allineato. In cambio, il controllo che
+  /// ogni messaggio in ingresso deve fare — «la micro-voce armata è di *questa* pratica?» — diventa
+  /// un confronto fra due campi invece di una risalita a due livelli dentro la transazione del
+  /// webhook, che è il percorso con il tempo di risposta da rispettare.
+  ///
+  /// Il controllo serve perché il contesto è legato alla **chat**, non alla pratica: su Signal non
+  /// esiste nemmeno un collegamento chat→pratica e la pratica si deduce dal messaggio, quindi senza
+  /// questo campo un messaggio finito in una pratica diversa da quella della micro-voce resterebbe
+  /// abbinato a una micro-voce che non gli appartiene — in silenzio.
+  progettoId          String            @map("progetto_id")
+  armatoDa            String            @default("link") @map("armato_da") // link | operatore
+  armatoAt            DateTime          @default(now()) @map("armato_at")
+  scadeAt             DateTime?         @map("scade_at")
+
+  @@unique([tenantId, canale, chatId], map: "idx_contesto_microvoce_chat_unica")
+  @@index([tenantId, microvoceProgettoId], map: "idx_contesto_microvoce_tenant_microvoce")
+  @@index([tenantId, progettoId], map: "idx_contesto_microvoce_tenant_progetto")
+  @@map("contesto_microvoce_chat")
 }
 
 /// Inbox idempotente dei provider: la chiave composta rende atomico il rifiuto dei replay.

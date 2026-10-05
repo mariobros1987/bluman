@@ -83,6 +83,11 @@ export function normalizzaTelefono(valore: unknown): string | null {
 const PAYLOAD_COLLEGAMENTO = /^([a-f0-9]{32})_([A-Za-z0-9_-]{22})$/;
 const DOMINIO_PAYLOAD_COLLEGAMENTO = 'telegram-deeplink';
 
+/** L'UUID compatto (32 esadecimali, senza trattini) rimesso nella forma canonica. */
+function uuidDaCompatto(compatto: string): string {
+  return `${compatto.slice(0, 8)}-${compatto.slice(8, 12)}-${compatto.slice(12, 16)}-${compatto.slice(16, 20)}-${compatto.slice(20)}`;
+}
+
 function macCollegamento(tenantId: string, progettoId: string, masterSecret: string): string {
   // I due identificativi si normalizzano alla forma compatta **prima** di firmare. `creaSegretoTelegram`
   // qui sopra firma i valori come arrivano, e va bene perché li produce sempre il database; qui il
@@ -129,7 +134,70 @@ export function progettoIdDaPayloadCollegamento(
   const compatto = match?.[1];
   const mac = match?.[2];
   if (!compatto || !mac) return null;
-  const progettoId = `${compatto.slice(0, 8)}-${compatto.slice(8, 12)}-${compatto.slice(12, 16)}-${compatto.slice(16, 20)}-${compatto.slice(20)}`;
+  const progettoId = uuidDaCompatto(compatto);
   const atteso = macCollegamento(tenantId, progettoId, masterSecret);
   return ugualiCostanti(Buffer.from(mac), Buffer.from(atteso)) ? progettoId : null;
+}
+
+// ── Payload del link per micro-voce ───────────────────────────────────────────────────
+//
+// Lo stesso link del progetto, con un identificativo diverso dentro: la micro-voce invece della
+// pratica. La pratica si risale da lì (microvoce → modulo → progetto), quindi un UUID solo basta —
+// ed è necessario che basti, perché dei 64 caratteri che Telegram concede in `?start=` questo
+// payload ne usa già 56. Un secondo identificativo non ci starebbe.
+//
+// **Perché il prefisso `z`.** I payload devono restare distinguibili, ma senza invalidare i link
+// già spediti: quelli cominciano con l'UUID compatto, cioè con un carattere di `[a-f0-9]`. `z` è
+// fuori da quell'insieme, quindi «comincia per z» = «è per micro-voce» e «comincia con un
+// esadecimale» = «è per pratica». Nessun link in circolazione cambia significato: la regex del
+// progetto qui sopra non matcha un payload con il prefisso, e resta **identica**.
+//
+// Il MAC usa un dominio **proprio**: anche con lo stesso master secret, la stringa firmata è
+// diversa, quindi i due payload non sono interscambiabili in nessuna delle due direzioni.
+const PAYLOAD_MICROVOCE = /^z([a-f0-9]{32})_([A-Za-z0-9_-]{22})$/;
+const DOMINIO_PAYLOAD_MICROVOCE = 'telegram-deeplink-microvoce';
+const PREFISSO_MICROVOCE = 'z';
+
+function macMicrovoce(tenantId: string, microvoceId: string, masterSecret: string): string {
+  return createHmac('sha256', masterSecret)
+    .update(`${DOMINIO_PAYLOAD_MICROVOCE}\0${uuidCompatto(tenantId)}\0${uuidCompatto(microvoceId)}`)
+    .digest()
+    .subarray(0, 16)
+    .toString('base64url');
+}
+
+/**
+ * Il payload del link per **micro-voce**: `z<uuid-compatto>_<mac>`.
+ *
+ * Lancia se `tenantId` o `microvoceId` non sono UUID, per la stessa ragione di
+ * `creaPayloadCollegamento`: un link che il webhook non saprebbe sciogliere è meglio non produrlo.
+ */
+export function creaPayloadMicrovoce(tenantId: string, microvoceId: string, masterSecret: string): string {
+  const tenant = uuidCompatto(tenantId);
+  const microvoce = uuidCompatto(microvoceId);
+  if (!/^[a-f0-9]{32}$/.test(tenant)) throw new Error('tenantId non valido per il payload di micro-voce');
+  if (!/^[a-f0-9]{32}$/.test(microvoce)) throw new Error('microvoceId non valido per il payload di micro-voce');
+  return `${PREFISSO_MICROVOCE}${microvoce}_${macMicrovoce(tenantId, microvoceId, masterSecret)}`;
+}
+
+/**
+ * Scioglie un payload di micro-voce, o `null` se non è autentico.
+ *
+ * Gemella di `progettoIdDaPayloadCollegamento` e con la stessa regola: un solo `null` per ogni
+ * motivo, perché chi prova non deve poter capire cosa ha sbagliato.
+ */
+export function microvoceIdDaPayloadCollegamento(
+  payload: unknown,
+  tenantId: string,
+  masterSecret: string | undefined,
+): string | null {
+  if (!masterSecret) return null;
+  const valore = typeof payload === 'string' ? payload.trim() : '';
+  const match = valore.match(PAYLOAD_MICROVOCE);
+  const compatto = match?.[1];
+  const mac = match?.[2];
+  if (!compatto || !mac) return null;
+  const microvoceId = uuidDaCompatto(compatto);
+  const atteso = macMicrovoce(tenantId, microvoceId, masterSecret);
+  return ugualiCostanti(Buffer.from(mac), Buffer.from(atteso)) ? microvoceId : null;
 }

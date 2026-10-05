@@ -18,6 +18,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma, conContestoInTransazione } from '../util/prismaClient';
 import { normalizzaTelefono } from '../util/webhookSecurity';
 import { notificaStudio } from './notificheService';
+import { abbinaAlContesto, type TxAbbinamento } from './comunicazioniMicrovoci';
 import { isProgettoAttivo } from '../domain/stateEngine';
 import { uploadDocumento } from './storageService';
 import { credenzialiCanali } from './otpDispatch.js';
@@ -44,9 +45,11 @@ type TransazioneIngestione = {
     create: (args: { data: { tenantId: string; provider: string; eventId: string } }) => Promise<unknown>;
   };
   comunicazioneProgetto: {
-    create: (args: Prisma.ComunicazioneProgettoCreateArgs) => Promise<unknown>;
+    // L'id serve ad abbinare il messaggio alla micro-voce del contesto armato, nella stessa
+    // transazione che lo crea.
+    create: (args: Prisma.ComunicazioneProgettoCreateArgs) => Promise<{ id: string }>;
   };
-};
+} & TxAbbinamento;
 
 /** Replay: la busta era già stata registrata. Non è un guasto, è il caso previsto. */
 function isReplay(err: unknown): boolean {
@@ -193,12 +196,17 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
       const testo = messaggio.testo.trim()
         || (messaggio.allegati.length ? `[Allegato: ${messaggio.allegati[0]?.nome || 'file'}]` : '');
 
+      // La chat Signal: il numero del mittente in forma normalizzata, che è la stessa che
+      // l'interfaccia mostra. Il ripiego è il valore grezzo, perché `normalizzaTelefono` restituisce
+      // `null` su una forma che non riconosce e un contesto armato deve poter esistere comunque.
+      const chatId = (messaggio.mittente && normalizzaTelefono(messaggio.mittente)) || messaggio.mittente || '';
+
       try {
         await transazione(async (tx) => {
           await tx.webhookInbox.create({
             data: { tenantId, provider: 'signal_message', eventId: messaggio.eventId },
           });
-          await tx.comunicazioneProgetto.create({
+          const comunicazione = await tx.comunicazioneProgetto.create({
             data: {
               tenantId,
               progettoId: progetto.id,
@@ -208,9 +216,15 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
               direzione: 'entrata',
               testo,
               externalId: `signal:${messaggio.eventId}`,
+              chatId: chatId || null,
               ...(allegati ? { allegatiJson: JSON.stringify(allegati) } : {}),
             },
           });
+          // Il contesto armato su questa chat abbina il messaggio alla sua micro-voce, come per
+          // Telegram e WhatsApp. Signal non ha un deep link con payload: lo arma l'operatore.
+          if (chatId) {
+            await abbinaAlContesto(tx, tenantId, 'signal', chatId, progetto.id, comunicazione.id);
+          }
         });
       } catch (err) {
         if (isReplay(err)) {

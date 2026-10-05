@@ -97,9 +97,18 @@ export async function archiviaProgettoApi(id: string, archiviato: boolean) {
  * Il link si compone sul server e non qui: la firma è un HMAC con il segreto del webhook, che
  * non esiste nel browser (regola 6). Il motivo per cui non si compone si riporta com'è — «bot non
  * configurato» e «manca lo @username» si risolvono in due punti diversi delle impostazioni.
+ *
+ * Con `microvoceId` il link è quello della **micro-voce**: chi lo tocca collega la chat alla pratica
+ * e dichiara anche di quale voce sta parlando, così i messaggi che seguono nascono già abbinati. Il
+ * `tipo` che torna dice quale dei due è stato composto, e non è ridondante: è ciò che permette alla
+ * scheda di **dire** al cliente cosa succederà, invece di farglielo scoprire dopo.
  */
-export async function fetchLinkTelegramApi(progettoId: string): Promise<{ url: string; botUsername: string }> {
-  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/link-telegram`, {
+export async function fetchLinkTelegramApi(
+  progettoId: string,
+  microvoceId?: string,
+): Promise<{ url: string; botUsername: string; tipo: 'pratica' | 'microvoce' }> {
+  const query = microvoceId ? `?microvoceId=${encodeURIComponent(microvoceId)}` : '';
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/link-telegram${query}`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Link Telegram non disponibile'));
@@ -109,15 +118,19 @@ export async function fetchLinkTelegramApi(progettoId: string): Promise<{ url: s
 /**
  * Spedisce l'invito al cliente. Il server registra la comunicazione in uscita nel fascicolo,
  * quindi questa non è una notifica di comodo: è un messaggio che entra nella storia della pratica.
+ *
+ * `microvoceId` fa spedire il link della voce **e lo stesso** che la scheda mostra: la scelta si fa
+ * sul server per non rischiare che l'invito parta con un link diverso da quello sullo schermo.
  */
 export async function inviaLinkTelegramApi(
   progettoId: string,
   canale: 'email' | 'whatsapp',
+  microvoceId?: string,
 ): Promise<{ via: string; destinatario: string }> {
   const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/link-telegram/invia`, {
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ canale }),
+    body: JSON.stringify(microvoceId ? { canale, microvoceId } : { canale }),
   });
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Invio del link non riuscito'));
   return await res.json();
@@ -148,6 +161,162 @@ export async function revocaCollegamentoChatApi(progettoId: string, collegamento
     { method: 'DELETE', headers: getAuthHeaders() },
   );
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Revoca non riuscita'));
+}
+
+// ── Micro-voci: abbinamento dei messaggi, e contesto armato di una chat ────────────────
+
+/** Una micro-voce di questa pratica, piatta, con il modulo che la possiede. Per il selettore. */
+export interface MicrovoceDellaPratica {
+  id: string;
+  nome: string;
+  stato: string;
+  moduloId: string;
+  moduloNome: string;
+}
+
+export async function fetchMicrovociProgettoApi(progettoId: string): Promise<MicrovoceDellaPratica[]> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/microvoci`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Elenco delle micro-voci non disponibile'));
+  const dati = await res.json();
+  return Array.isArray(dati?.microvoci) ? dati.microvoci : [];
+}
+
+/**
+ * Un abbinamento visto dal messaggio: quale micro-voce, il suo nome, e **perché** è lì.
+ *
+ * `origine` non è decorazione: `contesto` è un abbinamento che qualcuno ha dichiarato toccando un
+ * link, `manuale` è l'operatore, `eredita` sarà una risposta a un messaggio già abbinato. Senza,
+ * un abbinamento automatico sbagliato sarebbe indistinguibile da uno giusto — e non si saprebbe
+ * quale correggere.
+ */
+export interface AbbinamentoMicrovoce {
+  microvoceId: string;
+  nome: string;
+  origine: string;
+}
+
+/** Abbina a mano un messaggio a una micro-voce. 404 se l'uno o l'altra non sono di questa pratica. */
+export async function abbinaComunicazioneMicrovoceApi(
+  progettoId: string,
+  messaggioId: string,
+  microvoceProgettoId: string,
+): Promise<void> {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/comunicazioni/${encodeURIComponent(messaggioId)}/microvoci`,
+    { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ microvoceProgettoId }) },
+  );
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Abbinamento non riuscito'));
+}
+
+/** Toglie un abbinamento. `false` se non c'era: non è un errore, è il risultato voluto. */
+export async function slegaComunicazioneMicrovoceApi(
+  progettoId: string,
+  messaggioId: string,
+  microvoceId: string,
+): Promise<boolean> {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/comunicazioni/${encodeURIComponent(messaggioId)}`
+      + `/microvoci/${encodeURIComponent(microvoceId)}`,
+    { method: 'DELETE', headers: getAuthHeaders() },
+  );
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Rimozione dell\'abbinamento non riuscita'));
+  return Boolean((await res.json())?.rimosso);
+}
+
+/** Un messaggio abbinato a una micro-voce, con l'origine dell'abbinamento. */
+export interface MessaggioDiMicrovoce {
+  id: string;
+  canale: string;
+  mittente: string;
+  destinatario: string;
+  direzione: string;
+  testo: string;
+  createdAt: string;
+  allegatiJson: string | null;
+  origine: string;
+}
+
+/** I messaggi abbinati a una micro-voce, dal più vecchio al più nuovo. */
+export async function fetchComunicazioniMicrovoceApi(
+  microvoceId: string,
+): Promise<{ microvoce: { id: string; nome: string }; messaggi: MessaggioDiMicrovoce[] }> {
+  const res = await apiFetch(`${API_BASE}/microvoci/${encodeURIComponent(microvoceId)}/comunicazioni`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Messaggi della micro-voce non disponibili'));
+  const dati = await res.json();
+  return {
+    microvoce: dati?.microvoce ?? { id: microvoceId, nome: '' },
+    messaggi: Array.isArray(dati?.messaggi) ? dati.messaggi : [],
+  };
+}
+
+/**
+ * Una conversazione che ha lasciato messaggi in questa pratica, e il contesto che ha addosso.
+ *
+ * L'elenco non è dei «collegamenti»: quello è solo Telegram. Qui c'è qualunque chat che abbia scritto
+ * nel fascicolo — WhatsApp e Signal compresi — perché è da qui che l'operatore sceglie dove armare
+ * una micro-voce, e per armarla deve poterla nominare.
+ */
+export interface ChatDellaPratica {
+  canale: string;
+  chatId: string;
+  ultimoMessaggioAt: string;
+  messaggi: number;
+  contesto: {
+    id: string;
+    armatoDa: string;
+    armatoAt: string;
+    scadeAt: string | null;
+    microvoce: { id: string; nome: string };
+  } | null;
+}
+
+export async function fetchChatProgettoApi(progettoId: string): Promise<ChatDellaPratica[]> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/chat`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Elenco delle chat non disponibile'));
+  const dati = await res.json();
+  return Array.isArray(dati?.chat) ? dati.chat : [];
+}
+
+/**
+ * Arma il contesto di una chat: da qui in poi i suoi messaggi si abbinano a questa micro-voce.
+ *
+ * È la stessa cosa che fa il cliente toccando il link della voce. Esiste perché WhatsApp e Signal
+ * non hanno un link: lì l'unico che può dire «si sta parlando di questa voce» è l'operatore.
+ */
+export async function armaContestoMicrovoceApi(
+  progettoId: string,
+  canale: string,
+  chatId: string,
+  microvoceId: string,
+): Promise<{ microvoce: { id: string; nome: string }; scadeAt: string }> {
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/contesti-microvoce`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ canale, chatId, microvoceId }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Armamento del contesto non riuscito'));
+  return await res.json();
+}
+
+/** Disarma il contesto di una chat. `false` se non ce n'era uno — non è un errore. */
+export async function disarmaContestoMicrovoceApi(
+  progettoId: string,
+  canale: string,
+  chatId: string,
+): Promise<boolean> {
+  const query = `?canale=${encodeURIComponent(canale)}&chatId=${encodeURIComponent(chatId)}`;
+  const res = await apiFetch(`${API_BASE}/progetti/${encodeURIComponent(progettoId)}/contesti-microvoce${query}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Disarmo del contesto non riuscito'));
+  return Boolean((await res.json())?.disarmato);
 }
 
 /**

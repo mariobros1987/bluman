@@ -18,7 +18,8 @@
  * d'uscita se il cliente ha toccato il link sbagliato. Più chat possono puntare alla stessa
  * pratica.
  */
-import { prisma } from '../util/prismaClient.js';
+import { prisma, conContestoInTransazione } from '../util/prismaClient.js';
+import { disarmaContesto } from './comunicazioniMicrovoci.js';
 
 /**
  * Una pratica che non accetta più messaggi.
@@ -34,9 +35,21 @@ export function progettoChiuso(stato: string): boolean {
 }
 
 export type EsitoCollegamento =
-  | { ok: true; progetto: { id: string; nome: string }; cliente: { id: string; nome: string } }
+  | {
+      ok: true;
+      progetto: { id: string; nome: string };
+      cliente: { id: string; nome: string };
+      /** Vero quando la chat era su un'**altra** pratica e il suo contesto micro-voce è caduto. */
+      contestoDisarmato: boolean;
+    }
   | { ok: false; motivo: 'progetto_non_trovato' }
   | { ok: false; motivo: 'progetto_chiuso'; stato: string };
+
+/** L'esito di una revoca: se è avvenuta, e se portandola via si è tolto anche un contesto armato. */
+export interface EsitoScollegamento {
+  rimosso: boolean;
+  contestoDisarmato: boolean;
+}
 
 /**
  * Aggancia una chat a una pratica, o sposta il collegamento che c'era.
@@ -52,6 +65,13 @@ export type EsitoCollegamento =
  * Torna i nomi oltre agli identificativi perché chi risponde al cliente deve poter nominare la
  * pratica: una seconda lettura per una riga che si è appena letta sarebbe un giro di rete inutile
  * dentro il webhook, che ha un tempo di risposta da rispettare.
+ *
+ * **Se lo spostamento è verso un'altra pratica, il contesto micro-voce della chat cade con lui.**
+ * Il contesto è legato alla chat, non alla pratica: senza questo, una chat che passa dalla pratica
+ * A alla B resterebbe etichettata con una micro-voce di A, e il primo messaggio scritto lì dentro
+ * nascerebbe abbinato a un modulo che non c'entra — senza che nessuno dei due se ne accorga. Se
+ * invece la chat resta sulla stessa pratica, il contesto non si tocca: ritoccare lo stesso link non
+ * deve essere un modo per disarmare di nascosto.
  */
 export async function collegaChatAProgetto(
   tenantId: string,
@@ -68,23 +88,38 @@ export async function collegaChatAProgetto(
   if (progettoChiuso(progetto.stato)) return { ok: false, motivo: 'progetto_chiuso', stato: progetto.stato };
 
   const chiave = { tenantId, canale, chatId };
-  await prisma.collegamentoChatProgetto.upsert({
-    where: { tenantId_canale_chatId: chiave },
-    create: { ...chiave, clienteId: progetto.cliente.id, progettoId: progetto.id, creatoDa },
-    // `creatoAt` si riporta a ora: il campo dice da quando *questo* collegamento vale, e dopo uno
-    // spostamento il collegamento è un altro.
-    update: {
-      clienteId: progetto.cliente.id,
-      progettoId: progetto.id,
-      creatoDa,
-      creatoAt: new Date(),
-    },
-  });
+  const contestoDisarmato = await prisma.$transaction(async (tx) =>
+    conContestoInTransazione(tx, async () => {
+      // La pratica di prima, se c'era: è ciò che distingue «sposto» da «confermo», e sono due cose
+      // diverse per il contesto micro-voce.
+      const precedente = await tx.collegamentoChatProgetto.findUnique({
+        where: { tenantId_canale_chatId: chiave },
+        select: { progettoId: true },
+      });
+
+      await tx.collegamentoChatProgetto.upsert({
+        where: { tenantId_canale_chatId: chiave },
+        create: { ...chiave, clienteId: progetto.cliente.id, progettoId: progetto.id, creatoDa },
+        // `creatoAt` si riporta a ora: il campo dice da quando *questo* collegamento vale, e dopo uno
+        // spostamento il collegamento è un altro.
+        update: {
+          clienteId: progetto.cliente.id,
+          progettoId: progetto.id,
+          creatoDa,
+          creatoAt: new Date(),
+        },
+      });
+
+      if (!precedente || precedente.progettoId === progetto.id) return false;
+      return disarmaContesto(tenantId, canale, chatId, tx);
+    }),
+  );
 
   return {
     ok: true,
     progetto: { id: progetto.id, nome: progetto.nome },
     cliente: progetto.cliente,
+    contestoDisarmato,
   };
 }
 
@@ -142,21 +177,48 @@ export async function elencaCollegamentiProgetto(
 }
 
 /**
- * Revoca un collegamento. `false` se non esisteva (o non era di quella pratica).
+ * Revoca un collegamento. `rimosso: false` se non esisteva (o non era di quella pratica).
  *
  * Il `progettoId` nella `where` non è decorativo: senza, l'identificativo di un collegamento
  * basterebbe a revocare quello di un'altra pratica dello stesso studio, e la rotta risponderebbe
  * «fatto» avendo cancellato qualcos'altro.
  *
- * `deleteMany` invece di `delete` perché l'assenza non è un'eccezione da tradurre: è una risposta.
+ * **Il contesto micro-voce della chat muore con il collegamento.** La revoca è una capacità che
+ * toglie: se restasse armato, la chat non è più legata a nessuna pratica ma continua a portarsi
+ * addosso la micro-voce di quella da cui è stata staccata, e — rientrando con lo stesso link su
+ * un'altra pratica — abbinerebbe i messaggi a un modulo che non c'entra. Non si revoca a metà.
+ *
+ * Torna anche `contestoDisarmato` e non solo un booleano perché è una cosa che va **detta**: chi ha
+ * armato il contesto lo vede sparire, e la rotta ne lascia traccia nell'audit. Una rimozione
+ * silenziosa è indistinguibile da un contesto mai armato.
  */
 export async function scollegaPerId(
   tenantId: string,
   progettoId: string,
   collegamentoId: string,
-): Promise<boolean> {
-  const esito = await prisma.collegamentoChatProgetto.deleteMany({
-    where: { id: collegamentoId, tenantId, progettoId },
-  });
-  return esito.count > 0;
+): Promise<EsitoScollegamento> {
+  return prisma.$transaction(async (tx) =>
+    conContestoInTransazione(tx, async () => {
+      // Prima la lettura, per sapere *quale* chat si sta staccando: il contesto è indicizzato sulla
+      // chat, e l'id del collegamento da solo non lo dice.
+      const collegamento = await tx.collegamentoChatProgetto.findFirst({
+        where: { id: collegamentoId, tenantId, progettoId },
+        select: { canale: true, chatId: true },
+      });
+      if (!collegamento) return { rimosso: false, contestoDisarmato: false };
+
+      const esito = await tx.collegamentoChatProgetto.deleteMany({
+        where: { id: collegamentoId, tenantId, progettoId },
+      });
+      if (esito.count === 0) return { rimosso: false, contestoDisarmato: false };
+
+      const contestoDisarmato = await disarmaContesto(
+        tenantId,
+        collegamento.canale,
+        collegamento.chatId,
+        tx,
+      );
+      return { rimosso: true, contestoDisarmato };
+    }),
+  );
 }

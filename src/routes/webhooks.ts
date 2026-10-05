@@ -44,6 +44,7 @@ import { prisma, prismaAmministrativo, attivaContestoTenant, conContestoInTransa
 import { notificaStudio } from '../services/notificheService.js';
 import { registraIngressoSenzaFascicolo } from '../services/ingressoSenzaFascicolo.js';
 import { progettoChiuso, risolviFascicoloDaChat } from '../services/collegamentoChat.js';
+import { abbinaAlContesto, type TxAbbinamento } from '../services/comunicazioniMicrovoci.js';
 import { gestisciAvvio, leggiRichiestaAvvio } from '../services/avvioTelegram.js';
 import { confrontoTokenCostante } from '../util/password.js';
 import { uploadDocumento } from '../services/storageService.js';
@@ -152,10 +153,12 @@ type TransazioneWebhook = {
     create: (args: { data: { tenantId: string; provider: string; eventId: string } }) => Promise<unknown>;
   };
   comunicazioneProgetto: {
-    create: (args: Prisma.ComunicazioneProgettoCreateArgs) => Promise<unknown>;
+    // L'id è ciò che serve ad abbinare il messaggio alla micro-voce del contesto armato: la
+    // creazione e l'abbinamento stanno nella stessa transazione, quindi il valore si usa qui.
+    create: (args: Prisma.ComunicazioneProgettoCreateArgs) => Promise<{ id: string }>;
     update: (args: Prisma.ComunicazioneProgettoUpdateArgs) => Promise<unknown>;
   };
-};
+} & TxAbbinamento;
 
 async function transazioneWebhook<T>(
   operazione: (tx: TransazioneWebhook) => Promise<T>,
@@ -200,6 +203,7 @@ async function leggiUsernameBot(botToken: string): Promise<string | null> {
  */
 async function archiviaInFascicolo(
   tenantId: string,
+  chatId: string,
   cliente: { id: string; nome: string },
   progetto: { id: string; nome: string },
   updateId: string,
@@ -210,7 +214,7 @@ async function archiviaInFascicolo(
       await tx.webhookInbox.create({
         data: { tenantId, provider: 'telegram_update', eventId: updateId },
       });
-      await tx.comunicazioneProgetto.create({
+      const messaggio = await tx.comunicazioneProgetto.create({
         data: {
           tenantId,
           progettoId: progetto.id,
@@ -220,8 +224,14 @@ async function archiviaInFascicolo(
           destinatario: 'Studio',
           testo: text,
           externalId: idEsterno('telegram', updateId),
+          chatId,
         },
       });
+      // La micro-voce di cui si sta parlando in questa chat, se qualcuno l'ha detta — il cliente
+      // toccando il link della voce, o l'operatore scegliendola dalla scheda. Dentro la stessa
+      // transazione: o il messaggio esiste con il suo abbinamento, o non esiste, senza la finestra
+      // in cui il fascicolo ha il messaggio e ha perso il motivo per cui è lì.
+      await abbinaAlContesto(tx, tenantId, 'telegram', chatId, progetto.id, messaggio.id);
     });
   } catch (err) {
     if (isReplayWebhook(err)) return 'duplicato';
@@ -526,7 +536,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
               await tx.webhookInbox.create({
                 data: { tenantId, provider: 'whatsapp_message', eventId: providerId },
               });
-              await tx.comunicazioneProgetto.create({
+              const messaggio = await tx.comunicazioneProgetto.create({
                 data: {
                   tenantId,
                   progettoId: activeProj.id,
@@ -536,9 +546,15 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
                   direzione: 'entrata',
                   testo: textBody,
                   externalId: idEsterno('whatsapp', providerId),
+                  chatId: fromNumber,
                   ...(allegatiJson ? { allegatiJson } : {}),
                 },
               });
+              // Come per Telegram: il contesto armato su questa chat abbina il messaggio alla sua
+              // micro-voce, nella stessa transazione. Su WhatsApp non c'è un deep link con payload,
+              // quindi il contesto lo arma l'operatore dalla scheda; la chiave della chat è il
+              // numero normalizzato del cliente, che è lo stesso che l'interfaccia gli mostra.
+              await abbinaAlContesto(tx, tenantId, 'whatsapp', fromNumber, activeProj.id, messaggio.id);
             });
           } catch (err) {
             if (isReplayWebhook(err)) continue;
@@ -637,6 +653,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
         }
         const esito = await archiviaInFascicolo(
           tenant.id,
+          chatId,
           collegato.cliente,
           collegato.progetto,
           updateId,
@@ -701,7 +718,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
       // tipo di `attivi[0]` è `Progetto | undefined` e il resto della rotta usa `progetto.id`.
       if (!progetto) return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
 
-      const esito = await archiviaInFascicolo(tenant.id, cliente, progetto, updateId, text);
+      const esito = await archiviaInFascicolo(tenant.id, chatId, cliente, progetto, updateId, text);
       return reply.send(esito === 'duplicato' ? { ok: true, duplicate: true } : { ok: true });
     } catch (err) {
       console.warn('[Telegram Webhook Error]', err);

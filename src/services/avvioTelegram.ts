@@ -18,7 +18,11 @@ import { notificaStudio } from './notificheService.js';
 import { credenzialiCanali } from './otpDispatch.js';
 import { inviaTestoTelegram } from './telegramService.js';
 import { collegaChatAProgetto } from './collegamentoChat.js';
-import { progettoIdDaPayloadCollegamento } from '../util/webhookSecurity.js';
+import { armaContesto, microvoceDiProgetto } from './comunicazioniMicrovoci.js';
+import {
+  progettoIdDaPayloadCollegamento,
+  microvoceIdDaPayloadCollegamento,
+} from '../util/webhookSecurity.js';
 
 /**
  * Riconosce un `/start`, con o senza payload.
@@ -36,16 +40,19 @@ export function leggiRichiestaAvvio(testo: string): { payload: string | null } |
 
 export type StatoAvvio =
   | 'collegato'
+  | 'contesto_armato'
   | 'duplicato'
   | 'senza_payload'
   | 'payload_non_valido'
   | 'progetto_non_trovato'
-  | 'progetto_chiuso';
+  | 'progetto_chiuso'
+  | 'microvoce_non_trovata';
 
 export interface EsitoAvvio {
   stato: StatoAvvio;
   progetto?: { id: string; nome: string };
   cliente?: { id: string; nome: string };
+  microvoce?: { id: string; nome: string };
 }
 
 const TESTO_SENZA_PAYLOAD =
@@ -64,6 +71,10 @@ const TESTO_PROGETTO_NON_TROVATO =
 const TESTO_PROGETTO_CHIUSO =
   'La pratica di questo link è conclusa o archiviata, quindi non raccoglie più messaggi. Chiedi '
   + 'allo studio il link della pratica aperta.';
+
+const TESTO_MICROVOCE_NON_TROVATA =
+  'Il link con cui sei arrivato non corrisponde a nessuna voce di questo studio: può essere stata '
+  + 'cancellata dopo che il link è stato inviato. Chiedi allo studio di rimandartelo.';
 
 /**
  * Risponde nella chat del cliente.
@@ -87,6 +98,12 @@ async function rispondiAllaChat(tenantId: string, chatId: string, testo: string)
  *
  * Non lancia per un payload non valido o per una pratica chiusa: sono esiti previsti di una richiesta
  * che arriva da fuori, e ognuno ha la sua risposta nella chat.
+ *
+ * Il payload può dire **due** cose: a quale pratica appartiene la chat (il caso di sempre) o quale
+ * micro-voce di quella pratica il cliente sta per raccontare. Si prova prima la micro-voce, perché
+ * il suo payload è il più specifico — e i due non si possono confondere: quello della micro-voce ha
+ * il prefisso `z`, che nessun payload di pratica può avere (i loro iniziano con l'UUID, quindi con
+ * un carattere esadecimale). Un link già spedito continua a significare la stessa cosa.
  */
 export async function gestisciAvvio(
   tenantId: string,
@@ -99,6 +116,9 @@ export async function gestisciAvvio(
     await rispondiAllaChat(tenantId, chatId, TESTO_SENZA_PAYLOAD);
     return { stato: 'senza_payload' };
   }
+
+  const microvoceId = microvoceIdDaPayloadCollegamento(payload, tenantId, masterSecret);
+  if (microvoceId) return gestisciAvvioMicrovoce(tenantId, chatId, updateId, microvoceId);
 
   const progettoId = progettoIdDaPayloadCollegamento(payload, tenantId, masterSecret);
   if (!progettoId) {
@@ -136,7 +156,14 @@ export async function gestisciAvvio(
     chatId,
     `✅ Fatto: questa chat è collegata alla pratica «${collegamento.progetto.nome}». Da ora i `
     + 'messaggi che scrivi qui entrano in quel fascicolo. Se ti serviva un\'altra pratica, apri il '
-    + 'link di quella e questa chat passerà lì.',
+    + 'link di quella e questa chat passerà lì.'
+    // Se la chat aveva una micro-voce selezionata e la si è spostata su un'altra pratica, quella
+    // selezione è caduta: va detta, perché il cliente l'aveva fatta e non vedrebbe sparire niente.
+    // È un messaggio del bot, non un'etichetta dentro il messaggio del cliente.
+    + (collegamento.contestoDisarmato
+      ? '\n\nℹ️ La micro-voce che avevi selezionato riguardava l\'altra pratica, quindi è stata '
+        + 'deselezionata: se ti serve, aprine di nuovo il link.'
+      : ''),
   );
 
   // Lo studio lo deve sapere: è la conferma che il link che ha mandato ha funzionato, e da quel
@@ -151,4 +178,90 @@ export async function gestisciAvvio(
   }).catch(() => {});
 
   return { stato: 'collegato', progetto: collegamento.progetto, cliente: collegamento.cliente };
+}
+
+/**
+ * Il `/start` di un link per **micro-voce**: il cliente ha toccato il link di una voce e da quel
+ * momento racconta *quella*.
+ *
+ * Fa due cose, e l'ordine conta. Prima **collega la chat alla pratica** che possiede la micro-voce
+ * (riusando `collegaChatAProgetto`, con tutto ciò che comporta: rifiuto di una pratica chiusa,
+ * spostamento se la chat era altrove, e — se era altrove davvero — disarmo del contesto vecchio).
+ * Poi **arma il contesto** su quella micro-voce.
+ *
+ * Il collegamento non si sposta sulla micro-voce, e non potrebbe: la chiave unica è sulla **chat** e
+ * una chat parla di tutte le voci della pratica. Se la micro-voce scrivesse il collegamento, un
+ * cliente che parla di due moduli lo farebbe saltellare a ogni link. Il contesto è la cosa che ha la
+ * granularità giusta per una cosa che può cambiare da un messaggio all'altro.
+ */
+async function gestisciAvvioMicrovoce(
+  tenantId: string,
+  chatId: string,
+  updateId: string,
+  microvoceId: string,
+): Promise<EsitoAvvio> {
+  const microvoce = await microvoceDiProgetto(tenantId, microvoceId);
+  if (!microvoce) {
+    await rispondiAllaChat(tenantId, chatId, TESTO_MICROVOCE_NON_TROVATA);
+    return { stato: 'microvoce_non_trovata' };
+  }
+
+  const collegamento = await collegaChatAProgetto(tenantId, 'telegram', chatId, microvoce.progettoId, 'link');
+  if (!collegamento.ok) {
+    await rispondiAllaChat(
+      tenantId,
+      chatId,
+      collegamento.motivo === 'progetto_non_trovato' ? TESTO_PROGETTO_NON_TROVATO : TESTO_PROGETTO_CHIUSO,
+    );
+    return { stato: collegamento.motivo };
+  }
+
+  // Arma dopo il collegamento: prima di questo istante la chat può essere in un'altra pratica, e un
+  // contesto armato lì sarebbe stato rifiutato dal confronto sulla pratica — ma il cliente avrebbe
+  // visto una conferma per un armamento che non c'era.
+  const armato = await armaContesto(tenantId, 'telegram', chatId, microvoce.id, 'link');
+  if (!armato.ok) {
+    await rispondiAllaChat(tenantId, chatId, TESTO_MICROVOCE_NON_TROVATA);
+    return { stato: 'microvoce_non_trovata' };
+  }
+
+  try {
+    await prisma.webhookInbox.create({
+      data: { tenantId, provider: 'telegram_update', eventId: updateId },
+    });
+  } catch (err) {
+    if ((err as { code?: string })?.code === 'P2002') {
+      return {
+        stato: 'duplicato',
+        progetto: collegamento.progetto,
+        cliente: collegamento.cliente,
+        microvoce: { id: microvoce.id, nome: microvoce.nome },
+      };
+    }
+    throw err;
+  }
+
+  await rispondiAllaChat(
+    tenantId,
+    chatId,
+    `✅ Fatto: da ora i messaggi che scrivi qui riguardano «${microvoce.nome}», nella pratica `
+    + `«${collegamento.progetto.nome}». Se ti serve un'altra voce, apri il link di quella e questa `
+    + 'chat passerà a quella: la pratica resta la stessa.',
+  );
+
+  await notificaStudio(tenantId, {
+    tipoEvento: 'chat_collegata_progetto',
+    oggetto: `Micro-voce selezionata — ${collegamento.cliente.nome}`,
+    corpo: `${collegamento.cliente.nome} ha selezionato la voce «${microvoce.nome}» della pratica `
+      + `«${collegamento.progetto.nome}» (chat Telegram ${chatId}): i messaggi che scriverà lì `
+      + 'verranno abbinati a quella voce.',
+    link: `/projects/${collegamento.progetto.id}`,
+  }).catch(() => {});
+
+  return {
+    stato: 'contesto_armato',
+    progetto: collegamento.progetto,
+    cliente: collegamento.cliente,
+    microvoce: { id: microvoce.id, nome: microvoce.nome },
+  };
 }

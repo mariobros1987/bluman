@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const progettoFindFirst = vi.fn<any>(async () => null);
 const collegamentoFindUnique = vi.fn<any>(async () => null);
+const collegamentoFindFirst = vi.fn<any>(async () => null);
 const collegamentoFindMany = vi.fn<any>(async () => []);
 const collegamentoDeleteMany = vi.fn<any>(async () => ({ count: 1 }));
 
@@ -33,16 +34,37 @@ const collegamentoUpsert = vi.fn<any>(async ({ where, create, update }: any) => 
   return riga;
 });
 
-vi.mock('../util/prismaClient.js', () => ({
-  prisma: {
-    progetto: { findFirst: progettoFindFirst },
-    collegamentoChatProgetto: {
-      findUnique: collegamentoFindUnique,
-      findMany: collegamentoFindMany,
-      upsert: collegamentoUpsert,
-      deleteMany: collegamentoDeleteMany,
-    },
+const contestoDeleteMany = vi.fn<any>(async () => ({ count: 0 }));
+
+/**
+ * Il finto Prisma.
+ *
+ * `$transaction` deve **esistere**, ed è la sola cosa non ovvia di questo finto: il servizio scrive
+ * il collegamento e disarma il contesto micro-voce in una transazione sola, e senza questo metodo
+ * ogni test che passa da lì esplode con «prisma.$transaction is not a function» — un rosso che
+ * sembra un guasto del database e invece è un pezzo mancante nel finto. Qui non c'è un database da
+ * isolare, quindi la callback gira sullo stesso oggetto.
+ */
+const finto = {
+  progetto: { findFirst: progettoFindFirst },
+  collegamentoChatProgetto: {
+    findUnique: collegamentoFindUnique,
+    findFirst: collegamentoFindFirst,
+    findMany: collegamentoFindMany,
+    upsert: collegamentoUpsert,
+    deleteMany: collegamentoDeleteMany,
   },
+  contestoMicrovoceChat: { deleteMany: contestoDeleteMany },
+  $transaction: async (fn: any) => fn(finto),
+};
+
+vi.mock('../util/prismaClient.js', () => ({
+  prisma: finto,
+  // Fuori da una richiesta HTTP non c'è contesto tenant da impostare, quindi la vera
+  // `conContestoInTransazione` eseguirebbe la callback e basta. Il finto fa lo stesso, ma deve
+  // **esserci**: se manca, vitest rifiuta l'import con «No export is defined on the mock», e il
+  // rosso parla di un export mancante invece che del comportamento in prova.
+  conContestoInTransazione: async (_tx: any, fn: () => Promise<any>) => fn(),
 }));
 
 const {
@@ -70,9 +92,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   collegamenti.clear();
   progettoFindFirst.mockResolvedValue(null);
-  collegamentoFindUnique.mockResolvedValue(null);
+  collegamentoFindUnique.mockImplementation(async ({ where }: any) => {
+    // Legge dalla **stessa mappa** in cui scrive l'upsert. Un finto che rispondesse sempre `null`
+    // direbbe che nessuna chat è mai collegata due volte, e «sposta» — cioè la cosa che questi test
+    // esistono per presidiare — non verrebbe mai esercitato davvero.
+    const { tenantId, canale, chatId } = where.tenantId_canale_chatId;
+    return collegamenti.get(`${tenantId}:${canale}:${chatId}`) ?? null;
+  });
+  collegamentoFindFirst.mockResolvedValue(null);
   collegamentoFindMany.mockResolvedValue([]);
   collegamentoDeleteMany.mockResolvedValue({ count: 1 });
+  contestoDeleteMany.mockResolvedValue({ count: 0 });
 });
 
 describe('progettoChiuso', () => {
@@ -122,6 +152,34 @@ describe('collegaChatAProgetto', () => {
     // Entrambe le scritture sono passate per la stessa chiave: la seconda è un aggiornamento.
     const chiavi = collegamentoUpsert.mock.calls.map((c: any) => JSON.stringify(c[0].where));
     expect(new Set(chiavi).size).toBe(1);
+  });
+
+  it('spostando la chat su un\'altra pratica, il contesto micro-voce cade con lei', async () => {
+    // Il contesto è legato alla **chat**, non alla pratica. Se sopravvivesse allo spostamento, il
+    // primo messaggio scritto nella pratica B nascerebbe abbinato a una voce della pratica A —
+    // senza che né il cliente né l'operatore se ne accorgano.
+    progettoFindFirst.mockResolvedValue(pratica(PROGETTO_B, 'in_progress'));
+    collegamentoFindUnique.mockResolvedValue({ progettoId: PROGETTO_A });
+    contestoDeleteMany.mockResolvedValue({ count: 1 });
+
+    const esito = await collegaChatAProgetto(TENANT, 'telegram', CHAT, PROGETTO_B);
+
+    expect(esito.ok && esito.contestoDisarmato).toBe(true);
+    expect(contestoDeleteMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT, canale: 'telegram', chatId: CHAT },
+    });
+  });
+
+  it('ritoccare il link della stessa pratica non è un modo per disarmare di nascosto', async () => {
+    // Il cliente che riapre il link che ha già — per sbaglio, o perché l'ha ritrovato — non deve
+    // perdere il contesto che aveva armato: quello che si tocca è il collegamento, non la voce.
+    progettoFindFirst.mockResolvedValue(pratica(PROGETTO_A, 'in_progress'));
+    collegamentoFindUnique.mockResolvedValue({ progettoId: PROGETTO_A });
+
+    const esito = await collegaChatAProgetto(TENANT, 'telegram', CHAT, PROGETTO_A);
+
+    expect(esito.ok && esito.contestoDisarmato).toBe(false);
+    expect(contestoDeleteMany).not.toHaveBeenCalled();
   });
 
   it('la pratica di un altro studio non è collegabile', async () => {
@@ -184,16 +242,59 @@ describe('elenco e revoca', () => {
   it('la revoca è vincolata alla pratica, non solo al collegamento', async () => {
     // Senza `progettoId` nella `where`, l'identificativo di un collegamento basterebbe a revocare
     // quello di un'altra pratica dello stesso studio.
+    collegamentoFindFirst.mockResolvedValue({ canale: 'telegram', chatId: CHAT });
+
     await scollegaPerId(TENANT, PROGETTO_A, 'coll-1');
+
+    expect(collegamentoFindFirst).toHaveBeenCalledWith({
+      where: { id: 'coll-1', tenantId: TENANT, progettoId: PROGETTO_A },
+      select: { canale: true, chatId: true },
+    });
     expect(collegamentoDeleteMany).toHaveBeenCalledWith({
       where: { id: 'coll-1', tenantId: TENANT, progettoId: PROGETTO_A },
     });
   });
 
+  it('revocando, il contesto micro-voce della chat cade con il collegamento', async () => {
+    // Non si revoca a metà: la chat non è più legata a nessuna pratica, e un contesto che
+    // sopravvivesse continuerebbe ad abbinare i messaggi alla voce della pratica da cui è stata
+    // staccata. Le coordinate per trovarlo le dà la lettura, perché l'id del collegamento da solo
+    // non dice su quale chat era armato.
+    collegamentoFindFirst.mockResolvedValue({ canale: 'telegram', chatId: CHAT });
+    contestoDeleteMany.mockResolvedValue({ count: 1 });
+
+    expect(await scollegaPerId(TENANT, PROGETTO_A, 'coll-1')).toEqual({
+      rimosso: true,
+      contestoDisarmato: true,
+    });
+    expect(contestoDeleteMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT, canale: 'telegram', chatId: CHAT },
+    });
+  });
+
   it('una revoca che non trova niente risponde false invece di lanciare', async () => {
+    // Il collegamento non è di questa pratica (la lettura torna null): niente da cancellare, e
+    // **niente contesto da disarmare** — disarmarlo qui toglierebbe l'armamento di una chat che non
+    // si sta toccando.
+    expect(await scollegaPerId(TENANT, PROGETTO_A, 'coll-inesistente')).toEqual({
+      rimosso: false,
+      contestoDisarmato: false,
+    });
+    expect(collegamentoDeleteMany).not.toHaveBeenCalled();
+    expect(contestoDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it('se la cancellazione non tocca righe, la revoca è falsa e il contesto resta', async () => {
+    // La lettura l'aveva trovato ma la `where` della cancellazione non lo prende: è il caso della
+    // corsa fra due revoche. Il contesto non si disarma, perché non è questa la revoca che è andata
+    // a segno.
+    collegamentoFindFirst.mockResolvedValue({ canale: 'telegram', chatId: CHAT });
     collegamentoDeleteMany.mockResolvedValue({ count: 0 });
-    expect(await scollegaPerId(TENANT, PROGETTO_A, 'coll-inesistente')).toBe(false);
-    collegamentoDeleteMany.mockResolvedValue({ count: 1 });
-    expect(await scollegaPerId(TENANT, PROGETTO_A, 'coll-1')).toBe(true);
+
+    expect(await scollegaPerId(TENANT, PROGETTO_A, 'coll-1')).toEqual({
+      rimosso: false,
+      contestoDisarmato: false,
+    });
+    expect(contestoDeleteMany).not.toHaveBeenCalled();
   });
 });

@@ -88,6 +88,11 @@ const prismaFinto: any = {
     }]),
   },
   comunicazioneProgetto: { findFirst, findMany: vi.fn(async () => []), update },
+  // I due modelli dell'abbinamento micro-voce: questo file prova la ricevuta di consegna e non li
+  // attraversa, ma `registraRotteWebhooks` monta anche il percorso in ingresso — e un `tx` senza
+  // questi modelli farebbe esplodere quel percorso con un TypeError che non dice niente.
+  comunicazioneMicrovoce: { upsert: vi.fn(async () => ({})) },
+  contestoMicrovoceChat: { findUnique: vi.fn(async () => null), update: vi.fn(async () => ({})) },
   webhookInbox: { create: inboxCreate },
   $executeRaw: vi.fn(async () => 1),
 };

@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, sendEmailDirectApi, sendSignalDirectApi, sendTelegramDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, fetchTenantInfoApi, uploadFileApi, urlDocumentoAssoluto } from '../api/client';
+import {
+  abbinaComunicazioneMicrovoceApi,
+  fetchMicrovociProgettoApi,
+  slegaComunicazioneMicrovoceApi,
+  type AbbinamentoMicrovoce,
+  type MicrovoceDellaPratica,
+} from '../api/progetti';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { SpunteStato } from './SpunteStato';
@@ -15,6 +22,14 @@ export interface MessaggioComunicazione {
   testo: string;
   dataOra: string;
   allegati?: { nome: string; url: string; dimensione: string }[];
+  /**
+   * Le micro-voci a cui questo messaggio è abbinato, e **perché**.
+   *
+   * Arriva dal server insieme al messaggio e non da una chiamata a parte: la bolla deve poter dire
+   * subito di cosa parla, e un secondo giro di rete per un'etichetta farebbe comparire la chat senza
+   * etichette e poi con — che è peggio di non mostrarle affatto.
+   */
+  microvoci?: AbbinamentoMicrovoce[];
   /**
    * Lo stato di recapito, quello vero.
    *
@@ -221,6 +236,18 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
   const [nuovoTesto, setNuovoTesto] = useState('');
   const [canaleSelezionato, setCanaleSelezionato] = useState<'email' | 'whatsapp' | 'telegram' | 'signal' | 'portal'>('whatsapp');
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
+
+  // ── Abbinamento alle micro-voci ─────────────────────────────────────────────────────
+  //
+  // È il livello «a mano»: la rete che non fallisce mai, e l'unico modo per correggere un
+  // abbinamento che il contesto ha dedotto e che era sbagliato. Per questo la selezione è esplicita
+  // e l'azione dice cosa fa — non c'è nessun automatismo che indovina di cosa parla un messaggio.
+  const [selezionati, setSelezionati] = useState<string[]>([]);
+  const [microvociPratica, setMicrovociPratica] = useState<MicrovoceDellaPratica[]>([]);
+  const [erroreMicrovoci, setErroreMicrovoci] = useState<string | null>(null);
+  const [microvoceScelta, setMicrovoceScelta] = useState('');
+  const [abbinando, setAbbinando] = useState(false);
+  const [abbinamentiInCorso, setAbbinamentiInCorso] = useState<string[]>([]);
   const [customDestEmail, setCustomDestEmail] = useState('');
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [inviando, setInviando] = useState(false);
@@ -702,6 +729,82 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   const channelDetail = getCurrentChannelDetails();
   const messaggiFiltrati = messaggi.filter(m => filtroCanale === 'TUTTI' || m.canale === filtroCanale);
+
+  // ── Abbinare i messaggi alle micro-voci ─────────────────────────────────────────────
+
+  const toggleSelezione = (id: string) =>
+    setSelezionati(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+
+  // Le micro-voci si chiedono **solo quando servono**: chi apre la chat per leggere non paga una
+  // richiesta in più, e chi seleziona la paga una volta sola. Chiedere l'elenco all'apertura della
+  // scheda sarebbe un giro di rete per un menu che forse nessuno apre.
+  useEffect(() => {
+    if (selezionati.length === 0 || microvociPratica.length > 0 || erroreMicrovoci) return;
+    let annullato = false;
+    void fetchMicrovociProgettoApi(String(progettoId))
+      .then((voci) => { if (!annullato) setMicrovociPratica(voci); })
+      .catch((err) => {
+        if (!annullato) {
+          setErroreMicrovoci(err instanceof Error ? err.message : 'Elenco delle micro-voci non disponibile.');
+        }
+      });
+    return () => { annullato = true; };
+  }, [selezionati.length, microvociPratica.length, erroreMicrovoci, progettoId]);
+
+  const abbinaSelezionati = async () => {
+    const mvId = microvoceScelta || microvociPratica[0]?.id;
+    if (!mvId) {
+      setFeedback({ tipo: 'err', testo: 'Questa pratica non ha micro-voci: non c\'è niente a cui abbinare.' });
+      return;
+    }
+    setAbbinando(true);
+    try {
+      // Gli esiti si raccolgono tutti invece di fermarsi al primo errore: sono righe indipendenti,
+      // e dire «3 su 5» è più utile che dire «non riuscito» dopo averne salvate due.
+      const falliti = (await Promise.all(
+        selezionati.map(async (id) => {
+          try {
+            await abbinaComunicazioneMicrovoceApi(String(progettoId), id, mvId);
+            return null;
+          } catch {
+            return id;
+          }
+        }),
+      )).filter((x): x is string => x !== null);
+
+      const nome = microvociPratica.find(v => v.id === mvId)?.nome ?? 'la micro-voce';
+      const riusciti = selezionati.length - falliti.length;
+      setFeedback(falliti.length === 0
+        ? { tipo: 'ok', testo: `✓ ${riusciti} ${riusciti === 1 ? 'messaggio abbinato' : 'messaggi abbinati'} a «${nome}».` }
+        : { tipo: 'err', testo: `${riusciti} abbinati a «${nome}», ${falliti.length} no: riprova sui restanti.` });
+      setSelezionati(falliti);
+      await loadComunicazioni();
+    } finally {
+      setAbbinando(false);
+    }
+  };
+
+  const slega = async (m: MessaggioComunicazione, mv: AbbinamentoMicrovoce) => {
+    setAbbinamentiInCorso(prev => [...prev, m.id]);
+    try {
+      await slegaComunicazioneMicrovoceApi(String(progettoId), m.id, mv.microvoceId);
+      await loadComunicazioni();
+    } catch (err) {
+      setFeedback({ tipo: 'err', testo: err instanceof Error ? err.message : 'Rimozione non riuscita.' });
+    } finally {
+      setAbbinamentiInCorso(prev => prev.filter(x => x !== m.id));
+    }
+  };
+
+  const microvociPerModulo = useMemo(() => {
+    const gruppi = new Map<string, MicrovoceDellaPratica[]>();
+    for (const v of microvociPratica) {
+      const elenco = gruppi.get(v.moduloNome) ?? [];
+      elenco.push(v);
+      gruppi.set(v.moduloNome, elenco);
+    }
+    return [...gruppi.entries()];
+  }, [microvociPratica]);
   const primoNonLettoId = useMemo(() => {
     const primo = messaggiFiltrati.find(m => m.direzione === 'entrata' && m.stato !== 'letto');
     return primo ? primo.id : null;
@@ -819,6 +922,71 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         </button>
       </div>
 
+      {/* Barra d'azione dell'abbinamento: compare solo con una selezione attiva, perché prima non
+          c'è niente da fare e un pannello sempre aperto occuperebbe spazio per un'azione rara. */}
+      {selezionati.length > 0 && (
+        <div
+          style={{
+            background: 'var(--pill-indigo-bg)',
+            border: '1px solid var(--indigo-d)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+            fontSize: 11.5,
+            color: 'var(--pill-indigo-fg)',
+          }}
+        >
+          <strong>{selezionati.length} {selezionati.length === 1 ? 'messaggio selezionato' : 'messaggi selezionati'}</strong>
+          {erroreMicrovoci ? (
+            <span style={{ color: 'var(--amber)' }}>{erroreMicrovoci}</span>
+          ) : (
+            <>
+              <select
+                value={microvoceScelta || microvociPratica[0]?.id || ''}
+                onChange={e => setMicrovoceScelta(e.target.value)}
+                disabled={microvociPratica.length === 0}
+                style={{ background: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 8px', fontSize: 11.5, maxWidth: 280 }}
+              >
+                {microvociPratica.length === 0 && <option value="">Carico le micro-voci…</option>}
+                {microvociPerModulo.map(([modulo, voci]) => (
+                  <optgroup key={modulo} label={modulo}>
+                    {voci.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void abbinaSelezionati()}
+                disabled={abbinando || microvociPratica.length === 0}
+                style={{
+                  background: 'var(--indigo)',
+                  color: '#fff',
+                  border: '1px solid var(--indigo-l)',
+                  borderRadius: 8,
+                  padding: '5px 12px',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: abbinando || microvociPratica.length === 0 ? 'default' : 'pointer',
+                  opacity: abbinando || microvociPratica.length === 0 ? 0.6 : 1,
+                }}
+              >
+                {abbinando ? '⏳ Abbino…' : '🔗 Abbina a micro-voce'}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={() => { setSelezionati([]); setFeedback(null); }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}
+          >
+            Annulla selezione
+          </button>
+        </div>
+      )}
+
       {/* Timeline Chat Comunicazioni con Smart Scroll e Ricevute di Stato */}
       <div style={{ position: 'relative' }}>
         <div
@@ -856,6 +1024,16 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                   {/* Info Messaggio Header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {/* La casella è sempre visibile, non solo al passaggio del mouse: su un tablet
+                          un comando che compare solo con l'hover non esiste, e il selettore è
+                          l'unico modo per abbinare a mano — non può dipendere dal puntatore. */}
+                      <input
+                        type="checkbox"
+                        checked={selezionati.includes(m.id)}
+                        onChange={() => toggleSelezione(m.id)}
+                        title="Seleziona per abbinare a una micro-voce"
+                        style={{ cursor: 'pointer', accentColor: 'var(--indigo)', opacity: selezionati.length > 0 ? 1 : 0.5 }}
+                      />
                       <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: badge.bg, color: badge.color }}>
                         {badge.icon} {badge.label}
                       </span>
@@ -888,6 +1066,50 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               <div style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                 {cleanDisplayEmailText(m.testo)}
               </div>
+
+              {/* Micro-voci a cui il messaggio è abbinato, con il motivo dell'abbinamento.
+                  Il motivo è metà dell'informazione: «contesto» vuol dire che il cliente ha toccato
+                  il link di quella voce, «manuale» che l'ha deciso l'operatore. Un abbinamento
+                  dedotto e sbagliato si corregge solo se si sa che era dedotto. */}
+              {m.microvoci && m.microvoci.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {m.microvoci.map((mv) => (
+                    <span
+                      key={mv.microvoceId}
+                      title={mv.origine === 'contesto'
+                        ? 'Abbinata dal link che il cliente ha toccato'
+                        : mv.origine === 'eredita'
+                          ? 'Ereditata dal messaggio a cui risponde'
+                          : 'Abbinata a mano dall\'operatore'}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: '3px 8px',
+                        borderRadius: 12,
+                        background: 'var(--pill-green-bg)',
+                        color: 'var(--green)',
+                        border: '1px solid var(--pill-green-bd)',
+                      }}
+                    >
+                      <span>
+                        {mv.origine === 'contesto' ? '🔗' : mv.origine === 'eredita' ? '↩️' : '✋'} {mv.nome}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={abbinamentiInCorso.includes(m.id)}
+                        onClick={() => void slega(m, mv)}
+                        title="Togli l'abbinamento: il messaggio resta nel fascicolo, smette di essere collegato a questa voce"
+                        style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 11, lineHeight: 1, padding: 0 }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* Allegati Messaggio */}
               {m.allegati && m.allegati.length > 0 && (

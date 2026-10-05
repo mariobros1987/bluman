@@ -58,6 +58,12 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     progetto: {
       findUnique: async () => ({ id: 'proj-1', nome: 'Progetto', cliente: { nome: 'Cliente Verificato' } }),
     },
+    // La lettura della chat chiede anche gli abbinamenti alle micro-voci, in una query sola per
+    // tutto il fascicolo. Qui non ce ne sono, ma il metodo deve **esistere**: senza, la rotta va in
+    // 500 e `res.json()` torna un oggetto d'errore invece dell'elenco — cioè i quattro test qui
+    // sotto fallirebbero con «object is not iterable», che parla di destrutturazione e non del
+    // vero motivo.
+    comunicazioneMicrovoce: { findMany: async () => [] },
   };
   return { ...reale, prisma };
 });

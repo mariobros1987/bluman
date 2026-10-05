@@ -20,6 +20,14 @@ const findComunicazioni = vi.fn<any>(async () => []);
 // La ricevuta di consegna ritrova la riga dal `wamid` dentro `external_id`: è una `findFirst`
 // perché quel `wamid` è unico, e cercarne due sarebbe una query che non ha senso fare.
 const findComunicazioneFirst = vi.fn<any>(async () => null);
+// Il contesto micro-voce armato su una chat. Per difetto **non ce n'è nessuno**: è il caso di ogni
+// studio che non ha mai toccato un link per micro-voce, e mantiene i test qui sotto su ciò che
+// provavano prima — l'instradamento, non l'abbinamento. I test che lo riguardano lo armano.
+const contestoFindUnique = vi.fn<any>(async () => null);
+const contestoUpdate = vi.fn(async () => ({}));
+// Il parametro è dichiarato perché il test ispeziona *cosa* è stato abbinato: senza, la chiamata
+// registrata è una tupla vuota e `calls[0][0]` non compila — cioè proprio la cosa da verificare.
+const abbinamentoUpsert = vi.fn(async (_args: any) => ({}));
 const eventiInbox = new Set<string>();
 const webhookInboxCreate = vi.fn(async ({ data }: any) => {
   const chiave = `${data.tenantId}:${data.provider}:${data.eventId}`;
@@ -65,6 +73,8 @@ const prismaFinto: any = {
   progetto: { findMany: progettoFindMany, findFirst: progettoFindFirst },
   collegamentoChatProgetto: { findUnique: collegamentoFindUnique, upsert: collegamentoUpsert },
   comunicazioneProgetto: { findMany: findComunicazioni, findFirst: findComunicazioneFirst, create, update },
+  comunicazioneMicrovoce: { upsert: abbinamentoUpsert },
+  contestoMicrovoceChat: { findUnique: contestoFindUnique, update: contestoUpdate },
   webhookInbox: { create: webhookInboxCreate },
   $executeRaw: vi.fn(async () => 1),
 };
@@ -137,6 +147,9 @@ beforeEach(() => {
   inviaTestoTelegram.mockResolvedValue({ ok: true });
   findComunicazioni.mockResolvedValue([]);
   findComunicazioneFirst.mockResolvedValue(null);
+  contestoFindUnique.mockResolvedValue(null);
+  contestoUpdate.mockResolvedValue({});
+  abbinamentoUpsert.mockResolvedValue({});
   eventiInbox.clear();
   tenantUpdate.mockResolvedValue({});
 });
@@ -550,6 +563,119 @@ describe('collegamento chat → pratica (link Telegram)', () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(create.mock.calls[0]![0].data.canale).toBe('telegram');
     expect(clienteFindMany).toHaveBeenCalled();
+    await server.close();
+  });
+});
+
+/**
+ * Il contesto micro-voce: la micro-voce di cui si sta parlando *adesso* in una chat.
+ *
+ * Sono i quattro modi in cui l'abbinamento automatico può sbagliare, e ognuno deve finire nel
+ * verso giusto — cioè **non** abbinare. Il quinto caso, quello che deve abbinare, è il primo.
+ *
+ * Il messaggio entra comunque nel fascicolo in tutti i casi: il contesto decide se il messaggio ha
+ * anche una micro-voce, non se esiste. Un contesto scaduto non deve poter togliere un messaggio dal
+ * fascicolo — sarebbe un guasto molto peggiore dell'etichetta mancante.
+ */
+describe('contesto micro-voce su una chat', () => {
+  const ROTTA = '/webhooks/communications/telegram';
+  const CHAT = '99';
+  const PROGETTO = '00000000-0000-4000-8000-0000000000a1';
+  const ALTRA_PRATICA = '00000000-0000-4000-8000-0000000000a2';
+  const MV = 'mv-1';
+
+  const invia = (server: any, updateId: number) => server.inject({
+    method: 'POST',
+    url: ROTTA,
+    headers: { 'x-telegram-bot-api-secret-token': creaSegretoTelegram(TENANT, '12345:token-lungo-valido', 'tg-master') },
+    payload: { update_id: updateId, message: { chat: { id: CHAT }, text: 'ho mandato i documenti' } },
+  });
+
+  /** La chat collegata alla pratica, con un contesto armato sopra: è la situazione normale. */
+  const conContesto = (contesto: Record<string, unknown>) => {
+    collegamentoFindUnique.mockResolvedValue({
+      id: 'coll-1',
+      cliente: { id: 'cli-1', nome: 'Mario Emirati' },
+      progetto: { id: PROGETTO, nome: 'Emirati Arabi 123', stato: 'in_progress' },
+    });
+    contestoFindUnique.mockResolvedValue({
+      progettoId: PROGETTO,
+      microvoceProgettoId: MV,
+      armatoAt: new Date(),
+      scadeAt: new Date(Date.now() + 3_600_000),
+      ...contesto,
+    });
+  };
+
+  it('abbina il messaggio alla micro-voce armata, con l\'origine dichiarata', async () => {
+    conContesto({});
+    const server = await app();
+    const res = await invia(server, 600);
+
+    expect(res.statusCode).toBe(200);
+    expect(abbinamentoUpsert).toHaveBeenCalledTimes(1);
+    expect(abbinamentoUpsert.mock.calls[0]![0]).toMatchObject({
+      create: { tenantId: TENANT, comunicazioneId: 'com-1', microvoceProgettoId: MV, origine: 'contesto' },
+    });
+    // E il contesto si rinnova: la conversazione è viva.
+    expect(contestoUpdate).toHaveBeenCalledTimes(1);
+    await server.close();
+  });
+
+  it('un contesto scaduto non abbina, ma il messaggio entra lo stesso nel fascicolo', async () => {
+    conContesto({ scadeAt: new Date(Date.now() - 3_600_000) });
+    const server = await app();
+    const res = await invia(server, 601);
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(abbinamentoUpsert).not.toHaveBeenCalled();
+    expect(contestoUpdate).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('oltre il tetto assoluto non abbina nemmeno se il rinnovo l\'aveva tenuto vivo', async () => {
+    // È il caso che il rinnovo da solo non copre: una chat che scrive tutti i giorni non fa mai
+    // scadere il contesto per inattività, e senza tetto resterebbe etichettata per sempre.
+    conContesto({
+      armatoAt: new Date(Date.now() - 8 * 24 * 3_600_000),
+      scadeAt: new Date(Date.now() + 3_600_000),
+    });
+    const server = await app();
+    const res = await invia(server, 602);
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(abbinamentoUpsert).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('un contesto la cui micro-voce è di un\'altra pratica non abbina', async () => {
+    // Il contesto è legato alla chat, non alla pratica: su Signal non esiste nemmeno un
+    // collegamento, e la pratica si deduce dal messaggio. Senza questo confronto l'abbinamento
+    // sarebbe sbagliato in silenzio.
+    conContesto({ progettoId: ALTRA_PRATICA });
+    const server = await app();
+    const res = await invia(server, 603);
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(abbinamentoUpsert).not.toHaveBeenCalled();
+    await server.close();
+  });
+
+  it('senza contesto armato il comportamento è quello di prima', async () => {
+    collegamentoFindUnique.mockResolvedValue({
+      id: 'coll-1',
+      cliente: { id: 'cli-1', nome: 'Mario Emirati' },
+      progetto: { id: PROGETTO, nome: 'Emirati Arabi 123', stato: 'in_progress' },
+    });
+    const server = await app();
+    const res = await invia(server, 604);
+
+    expect(res.statusCode).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(abbinamentoUpsert).not.toHaveBeenCalled();
     await server.close();
   });
 });
