@@ -288,6 +288,63 @@ describe('§35 — PATCH /tenant/info: la stringa vuota non cancella la password
   });
 });
 
+/**
+ * §2bis — i campi di piattaforma non si scrivono dalle Impostazioni dello studio.
+ *
+ * `durataMesi`, `dataAttivazione`, `dataScadenza`, `piano` e `stato` erano in `allowedKeys` di
+ * `PATCH /tenant/info`, cioè nella rotta che lo studio usa per le **proprie** impostazioni: un
+ * advisor poteva quindi cambiarsi il piano o spostarsi la scadenza da sé. Sono i termini del
+ * contratto fra studio e piattaforma, e li scrive solo il super_admin da
+ * `PATCH /admin/tenants/:id` (rilievo medio dell'audit 27/09/2026, chiuso il 05/10/2026).
+ *
+ * La differenza da un rifiuto secco conta: la rotta risponde `200` e salva il resto, perché
+ * `SettingsPage` rimanda indietro l'anagrafica intera — compresi i campi che ha solo letto.
+ * Un `403` sull'intero salvataggio romperebbe il salvataggio delle impostazioni vere.
+ */
+describe('§2bis — PATCH /tenant/info: i campi di piattaforma restano del super_admin', () => {
+  const CAMPI_PIATTAFORMA = {
+    durataMesi: 120,
+    dataAttivazione: '01/01/2020',
+    dataScadenza: '01/01/2099',
+    piano: 'free',
+    stato: 'sospeso',
+  };
+
+  it('un advisor che li manda non li scrive, e il resto del salvataggio passa', async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+
+    const res = await server().inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      headers: auth(),
+      payload: { ...CAMPI_PIATTAFORMA, ragioneSociale: 'Studio di Prova (rinominato)' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(stato.upsert).toHaveLength(1);
+    const scritto = stato.upsert[0].update;
+    for (const chiave of Object.keys(CAMPI_PIATTAFORMA)) {
+      expect(chiave in scritto).toBe(false);
+    }
+    // Controllo positivo: nella stessa richiesta un campo che allo studio spetta **si scrive**.
+    // Senza questo, il test passerebbe anche se la rotta avesse smesso di salvare qualsiasi cosa.
+    expect(scritto.ragioneSociale).toBe('Studio di Prova (rinominato)');
+    // E la riga a database è rimasta quella di prima, non solo l'`update` a essere pulito.
+    expect(stato.tenant.stato).toBe('attivo');
+    expect(stato.tenant.piano).toBe('enterprise');
+  });
+
+  it('restano leggibili: tolti dalla scrittura, non fatti sparire dalla UI', async () => {
+    // `GET /tenant/info` li deve continuare a consegnare — l'intestazione e la scheda studio li
+    // mostrano. Il difetto era che si potevano **scrivere**, non che si vedessero.
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    const res = await server().inject({ method: 'GET', url: '/tenant/info', headers: auth() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().stato).toBe('attivo');
+    expect(res.json().piano).toBe('enterprise');
+  });
+});
+
 describe('§35 — Signal: configurato davvero, o dichiarato spento', () => {
   it('il token del demone è un segreto come gli altri: non esce dal server', async () => {
     stato.tenant = { ...TENANT_CONFIGURATO };

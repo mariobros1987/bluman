@@ -367,8 +367,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       // Tenant, scrivibile da qualunque utente del tenant via questa rotta. Le password
       // vivono solo come hash scrypt su `user.passwordHash` (§23).
       'leadAdvisorNome', 'leadAdvisorEmail', 'giurisdizione',
-      'durataMesi', 'dataAttivazione', 'dataScadenza',
-      'piano', 'stato', 'moduliDisattivati'
+      // I campi di piattaforma — `durataMesi`, `dataAttivazione`, `dataScadenza`, `piano`, `stato` —
+      // NON stanno in questo elenco: sono i termini del contratto fra lo studio e la piattaforma, e
+      // li scrive solo il super_admin dalle rotte `/admin/tenants`. Erano qui, quindi un advisor
+      // poteva cambiarsi il piano o allungarsi la scadenza con una richiesta costruita a mano su
+      // questa rotta (rilievo medio dell'audit del 27/09/2026, chiuso il 05/10/2026). Restano
+      // leggibili da `GET /tenant/info`: la UI li mostra, non li decide.
+      'moduliDisattivati'
     ];
 
     const sanitizedData: Record<string, any> = {};
@@ -381,8 +386,6 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
             : [];
         } else if (key === 'smtpPort' || key === 'imapPort') {
           sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaPorta(rawBody[key], key);
-        } else if (key === 'durataMesi') {
-          sanitizedData[key] = rawBody[key] ? Number(rawBody[key]) : null;
         } else if (key === 'smtpHost' || key === 'imapHost') {
           sanitizedData[key] = rawBody[key] === null || rawBody[key] === '' ? null : validaHost(rawBody[key], key);
         } else if (key === 'smtpServername' || key === 'imapServername') {
