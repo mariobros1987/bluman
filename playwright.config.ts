@@ -1,4 +1,4 @@
-// Configurazione Playwright per i tre flussi critici di BluMan (e2e/README.md).
+// Configurazione Playwright per i quattro flussi critici di BluMan (e2e/README.md).
 //
 // I due webServer partono in questo ordine e Playwright attende che rispondano
 // prima di eseguire i test:

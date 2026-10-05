@@ -1,5 +1,5 @@
 // Seed di overlay per gli E2E Playwright — prepara il database usa-e-getta dei test
-// (container Postgres su localhost:5433) con i dati che i tre flussi critici
+// (container Postgres su localhost:5433) con i dati che i quattro flussi critici
 // richiedono e che il seed master non crea.
 //
 // Regola di sicurezza non negoziabile: questo script legge l'URL del database

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Distribuzione completa da riga di comando: frontend su Vercel (push + CLI), backend su Railway,
-# e — se raggiungibile — anche il VPS Register.it (codice, frontend, database, backend, nginx).
+# Distribuzione completa da riga di comando: frontend su Vercel (il push da solo NON lo pubblica —
+# a pubblicarlo è il deploy della CLI, vedi il passo 3), backend su Railway, e — se raggiungibile —
+# anche il VPS Register.it (codice, frontend, database, backend, nginx).
 #
 # Regole & Sicurezza:
 # - Autore/Committer Git: l'ultimo commit deve avere l'identità attesa da Vercel. La verifica
@@ -13,6 +14,10 @@
 #   Vitest (100% verdi).
 # - Railway up per il backend e Vercel deploy per il frontend, con verifica post-deploy
 #   dell'health e della sonda rotta sul dominio di produzione.
+# - Frontend pubblicato solo dalla CLI: se il deploy della CLI non riesce, lo script si FERMA.
+#   Il deploy del webhook GitHub non lo sostituisce (resta BLOCKED, non viene costruito), quindi
+#   proseguire lascerebbe il frontend vecchio davanti a un backend e un VPS nuovi — la stessa
+#   incoerenza che lo script già rifiuta di lasciare sul VPS.
 # - VPS: il passo gira DOPO il push, perché il server prende il codice da GitHub (`git pull`).
 #   Aggiorna cinque cose distinte e tutte e cinque servono: il **codice** (`git pull`), il
 #   **frontend** (build con `VITE_API_BASE=/api` in un container usa-e-getta), il
@@ -132,9 +137,14 @@ if [ "$SOLO_API" -eq 0 ]; then
   git push origin main
   successo "Push su GitHub (main) completato."
 
-  # Attende che l'ultimo deployment di produzione diventi Ready. Serve solo quando il
-  # deploy è partito dal webhook GitHub, che a volte resta appeso (UNKNOWN, build 0ms,
-  # zero log): in quel caso bisogna saperlo, perché la dashboard serve l'intervento.
+  # Attende che l'ultimo deployment di produzione diventi Ready. È una rete di sicurezza, e
+  # serve a un caso solo: quando il deploy NON l'ha fatto la CLI, perché allora a restare
+  # indietro è il frontend — il deployment del webhook GitHub non viene costruito.
+  #
+  # Non lo fa «ogni tanto»: non lo fa MAI (verificato il 05/10/2026 — in dieci giorni, un push
+  # al giorno, 131 deploy lasciati indietro e nessuno arrivato a Ready). La CLI lo stampa come
+  # UNKNOWN, ma l'API dice `readyState: BLOCKED`: è Vercel che rifiuta di costruirlo, non un
+  # build appeso. Chi pubblica il frontend è `npx vercel --prod`, e nient'altro.
   # NB sul parsing: `vercel inspect` stampa la sua tabella su STDERR, non su stdout —
   # con «2>/dev/null | awk» l'awk riceveva sempre input vuoto e lo stato risultava
   # «sconosciuto» anche a deploy verde (il falso allarme del 14/09). Qui si legge con
@@ -155,9 +165,11 @@ if [ "$SOLO_API" -eq 0 ]; then
     if [ "$ATTESA_OK" -eq 1 ]; then
       successo "Deployment Vercel di produzione Ready: $ULTIMO_URL"
     else
-      avviso "Il deployment Vercel non risulta Ready dopo 4 minuti (stato: ${STATO:-sconosciuto})."
-      echo "  Controlla https://vercel.com/fanta-ia/bluman — se è UNKNOWN con build a 0ms è"
-      echo "  il deployment appeso: rimuovilo dalla dashboard e rilancia 'npx vercel --prod --scope fanta-ia'."
+      avviso "Il deployment Vercel non è Ready (stato: ${STATO:-sconosciuto}): il frontend NON è stato pubblicato."
+      echo "  Se lo stato è UNKNOWN con build a 0ms, l'API lo chiama BLOCKED: è quello che Vercel fa dei"
+      echo "  deploy del webhook GitHub, non un build appeso. Non arriverà Ready, e non ne dice il motivo."
+      echo "  L'unico rimedio è pubblicare con la CLI: npx vercel --prod --scope fanta-ia"
+      return 1
     fi
   }
 
@@ -168,16 +180,18 @@ if [ "$SOLO_API" -eq 0 ]; then
     if npx vercel --prod --scope fanta-ia --yes; then
       # La CLI attende da sé la readiness e risponde con readyState: READY: il frontend
       # È online. Il giro di attesa qui sotto sarebbe solo 4 minuti sprecati su uno
-      # stato già noto — e la sua unica mansione (sorvegliare il webhook appeso) non
-      # esiste quando il deploy l'abbiamo fatto noi.
+      # stato già noto — e la sua unica mansione (accorgersi che il deploy del webhook
+      # è BLOCKED) non esiste quando il deploy l'abbiamo fatto noi.
       successo "Frontend rilasciato e Ready via CLI."
     else
-      avviso "Deploy CLI non riuscito: si aspetta il deploy avviato dal webhook GitHub."
-      attendi_vercel_ready
+      avviso "Deploy CLI non riuscito: il frontend NON è stato pubblicato."
+      attendi_vercel_ready || exit 1
     fi
   else
-    avviso "CLI Vercel non autenticata: salto il deploy CLI. Il webhook GitHub ha comunque avviato un deploy. Per abilitarlo: npx vercel login"
-    attendi_vercel_ready
+    avviso "CLI Vercel non autenticata: salto il deploy CLI, quindi il frontend NON verrà pubblicato."
+    echo "  Il webhook GitHub non pubblica al posto suo: quel deploy resta BLOCKED e nessuno lo costruisce."
+    echo "  Per abilitare la CLI: npx vercel login"
+    attendi_vercel_ready || exit 1
   fi
 fi
 

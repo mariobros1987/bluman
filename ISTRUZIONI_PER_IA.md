@@ -337,18 +337,19 @@ git config user.email "mario.dibenedetto87@gmail.com"   # verificata il 15/09/20
 ```
 
 - `scripts/distribuisci.sh` configura da sé questa identità e **rifiuta di partire** se l'ultimo commit ha un autore diverso (niente amend automatico: la correzione è manuale e consapevole).
-- Il progetto root `bluman` si deploya da solo a ogni push su `main` (integrazione GitHub); il progetto `frontend` si deploya manualmente dalla cartella `frontend/` con `npx vercel --prod`.
-- Verifica stato deploy: `npx vercel ls` (CLI già autenticata).
+- ⚠️ **Il push da solo non pubblica il frontend** (verificato il 05/10/2026): il deploy che l'integrazione GitHub di Vercel crea a ogni push resta `BLOCKED` — la CLI lo stampa `UNKNOWN`, build a `0ms` — e non arriva **mai** Ready. A pubblicare la SPA è **solo** `npx vercel --prod --scope fanta-ia`, che è il passo 3 di `scripts/distribuisci.sh` (da solo, `--solo-push`). Il backend invece sì: Railway auto-deploya da `main` dal 25/09/2026.
+- Verifica stato deploy: `npx vercel ls --prod` (CLI già autenticata); per lo stato vero `npx vercel inspect <url> --json` → `readyState`.
 
 ### 🎭 Suite E2E Playwright (mai sul DB di produzione)
 
 ```bash
-npm run test:e2e     # prepara l'ambiente (container, migrazioni, seed) e gira i 3 flussi critici
+npm run test:e2e     # prepara l'ambiente (container, migrazioni, seed) e gira i 4 flussi critici
 npm run e2e:prepara  # sola preparazione, senza test
 ```
 
-I tre flussi critici (login+cambio password, firma SES da portale con OTP email, fattura dal
-compositore) girano su container Docker usa-e-getta: `bluman-e2e-pg` (Postgres 16, porta
+I quattro flussi critici (login+cambio password, firma SES da portale con OTP email, fattura dal
+compositore, abbinamento di un messaggio del portale alla sua micro-voce) girano su container Docker
+usa-e-getta: `bluman-e2e-pg` (Postgres 16, porta
 **5433**) e `bluman-e2e-mailpit` (SMTP 1025, API 8025). **Non toccano mai Supabase**:
 `scripts/e2e/avvia-backend.mjs` cabla le URL su localhost:5433 prima del `.env`,
 `reuseExistingServer: false` per il backend, e `src/scripts/seedE2E.ts` rifiuta URL

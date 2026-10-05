@@ -10,6 +10,12 @@ lint, build, `vitest run`), controlla l'autore Git richiesto da Vercel, poi push
 `railway up` → Railway. Dopo il deploy verifica health, **che ogni pagina della SPA torni HTML**
 (non il JSON dell'API) e la sonda rotta (401, non 404).
 
+⚠️ **Un `git push` da solo non pubblica il frontend**: il deploy che Vercel crea dal webhook GitHub
+resta `BLOCKED` (build a `0ms`, nessun log) e non arriva mai Ready. A pubblicare la SPA è **solo** il
+deploy della CLI (`npx vercel --prod --scope fanta-ia`), cioè il passo 3 dello script — che per
+questo **si ferma** se quel deploy non riesce, invece di lasciare il frontend vecchio davanti a un
+backend e un VPS nuovi.
+
 Sulla **postazione Windows** del titolare il comando `railway` (wrapper npm) ingoia stdout/exit:
 si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
 
@@ -55,6 +61,9 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
 - Autore ultimo commit ≠ identità Vercel → lo script si ferma (correzione manuale, niente amend auto).
 - Albero sporco → esce con errore (vedi regola sopra).
 - Health/sonda rotta non ok dopo il deploy → fallimento non silenzioso (exit 1).
+- **Deploy CLI Vercel non riuscito** → lo script **esce** (exit 1): il frontend non è stato pubblicato,
+  e il deploy del webhook GitHub non lo sostituisce (resta `BLOCKED`, non viene costruito). Il
+  messaggio dice il rimedio: `npx vercel --prod --scope fanta-ia`.
 
 ## 🔧 Nota tecnica
 - `scripts/distribuisci.sh` (+ `--solo-push` / `--solo-api`); IaC `.railway/railway.ts`; migrazioni
