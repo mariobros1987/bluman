@@ -447,7 +447,7 @@ Configurazione: `vitest.config.ts` + `vitest.setup.ts` (isolamento dal DB reale)
 
 ### 🎭 E2E Playwright (`e2e/` + `scripts/e2e/`)
 
-Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da portale con OTP email, fattura dal compositore). **Non è vitest**: gira su un ambiente usa-e-getta con Docker, mai sul DB Supabase di produzione. Documentazione completa: `e2e/README.md`; comandi `npm run test:e2e` (prepara + gira) e `npm run e2e:prepara` (solo preparazione). Punti tassativi:
+Suite end-to-end dei quattro flussi critici (login con cambio password, firma SES da portale con OTP email, fattura dal compositore, abbinamento di un messaggio del portale alla sua micro-voce). **Non è vitest**: gira su un ambiente usa-e-getta con Docker, mai sul DB Supabase di produzione. Documentazione completa: `e2e/README.md`; comandi `npm run test:e2e` (prepara + gira) e `npm run e2e:prepara` (solo preparazione). Punti tassativi:
 
 - I container `bluman-e2e-pg` (Postgres 16, porta 5433) e `bluman-e2e-mailpit` (SMTP 1025, API 8025) sono l'unico database/SMTP che i test possono toccare. `scripts/e2e/avvia-backend.mjs` cabla le URL su localhost:5433 prima che dotenv carichi il `.env` di produzione, `playwright.config.ts` usa `reuseExistingServer: false` per il backend, e `src/scripts/seedE2E.ts` legge solo da `E2E_DATABASE_URL` rifiutando gli URL non-localhost.
 - `src/scripts/seedE2E.ts` richiede `E2E_PASSWORD` dall'ambiente (il default cablato violerebbe la regola 6: il presidio `src/credenziali.test.ts` scandisce anche `src/scripts/`). Il default vive in `scripts/e2e/prepara.mjs`, fuori dai percorsi scansionati.
@@ -455,6 +455,7 @@ Suite end-to-end dei tre flussi critici (login con cambio password, firma SES da
 - `leggiOtpDaMailpit` (`e2e/helpers.ts`) riconosce l'email di firma dall'oggetto «Codice di sicurezza» e legge il codice dallo span monospace dell'HTML — l'invio è solo HTML e la riga «Codice di firma BluMan:» esiste solo nel testo WhatsApp.
 - `workers: 1` obbligatorio: i flussi condividono il database e quello del portale consuma magic link e OTP soggetti ad anti-abuso.
 - La suite costruisce il database **dalle sole migrazioni versionate**: ogni drift schema/migrazioni (il caso delle tre FK di `20260915172000_allinea_fk_fatture_e_documenti`) emerge qui prima che in produzione.
+- `flusso-abbinamento-microvoce.spec.ts` è il passo 3 del piano `starry-percolating-hearth.md` eseguito dal browser: le due verifiche passano da strade diverse di proposito — la UI dice che l'operatore **vede** il badge giusto sulla bolla e il messaggio nella scheda «💬 Messaggi» della micro-voce, l'API dice che la riga in `comunicazione_microvoce` è stata **scritta**. Un abbinamento disegnato e non salvato le supererebbe una per una. Il canale è il **portale**, che non ha un passo di consegna dopo la scrittura (nessuna riga contatta Meta o un SMTP), e il nome della micro-voce si chiede all'API invece di cablarlo: viene dai template dei moduli e cambierebbe con loro.
 
 ### ☁️ Serverless Functions (`api/`)
 

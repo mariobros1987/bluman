@@ -1,8 +1,9 @@
-# E2E Playwright — i tre flussi critici
+# E2E Playwright — i quattro flussi critici
 
 Suite end-to-end dei flussi che, se si rompono, fermano lo studio e i clienti:
 login con cambio password obbligatorio, firma SES della lettera d'incarico dal
-portale cliente, emissione fattura dal compositore di microvoci.
+portale cliente, emissione fattura dal compositore di microvoci, abbinamento di
+un messaggio del cliente alla micro-voce di cui parla.
 
 ## Architettura: database usa-e-getta, mai produzione
 
@@ -57,11 +58,11 @@ database e quello del portale consuma magic link e OTP soggetti a anti-abuso.
 | :-- | :-- |
 | Password staff (mario, lorenzo) | `E2E_PASSWORD` oppure `E2e-BluMan-2026` |
 | Utente invitato (flusso login) | `mario.dibenedetto@bluecode.advisory` |
-| Advisor attivo (flusso fattura) | `lorenzo.marino@bluecode.advisory` |
+| Advisor attivo (flussi fattura e abbinamento) | `lorenzo.marino@bluecode.advisory` |
 | Cliente portale | `cli-03` — Belfort Industries S.A. |
 | Progetto di test | «Incarico E2E — Belfort Industries» (mod-m01 + mod-m02) |
 
-I tre flussi:
+I quattro flussi:
 
 - `flusso-login.spec.ts` — login dell'invitato, modale «Primo Accesso», cambio
   password, riaccesso con la nuova credenziale.
@@ -71,6 +72,13 @@ I tre flussi:
 - `flusso-fattura.spec.ts` — scheda progetto, tab Fatturazione & SDI,
   compositore con «Tutte da Fatturare», emissione serie FT e verifica sul
   registro `GET /invoices`.
+- `flusso-abbinamento-microvoce.spec.ts` — scheda Comunicazioni, selezione di un
+  messaggio del portale, «🔗 Abbina a micro-voce», badge con il motivo sulla
+  bolla, il messaggio nella scheda «💬 Messaggi» della micro-voce, e lo
+  slegamento che lo lascia nel fascicolo. È il passo 3 del piano
+  `starry-percolating-hearth.md` eseguito dal browser; il messaggio lo crea
+  l'API e non il compositore, perché la cosa da provare è il **legame**, e il
+  canale è il portale perché non ha un passo di consegna dopo la scrittura.
 
 ## Pulizia
 
