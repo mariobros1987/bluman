@@ -11,7 +11,7 @@ interface DigitalSignatureModalProps {
   onSigned: (signature: SignatureData) => void;
   /**
    * Piano di sovrapposizione. Serve quando il pad viene aperto sopra un'altra modale — per
-   * esempio quella della firma SES, che sta a 9999: col valore predefinito il pad si
+   * esempio quella della firma SES, che sta a 11000: col valore predefinito il pad si
    * disegnerebbe dietro e il cliente vedrebbe soltanto lo sfondo scurirsi.
    */
   zIndex?: number;

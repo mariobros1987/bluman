@@ -5,6 +5,11 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
 - **Firma del cliente** (dal Portale, §12): riceve un **OTP** via email/WhatsApp, lo inserisce e firma
   — è una **Firma Elettronica Semplice (OTP verificata) · art. 20 CAD**. Può firmare anche caricando un
   file firmato (`.p7m`) o via provider qualificati (Aruba/InfoCert/Namirial/SPID) per FEQ.
+- **Il passaggio codice → firma**: digitato il codice a 6 cifre, la finestra del codice **si chiude** e
+  compare il **pad** della firma grafica. Il codice è monouso e viene convalidato **insieme** alla
+  firma, non prima: se è errato la firma non si appone, il pad si chiude e si torna al campo per
+  correggerlo. Non esiste una «verifica del codice» separata, e non per dimenticanza: accettarlo
+  consumandolo prima della firma lo renderebbe un oracolo da tentare a ripetizione.
 - **Firma dello studio**: dalla scheda documento (`FirmaStudioModal`), con OTP e sigillo. Firmare a
   nome dello studio è funzione dell'**amministratore** (advisor/super_admin): un collaboratore non
   può, anche se ha i permessi sui documenti. Si firma solo un documento **pubblicato** (né una bozza

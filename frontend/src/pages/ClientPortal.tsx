@@ -728,8 +728,12 @@ export function ClientPortal() {
         )}
       </div>
 
-      {/* 🔐 MODALE DI FIRMA ELETTRONICA SEMPLICE (SES) CON OTP */}
-      {otpModalOpen && (
+      {/* 🔐 MODALE DI FIRMA ELETTRONICA SEMPLICE (SES) CON OTP.
+          Sparisce mentre il pad è aperto (`!padGrafometricaAperto`): il codice è già digitato, e
+          lasciare la maschera sopra il pad significa coprirlo — il pad si apriva dietro e premere
+          «Prosegui» sembrava non fare nulla. Se la convalida rifiuta il codice, il pad si chiude e
+          la maschera torna con l'errore accanto al campo da correggere. */}
+      {otpModalOpen && !padGrafometricaAperto && (
         <FirmaOtpModal
           otpCanale={otpCanale}
           setOtpCanale={setOtpCanale}
@@ -770,8 +774,10 @@ export function ClientPortal() {
           documentTitle={TITOLO_MANDATO}
           signerName={clientName}
           signerRole="Legale Rappresentante / Firmatario"
-          zIndex={10000}
-          notaRegistrazione="✓ Il tratto viene allegato al sigillo insieme al codice monouso che hai appena inserito, alla data e ora UTC e all'impronta SHA-256 del documento."
+          // Sopra ogni altro strato del portale tranne il sigillo: visore del documento 10000,
+          // maschera del codice 11000, modifica-doc 11500, sigillo di successo 12000.
+          zIndex={11800}
+          notaRegistrazione="✓ Il tratto viene allegato al sigillo insieme al codice monouso che hai appena inserito, alla data e ora UTC e all'impronta SHA-256 del documento. Il codice viene convalidato adesso, con la firma: se non è corretto la firma non viene apposta e torni al campo per correggerlo."
           onClose={() => setPadGrafometricaAperto(false)}
           onSigned={async (firma) => {
             // Il pad si chiude prima della chiamata: se la convalida rifiuta il codice
