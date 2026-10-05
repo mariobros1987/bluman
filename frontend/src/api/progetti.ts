@@ -263,6 +263,14 @@ export async function fetchComunicazioniMicrovoceApi(
 export interface ChatDellaPratica {
   canale: string;
   chatId: string;
+  /**
+   * Come si legge la conversazione, quando l'identificativo da solo non basta.
+   *
+   * Sul **portale** il `chatId` è l'id del cliente: mostrarlo tale e quale metterebbe un uuid
+   * davanti all'operatore proprio quando deve scegliere dove armare il contesto. Sugli altri canali
+   * è `null`, e l'identificativo — un numero, un id di chat — è già la cosa leggibile.
+   */
+  nome: string | null;
   ultimoMessaggioAt: string;
   messaggi: number;
   contesto: {

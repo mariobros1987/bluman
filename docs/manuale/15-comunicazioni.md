@@ -15,8 +15,17 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
     quella conversazione nascono abbinati a quella voce.
   - **L'operatore lo decide a mano**: nella scheda Comunicazioni, si seleziona un messaggio (o più) e
     si preme «🔗 Abbina a micro-voce».
-  - **L'operatore lo arma per WhatsApp e Signal**, dove il cliente non ha un link: dal pannello del
-    link, sezione «Micro-voce in ascolto», si sceglie la conversazione e la voce.
+  - **L'operatore lo arma per WhatsApp, Signal e portale**, dove il cliente non ha un link: dal
+    pannello del link, sezione «Micro-voce in ascolto», si sceglie la conversazione e la voce.
+  - **Una volta armato, l'abbinamento è automatico su Telegram, WhatsApp, Signal e portale**: i
+    messaggi *in arrivo* di quella conversazione nascono già legati alla voce. Il portale fa eccezione
+    in una cosa sola: la sua conversazione è il **cliente**, e non avendo un `chatId` di provider
+    compare nell'elenco delle chat col nome del cliente.
+  - **L'email non si abbina**, e non è una mancanza: la posta in arrivo si legge dalla casella e si
+    **mostra** nel fascicolo, non diventa una riga archiviata — non c'è nessuna riga da legare.
+  - **Un messaggio in *uscita* non eredita il contesto**: quello dice «questa conversazione parla di
+    questa voce» dei messaggi che arrivano. Che un messaggio scritto *da dentro* una micro-voce nasca
+    abbinato è un'altra regola, non ancora cablata (l'«eredità»).
 - I canali si configurano in **Impostazioni** (§16).
 
 ## 📐 Calcoli & logica
@@ -43,7 +52,8 @@ tengono onesto, e sono tutte necessarie:
 - **Ha un tetto assoluto**: 7 giorni dall'armamento, **anche se è attivo**. Il rinnovo misura
   l'attività, non la pertinenza: senza tetto, una chat che scrive tutti i giorni non scadrebbe mai.
 - **Cade quando la chat lascia la pratica**, o si sposta su un'altra; e **non abbina un messaggio che
-  è finito in un'altra pratica** (serve su Signal, dove la pratica si deduce dal messaggio).
+  è finito in un'altra pratica** (serve su Signal, dove la pratica si deduce dal messaggio, e sul
+  portale, dove la chiave del contesto è il **cliente** e un cliente ha più pratiche).
 - **Il link della micro-voce non sposta il collegamento**, lo arma soltanto: la chiave del
   collegamento è sulla chat, e una chat parla di tutte le voci della pratica — se la voce spostasse il
   collegamento, un cliente con due moduli lo farebbe saltellare a ogni messaggio.
@@ -61,8 +71,9 @@ tengono onesto, e sono tutte necessarie:
 - Chi non ha il permesso `communications=write` → invio bloccato.
 - **Un messaggio abbinato non si perde mai**: togliere l'abbinamento toglie l'etichetta, non il
   messaggio dal fascicolo.
-- **Il ruolo cliente non può abbinare a mano** (403): dal portale può solo *dichiarare* la voce
-  toccando il link. Non ha né il selettore né la vista dei moduli.
+- **Il ruolo cliente non può abbinare a mano** (403): può solo *dichiarare* la voce toccando il link
+  — e sul **portale**, dove un link non esiste, è l'operatore ad armare il contesto per lui. Non ha
+  né il selettore né la vista dei moduli.
 
 ## 🔧 Nota tecnica
 - Servizi: `src/services/emailRelay.ts`, `imapInbound.ts`, `collegamentoChat.ts`,
@@ -86,6 +97,14 @@ tengono onesto, e sono tutte necessarie:
   **64 caratteri** in `?start=`: la pratica ne usa 55, la micro-voce 56 — un secondo UUID non ci
   starebbe, ed è per questo che il link della voce porta **solo** la voce (la pratica si risale da lì).
   Presidio: `src/collegamentoChat.test.ts`, `src/comunicazioniMicrovoci.test.ts`.
+- **I quattro punti che consultano il contesto armato** — `abbinaAlContesto`, sempre **dentro la
+  stessa transazione** che scrive il messaggio, così non esiste la finestra in cui il fascicolo ha il
+  messaggio e ha perso il motivo per cui è lì: i webhook Telegram e WhatsApp (`src/routes/webhooks.ts`),
+  l'ingestione Signal (`src/services/signalInbound.ts`) e la scrittura dal portale/operatore
+  (`src/routes/progetti.ts`). Sugli ultimi due il `chatId` non arriva da un provider: su Signal è la
+  conversazione dedotta dal messaggio, sul **portale è il cliente**. Presidio:
+  `src/collegamentoChat.test.ts` (7 test sul solo portale: abbinamento, isolamento fra clienti e fra
+  pratiche, scadenza, e il confine dell'uscita).
 - **Le tre origini di un abbinamento** (`comunicazione_microvoce.origine`): `contesto` (il cliente ha
   toccato il link), `manuale` (l'operatore), `eredita` (una risposta a un messaggio già abbinato —
   **non ancora cablata**: dipende dal payload del provider e va verificata per canale prima di

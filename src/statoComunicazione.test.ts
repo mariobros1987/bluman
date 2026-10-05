@@ -57,6 +57,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     cliente: { findFirst: async () => ({ nome: 'Cliente Verificato' }) },
     progetto: {
       findUnique: async () => ({ id: 'proj-1', nome: 'Progetto', cliente: { nome: 'Cliente Verificato' } }),
+      // La lettura che etichetta la conversazione del portale. Qui l'operatore scrive su una
+      // pratica, quindi il cliente non arriva dal token e va cercato: senza questo metodo la
+      // rotta risponde 500, e il rosso parlerebbe di un finto incompleto invece che del codice.
+      findFirst: async () => ({ clienteId: 'cli-1' }),
     },
     // La lettura della chat chiede anche gli abbinamenti alle micro-voci, in una query sola per
     // tutto il fascicolo. Qui non ce ne sono, ma il metodo deve **esistere**: senza, la rotta va in
@@ -64,6 +68,12 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     // sotto fallirebbero con «object is not iterable», che parla di destrutturazione e non del
     // vero motivo.
     comunicazioneMicrovoce: { findMany: async () => [] },
+    // `$transaction` serve alla scrittura di un messaggio, che lega la riga e l'eventuale
+    // abbinamento alla micro-voce in una transazione sola: senza, ogni POST di questo file
+    // esplode con «prisma.$transaction is not a function». Il contesto micro-voce non ha
+    // `findUnique` perché qui non se ne arma mai nessuno — e il finto che rispondesse `null`
+    // comunque non direbbe niente di falso.
+    $transaction: async (fn: any) => fn(prisma),
   };
   return { ...reale, prisma };
 });

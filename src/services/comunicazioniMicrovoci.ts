@@ -442,6 +442,15 @@ export interface ContestoArmato {
 export interface ChatDelProgetto {
   canale: string;
   chatId: string;
+  /**
+   * Come si legge quella conversazione, quando l'identificativo da solo non basta.
+   *
+   * Serve a una cosa sola, e non è cosmetica: sul **portale** il `chatId` è l'id del cliente, e
+   * mostrarlo tale e quale metterebbe un uuid davanti all'operatore nel momento esatto in cui deve
+   * scegliere su quale conversazione armare il contesto. Sugli altri canali l'identificativo *è*
+   * la cosa leggibile — un numero, un id di chat — e resta `null`.
+   */
+  nome: string | null;
   ultimoMessaggioAt: Date;
   messaggi: number;
 }
@@ -470,14 +479,32 @@ export async function elencaChatDelProgetto(
     _count: { _all: true },
     orderBy: { _max: { createdAt: 'desc' } },
   });
-  return righe
+  const chat: ChatDelProgetto[] = righe
     .filter((r): r is typeof r & { chatId: string; _max: { createdAt: Date } } => r.chatId !== null)
     .map((r) => ({
       canale: r.canale,
       chatId: r.chatId,
+      nome: null,
       ultimoMessaggioAt: r._max.createdAt,
       messaggi: r._count._all,
     }));
+
+  // Sul portale il `chatId` è un id di cliente, e un id di cliente non si legge. Una query sola per
+  // tutte le conversazioni del portale della pratica — che è una, perché una pratica ha un cliente:
+  // il `where` sul tenant non è decorativo, perché quei `chatId` arrivano dai messaggi.
+  const idClienti = chat.filter((c) => c.canale === 'portal').map((c) => c.chatId);
+  if (idClienti.length > 0) {
+    const clienti = await prisma.cliente.findMany({
+      where: { tenantId, id: { in: idClienti } },
+      select: { id: true, nome: true },
+    });
+    const nomePerId = new Map(clienti.map((c) => [c.id, c.nome]));
+    for (const c of chat) {
+      if (c.canale === 'portal') c.nome = nomePerId.get(c.chatId) ?? null;
+    }
+  }
+
+  return chat;
 }
 
 /** I contesti armati di una pratica, per mostrarli (e disarmarli) nell'interfaccia. */

@@ -35,6 +35,13 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         cliente: { nome: 'Cliente Verificato' },
       }),
     },
+    // La scrittura di un messaggio lega la riga e l'eventuale abbinamento alla micro-voce in una
+    // transazione sola. Qui non c'è nessun contesto armato — e `findUnique` che risponde `null` è
+    // il modo di dirlo: nessun abbinamento, senza dover fingere un `upsert` che non verrebbe
+    // chiamato. I due metodi devono **esistere**, perché il 500 che manca è
+    // «prisma.$transaction is not a function», che parla del finto e non di questa rotta.
+    contestoMicrovoceChat: { findUnique: async () => null, update: async () => ({}) },
+    $transaction: async (fn: any) => fn(prisma),
     notifica: { create: async () => ({}) },
   };
   return { ...reale, prisma };

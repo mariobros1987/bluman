@@ -67,8 +67,17 @@ export function LinkTelegramProgetto({
   const [occupata, setOccupata] = useState<string | null>(null);
 
   const chiave = (c: { canale: string; chatId: string }) => `${c.canale}\u0000${c.chatId}`;
-  /** Le chat non sono solo Telegram: il nome del canale si mostra, o si legge «telegram» ovunque. */
-  const iconaCanale = (canale: string) => (canale === 'telegram' ? '✈️' : canale === 'whatsapp' ? '💬' : '🔒');
+  /**
+   * Le chat non sono solo Telegram: il nome del canale si mostra, o si legge «telegram» ovunque.
+   *
+   * Il ripiego `🔒` è quello di Signal — l'unico canale cifrato — quindi il **portale** ha il suo:
+   * da quando i suoi messaggi si abbinano alle micro-voci la conversazione compare in questo
+   * elenco, e disegnarla con un lucchetto direbbe una cosa falsa su come viaggia.
+   */
+  const iconaCanale = (canale: string) => (canale === 'telegram' ? '✈️'
+    : canale === 'whatsapp' ? '💬'
+      : canale === 'portal' ? '🧭'
+        : '🔒');
 
   const caricaCollegamenti = async () => {
     try {
@@ -190,7 +199,7 @@ export function LinkTelegramProgetto({
       const r = await armaContestoMicrovoceApi(progettoId, c.canale, c.chatId, mvid);
       setEsito({
         ok: true,
-        testo: `Da adesso i messaggi che arrivano su ${c.canale} ${c.chatId} si abbinano a «${r.microvoce.nome}». `
+        testo: `Da adesso i messaggi che arrivano su ${c.canale} ${c.nome ?? c.chatId} si abbinano a «${r.microvoce.nome}». `
           + 'Il contesto scade da sé se la conversazione cambia argomento.',
       });
       await caricaChat();
@@ -374,8 +383,8 @@ export function LinkTelegramProgetto({
               Micro-voce in ascolto
             </div>
             <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.45, marginBottom: 6 }}>
-              Su WhatsApp e Signal il cliente non può dire di quale voce parla: qui lo dici tu. Vale
-              solo per quella conversazione, e scade da sé.
+              Su WhatsApp, Signal e portale il cliente non può dire di quale voce parla: qui lo dici
+              tu. Vale solo per quella conversazione, e scade da sé.
             </div>
 
             {erroreChat && <div style={{ fontSize: 10.5, color: 'var(--amber)' }}>{erroreChat}</div>}
@@ -394,7 +403,7 @@ export function LinkTelegramProgetto({
                   style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 10.5, padding: '4px 0' }}
                 >
                   <span style={{ color: 'var(--pill-blue-fg)' }}>
-                    {iconaCanale(c.canale)} {c.chatId}
+                    {iconaCanale(c.canale)} {c.nome ?? c.chatId}
                   </span>
                   <span style={{ color: 'var(--muted)' }}>
                     {c.messaggi} msg · ultimo {new Date(c.ultimoMessaggioAt).toLocaleDateString('it-IT')}

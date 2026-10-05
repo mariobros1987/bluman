@@ -37,13 +37,15 @@ const stato: {
   slegati: number;
   /** La riga cliente che l'hook di autenticazione cerca per un token del portale. */
   clientePortale: any;
+  /** Le `where` con cui si è cercata la pratica: serve a presidiare il filtro sul tenant. */
+  ricercheProgetto: any[];
   audits: any[];
   revocati: number;
   contestiDisarmati: number;
 } = {
   tenant: null, pratica: null, microvoce: null, collegamenti: [], comunicazioni: [], chat: [],
   contesti: [], contestiArmati: [], messaggi: [], abbinamenti: [], abbinamentiPerVoce: [],
-  abbinati: [], slegati: 1, clientePortale: null, audits: [], revocati: 1, contestiDisarmati: 0,
+  abbinati: [], slegati: 1, clientePortale: null, ricercheProgetto: [], audits: [], revocati: 1, contestiDisarmati: 0,
 };
 
 // Il parametro è dichiarato perché questi test ispezionano *cosa* è stato spedito
@@ -65,7 +67,14 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
   const finto: any = {
     tenant: { findUnique: async () => stato.tenant },
-    progetto: { findFirst: async () => stato.pratica },
+    progetto: {
+      findFirst: async (args: any) => { stato.ricercheProgetto.push(args?.where); return stato.pratica; },
+      // La rilettura che precede l'avviso allo studio per un messaggio in arrivo. Il finto deve
+      // rispondere: la rotta legge `progetto.cliente.nome` **fuori** dal `catch` dell'avviso,
+      // quindi un `findUnique` assente non produce un avviso perso ma un 500 — e i test
+      // sull'abbinamento in entrata fallirebbero per il finto, sembrando rotti nel servizio.
+      findUnique: async () => stato.pratica,
+    },
     comunicazioneProgetto: {
       create: async (args: any) => {
         stato.comunicazioni.push(args.data);
@@ -90,6 +99,13 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     cliente: {
       findFirst: async (args: any) =>
         stato.clientePortale && stato.clientePortale.id === args?.where?.id ? stato.clientePortale : null,
+      // La risoluzione del nome per le conversazioni del **portale**, dove il `chatId` è un id di
+      // cliente. Il finto rispetta il `tenantId`: un finto che lo ignorasse direbbe che il filtro
+      // c'è anche quando qualcuno l'ha tolto.
+      findMany: async (args: any) => {
+        if (args?.where?.tenantId !== TENANT) return [];
+        return (args?.where?.id?.in ?? []).map((id: string) => ({ id, nome: id === 'cli-1' ? 'Mario Emirati' : `Cliente ${id}` }));
+      },
     },
     // Il legame messaggio ↔ micro-voce. `findMany` serve a **due** letture con due forme diverse —
     // il fascicolo intero e l'elenco di una voce — e le distingue dalla `where`, che è esattamente
@@ -118,6 +134,17 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       deleteMany: async () => ({ count: stato.contestiDisarmati }),
       upsert: async (args: any) => { stato.contestiArmati.push(args); return {}; },
       findMany: async () => stato.contesti,
+      // La lettura che fa `abbinaAlContesto` prima di legare un messaggio in ingresso. Cerca per
+      // la chiave unica `(tenantId, canale, chatId)`: il finto deve guardarla davvero, perché
+      // «il contesto di **questa** chat, e non di un'altra» è esattamente ciò che i test sul
+      // portale devono poter distinguere.
+      findUnique: async (args: any) => {
+        const w = args?.where?.tenantId_canale_chatId ?? {};
+        return stato.contesti.find(c => c.canale === w.canale && c.chatId === w.chatId) ?? null;
+      },
+      // L'abbinamento rinnova la scadenza: senza questo metodo la rotta esplode **dopo** aver
+      // scritto l'abbinamento, cioè con il lavoro già fatto e l'errore che sembra venire da altro.
+      update: async () => ({}),
     },
     // `$transaction` e `$executeRaw` servono a `conContestoInTransazione`, che la revoca e lo
     // spostamento del collegamento attraversano: senza, la rotta esplode con un 500 e il test
@@ -199,6 +226,10 @@ const TENANT_CON_BOT = {
 const praticaCon = (cliente: Record<string, unknown>) => ({
   id: PROGETTO,
   nome: 'Emirati Arabi 123',
+  // Il `clienteId` di primo livello è la colonna che `clienteDellaPratica` legge per etichettare
+  // la conversazione del portale: nel database è un campo della **pratica**, e il cliente
+  // annidato qui sotto è la relazione. Averli tutti e due è ciò che rende il finto fedele.
+  clienteId: 'cli-1',
   cliente: { id: 'cli-1', nome: 'Mario Emirati', email: null, cellulare: null, referentiJson: null, ...cliente },
 });
 
@@ -236,6 +267,7 @@ beforeEach(() => {
   stato.abbinati = [];
   stato.slegati = 1;
   stato.clientePortale = { id: 'cli-1', tenantId: TENANT, nome: 'Mario Emirati', sessionVersion: 0 };
+  stato.ricercheProgetto = [];
   stato.audits = [];
   stato.revocati = 1;
   stato.contestiDisarmati = 0;
@@ -779,6 +811,26 @@ describe('GET /progetti/:id/chat', () => {
     expect(res.json().chat[0].contesto).toBeNull();
   });
 
+  it('la conversazione del portale si nomina col cliente, non col suo uuid', async () => {
+    // Il `chatId` del portale è un id di cliente: senza il nome, l'operatore che deve scegliere su
+    // quale conversazione armare il contesto leggerebbe un uuid — e sarebbe l'unica riga della lista
+    // a non dire a chi appartiene.
+    stato.chat = [{ canale: 'portal', chatId: 'cli-1', _max: { createdAt: new Date('2026-10-03T09:00:00Z') }, _count: { _all: 3 } }];
+
+    const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/chat`, headers: auth() });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().chat[0]).toMatchObject({ canale: 'portal', nome: 'Mario Emirati', messaggi: 3 });
+  });
+
+  it('sugli altri canali il nome resta `null`: lì l\'identificativo *è* la cosa leggibile', async () => {
+    stato.chat = [{ canale: 'whatsapp', chatId: '393351234567', _max: { createdAt: new Date('2026-10-01T09:00:00Z') }, _count: { _all: 7 } }];
+
+    const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/chat`, headers: auth() });
+
+    expect(res.json().chat[0].nome).toBeNull();
+  });
+
   it('la rotta è protetta: senza token 401', async () => {
     const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/chat` });
     expect(res.statusCode).toBe(401);
@@ -814,6 +866,126 @@ describe('GET /progetti/:id/comunicazioni con gli abbinamenti', () => {
     const res = await server().inject({ method: 'GET', url: `/progetti/${PROGETTO}/comunicazioni`, headers: auth() });
 
     expect(res.json()[0].microvoci).toEqual([]);
+  });
+});
+
+/**
+ * Il portale era l'ultimo canale senza abbinamento automatico.
+ *
+ * Telegram, WhatsApp e Signal entrano dai webhook, e il `chatId` della conversazione lo dice il
+ * provider. Il portale un provider non ce l'ha: la sua conversazione è il **cliente**, e la rotta
+ * non lo sa se nessuno glielo dice. Da qui la prima proprietà da presidiare, ed è quella che
+ * *abilita* la funzione: la riga nasce con quel `chatId`, che è la chiave con cui la scheda «chat»
+ * della pratica elenca la conversazione — cioè l'unica su cui l'operatore può armare il contesto.
+ * Senza, la rotta consulterebbe un contesto che nessuno ha modo di creare, e tutti questi test
+ * sarebbero verdi su una funzione inutilizzabile.
+ *
+ * La seconda è il **confine**: si abbina solo in entrata. Il contesto dice «questa conversazione
+ * parla di questa voce» dei messaggi che *arrivano*; un messaggio in uscita scritto da dentro una
+ * micro-voce nascerebbe abbinato per costruzione, che è la seconda regola della Fase 3 e non va
+ * confusa con questa. Il test in fondo lo tiene fermo.
+ */
+describe('il portale consulta il contesto armato sulla conversazione del cliente', () => {
+  const contestoArmato = (extra: Record<string, unknown> = {}) => ({
+    canale: 'portal',
+    chatId: 'cli-1',
+    progettoId: PROGETTO,
+    microvoceProgettoId: MICROVOCE,
+    armatoAt: new Date(),
+    scadeAt: new Date(Date.now() + 3600_000),
+    ...extra,
+  });
+
+  const dalPortale = (extra: Record<string, unknown> = {}) => ({
+    method: 'POST' as const,
+    url: `/progetti/${PROGETTO}/comunicazioni`,
+    headers: auth(),
+    payload: {
+      canale: 'portal', mittente: 'Mario Emirati', destinatario: 'Studio',
+      direzione: 'entrata', testo: 'Ho caricato i documenti della costituzione.', ...extra,
+    },
+  });
+
+  it('un messaggio in entrata nasce già abbinato, e la riga porta il cliente come chat', async () => {
+    stato.contesti = [contestoArmato()];
+
+    const res = await server().inject(dalPortale());
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.comunicazioni[0].chatId).toBe('cli-1');
+    expect(stato.abbinati).toHaveLength(1);
+    expect(stato.abbinati[0].create).toMatchObject({
+      tenantId: TENANT, microvoceProgettoId: MICROVOCE, origine: 'contesto',
+    });
+    // L'abbinamento è agganciato **al messaggio appena scritto**: la transazione esiste proprio
+    // per questo, e un id sbagliato qui sarebbe un legame orfano — invisibile nel fascicolo, che
+    // mostrerebbe il messaggio senza il motivo per cui è lì.
+    expect(stato.abbinati[0].create.comunicazioneId).toBe('com-1');
+  });
+
+  it('senza contesto armato il messaggio entra come sempre, senza abbinarsi', async () => {
+    const res = await server().inject(dalPortale());
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.comunicazioni).toHaveLength(1);
+    expect(stato.abbinati).toEqual([]);
+  });
+
+  it("un contesto armato su un'altra pratica non abbina questo messaggio", async () => {
+    // La chiave del contesto è il **cliente**, e un cliente ha più pratiche: senza il confronto
+    // sulla pratica, una voce del modulo A abbinerebbe i messaggi dell'altra. È lo stesso caso di
+    // Signal, dove il collegamento alla pratica non esiste e la pratica si deduce dal messaggio.
+    stato.contesti = [contestoArmato({ progettoId: ALTRA_PRATICA })];
+
+    const res = await server().inject(dalPortale());
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.abbinati).toEqual([]);
+  });
+
+  it('un messaggio di un altro cliente non si abbina al contesto di questo', async () => {
+    // Il finto cerca per `(canale, chatId)`: se la rotta passasse il cliente sbagliato — o non
+    // passasse niente — il contesto di `cli-1` non si troverebbe. È il controllo che rende il
+    // `chatId` una chiave e non un'etichetta decorativa.
+    stato.contesti = [contestoArmato({ chatId: 'cli-9' })];
+
+    const res = await server().inject(dalPortale());
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.abbinati).toEqual([]);
+  });
+
+  it('il cliente della conversazione si cerca dentro lo studio della richiesta', async () => {
+    // L'id della pratica arriva dal percorso e non è un segreto: senza il `tenantId` nella
+    // `where`, l'id di una pratica di un altro studio farebbe etichettare questa conversazione con
+    // il cliente di quello — e nel portale dell'altro studio comparirebbe una conversazione che
+    // non è sua.
+    await server().inject(dalPortale());
+
+    expect(stato.ricercheProgetto[0]).toEqual({ id: PROGETTO, tenantId: TENANT });
+  });
+
+  it('un contesto scaduto non abbina', async () => {
+    // Il tetto assoluto è nell'altro ramo di `contestoAncoraValido`; qui basta la scadenza per
+    // inattività, che è quella che si rinnova a ogni messaggio abbinato.
+    stato.contesti = [contestoArmato({ scadeAt: new Date(Date.now() - 1000) })];
+
+    const res = await server().inject(dalPortale());
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.abbinati).toEqual([]);
+  });
+
+  it('il messaggio in uscita non eredita il contesto: quello vale per chi arriva', async () => {
+    // L'operatore che risponde dal portale mentre il contesto è armato. Il legame non si crea:
+    // «il messaggio in uscita nasce abbinato per costruzione» è la Fase 3, e non è cablata.
+    stato.contesti = [contestoArmato()];
+
+    const res = await server().inject(dalPortale({ direzione: 'uscita', mittente: 'Studio', destinatario: 'Mario Emirati' }));
+
+    expect(res.statusCode).toBe(201);
+    expect(stato.comunicazioni[0].chatId).toBe('cli-1');
+    expect(stato.abbinati).toEqual([]);
   });
 });
 

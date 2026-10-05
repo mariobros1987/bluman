@@ -16,7 +16,7 @@
 import type { Prisma } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
-import { prisma } from '../util/prismaClient.js';
+import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { operativitaBloccataDaKyc } from '../services/kycGate.js';
 import { notificaStudio } from '../services/notificheService.js';
@@ -31,12 +31,30 @@ import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
 import {
+  abbinaAlContesto,
   abbinaManuale,
   elencaComunicazioniMicrovoce,
   mappaAbbinamentiDelProgetto,
   microvoceDiProgetto,
   rimuoviAbbinamento,
 } from '../services/comunicazioniMicrovoci.js';
+
+/**
+ * Il cliente di una pratica, per etichettare la conversazione del portale.
+ *
+ * `findFirst` con il `tenantId` nella `where`, e non `app.getProgetto`: lì il port **lancia** se la
+ * pratica non è sua, e qui il cliente è un dato accessorio — far fallire la scrittura di un
+ * messaggio perché non si è riusciti a etichettarne la conversazione sarebbe un guasto inventato
+ * dal contorno. Il `tenantId` non è decorativo: senza, l'id di una pratica altrui farebbe
+ * etichettare la conversazione con il cliente di un altro studio.
+ */
+async function clienteDellaPratica(tenantId: string, progettoId: string): Promise<string | null> {
+  const pratica = await prisma.progetto.findFirst({
+    where: { id: progettoId, tenantId },
+    select: { clienteId: true },
+  });
+  return pratica?.clienteId ?? null;
+}
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -186,19 +204,44 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         ? { stato: 'consegnato', consegnatoAt: new Date().toISOString() }
         : { stato: 'da-inviare' };
 
-      const msg = await prisma.comunicazioneProgetto.create({
-        data: {
-          tenantId,
-          progettoId: req.params.id,
-          canale,
-          mittente,
-          destinatario,
-          direzione,
-          testo,
-          allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
-          externalId: JSON.stringify(statoIniziale),
-        },
-      });
+      // Il `chatId` della conversazione, quando questa rotta ne conosce una. Gli altri punti che
+      // scrivono nel fascicolo sono i webhook, e lì il `chatId` lo dice il provider: l'id della
+      // chat Telegram, il numero WhatsApp, l'identificativo Signal. Il **portale** un provider non
+      // ce l'ha: la sua conversazione è il **cliente**, ed è quella la chiave con cui la scheda
+      // «chat» della pratica la elenca — quindi l'unica su cui l'operatore può armare un contesto.
+      // Senza, la conversazione del portale non comparirebbe in quell'elenco, e questa rotta
+      // consulterebbe un contesto che nessuno ha modo di creare.
+      const chatId = canale === 'portal'
+        ? (clienteId ?? await clienteDellaPratica(tenantId, req.params.id))
+        : null;
+
+      const msg = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          const creato = await tx.comunicazioneProgetto.create({
+            data: {
+              tenantId,
+              progettoId: req.params.id,
+              canale,
+              mittente,
+              destinatario,
+              direzione,
+              testo,
+              chatId,
+              allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
+              externalId: JSON.stringify(statoIniziale),
+            },
+          });
+          // Solo in **entrata**: il contesto armato dice «questa conversazione parla di questa
+          // voce», e lo dice dei messaggi che *arrivano* — è ciò che fanno già Telegram, WhatsApp
+          // e Signal. Un messaggio in uscita scritto da dentro una micro-voce nascerebbe abbinato
+          // per costruzione: è la seconda regola della Fase 3, non ancora cablata, e non va
+          // confusa con questa.
+          if (chatId && inEntrata) {
+            await abbinaAlContesto(tx, tenantId, canale, chatId, req.params.id, creato.id);
+          }
+          return creato;
+        }),
+      );
       // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
       if (direzione === 'entrata' || direzione === 'ingresso') {
         const progetto = await prisma.progetto.findUnique({
