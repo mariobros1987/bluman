@@ -41,8 +41,17 @@ scratch/
 .claude/
 
 # Bundle e file della migrazione da Bluecode (esportaDaBluecode.ts → importaInBluecode.ts):
-# contengono documenti e anagrafiche di clienti reali, mai nel repo
+# contiene documenti e anagrafiche di clienti reali, mai nel repo. Gli script invece si
+# versionano: sono codice, non dati.
 .tmp-migrazione/
+
+# Diagnostica usa-e-getta delle sessioni (`.tmp-*.ts`, `.sql`, `.mjs`, `.sh`): resta sulla
+# macchina che l'ha scritta, non entra nel repo.
+.tmp-*
+
+# Trascrizioni complete di terminale e archivio locale di sessione (log grezzi dei dialoghi):
+# restano su questa macchina, mai nel repo.
+.terminal_backup/
 
 # Relitti del vecchio backend Python: mai più nel repo
 
