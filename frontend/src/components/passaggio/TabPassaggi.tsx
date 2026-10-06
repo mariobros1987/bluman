@@ -1,6 +1,6 @@
 import React from 'react';
 import type { DocumentTemplate } from '../../utils/documentTemplates';
-import type { Progetto, Passaggio } from '../../types';
+import type { Passaggio } from '../../types';
 import type { DocumentoEntry } from './types';
 import type { RecommendationResult } from './catalogoModelliStudio';
 import { TYPE_COLOR, TYPE_LABEL } from './passaggioUtils';
@@ -10,12 +10,10 @@ export function TabPassaggi({
   view,
   setView,
   visible,
-  project,
   recommendation,
   toggleDone,
   handleDeleteStep,
   setShowAddStepModal,
-  setPreviewFormValues,
   setPreviewFormModalStep,
   setSelectedDocPreview,
   handleUnlinkStepDoc,
@@ -25,12 +23,10 @@ export function TabPassaggi({
   view: 'operatore' | 'cliente';
   setView: React.Dispatch<React.SetStateAction<'operatore' | 'cliente'>>;
   visible: Passaggio[];
-  project: Progetto;
   recommendation: RecommendationResult;
   toggleDone: (id: string) => void;
   handleDeleteStep: (id: string) => void;
   setShowAddStepModal: React.Dispatch<React.SetStateAction<boolean>>;
-  setPreviewFormValues: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setPreviewFormModalStep: React.Dispatch<React.SetStateAction<Passaggio | null>>;
   setSelectedDocPreview: React.Dispatch<React.SetStateAction<DocumentoEntry | null>>;
   handleUnlinkStepDoc: (stepId: string) => void;
@@ -131,21 +127,11 @@ export function TabPassaggi({
                           <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--purple)' }}>📋 Dati da raccogliere dal cliente:</span>
                           <button
                             type="button"
-                            onClick={() => {
-                              setPreviewFormValues({
-                                'Ragione Sociale': project.cl,
-                                'P.IVA / VAT': 'IT99887766554',
-                                'Legale Rappresentante': 'Mario Dibenedetto',
-                                'Codice Fiscale': 'DBNMRI85M12H501Z',
-                                'Sede Legale': 'Milano (MI) Via Roma 10',
-                                'IBAN Operativo': 'IT99C0306903200100000001234',
-                                'Nome Titolare Effettivo': 'Mario Dibenedetto (100%)',
-                              });
-                              setPreviewFormModalStep(s);
-                            }}
+                            onClick={() => setPreviewFormModalStep(s)}
+                            title="Apre i dati raccolti per questo passaggio: si compilano e si salvano sul passaggio"
                             style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer' }}
                           >
-                            👁 Compila / Visualizza Form
+                            📋 Compila / Visualizza Form
                           </button>
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>

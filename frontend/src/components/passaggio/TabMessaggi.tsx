@@ -23,8 +23,12 @@ import { LinkTelegramProgetto } from '../projectDetail/LinkTelegramProgetto';
  * per una decisione che cambia il fascicolo. Il ritorno c'è comunque, ed è a un clic: ogni card porta
  * alla chat della pratica (`onApriInChat`), che è dove si legge la conversazione intera.
  *
- * Il componente non carica da sé: i messaggi arrivano da `PassaggioModal`, che li chiede una volta
- * sola e così può scrivere il conteggio nella linguetta anche prima che la scheda si apra.
+ * Il componente non carica da sé: i messaggi arrivano da `PassaggioModal`, che li chiede al
+ * montaggio — così può scrivere il conteggio nella linguetta anche prima che la scheda si apra — e
+ * poi li rilegge ogni 30 secondi finché la scheda è aperta. La rilettura sta lì e non qui perché il
+ * conteggio sulla linguetta deve restare fresco quanto l'elenco: una linguetta che dice «3» mentre
+ * dentro ce ne sono quattro è lo stesso difetto che aveva questa scheda quando si caricava una volta
+ * sola.
  */
 export function TabMessaggi({
   messaggi,

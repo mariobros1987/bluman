@@ -385,6 +385,9 @@ export function ProjectDetail() {
                 desc: p.descrizione,
                 file: p.documentoAllegatoUrl,
                 fields: p.campiFormJson,
+                // Le risposte raccolte: senza questa riga la scheda «Compila / Visualizza
+                // Form» riaprirebbe vuota su dati che a database ci sono già.
+                risposte: p.risposteFormJson ?? undefined,
               })) : undefined),
               note: savedNotes,
             };

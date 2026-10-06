@@ -28,6 +28,8 @@ import { TabMessaggi } from './passaggio/TabMessaggi';
 import { ComposerMicrovoce } from './passaggio/ComposerMicrovoce';
 import { ModaleCatalogo } from './passaggio/ModaleCatalogo';
 import { ModaleConfigFirma } from './passaggio/ModaleConfigFirma';
+import { ModaleNuovaAzione } from './passaggio/ModaleNuovaAzione';
+import { ModaleFormPassaggio } from './passaggio/ModaleFormPassaggio';
 import { closeBtnStyle } from './passaggio/passaggioStyles';
 
 interface PassaggioModalProps {
@@ -109,11 +111,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const [showCatalogModal, setShowCatalogModal] = useState(false);
   const [selectedCatalogCategory, setSelectedCatalogCategory] = useState<string>('ALL');
 
-  // Form master preview state
-  const [, setPreviewFormModalStep] = useState<Passaggio | null>(null);
-  const [, setPreviewFormValues] = useState<Record<string, string>>({});
-
-  const [, setShowAddStepModal] = useState(false);
+  // Le due schede della checklist. Erano state cancellate per sbaglio dal commit `8b1d9e21`,
+  // che portò via stato, handler e JSX lasciando i pulsanti a chiamare setter che nessuno
+  // leggeva: da fuori, «il pulsante non fa niente». I modali sono tornati come componenti di
+  // modulo (`passaggio/ModaleNuovaAzione`, `passaggio/ModaleFormPassaggio`), con lo stato qui —
+  // la stessa forma di `showCatalogModal` e `configFirmaModal` qui sotto.
+  const [showAddStepModal, setShowAddStepModal] = useState(false);
+  const [previewFormModalStep, setPreviewFormModalStep] = useState<Passaggio | null>(null);
 
   const doneN = steps.filter(s => s.stato === 'done').length;
   const visible = view === 'operatore' ? steps : steps.filter(s => s.who === 'cliente');
@@ -144,6 +148,55 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (onSaveVoce) {
       onSaveVoce(nextSteps, notes, documents.length);
     }
+  };
+
+  /**
+   * Il passaggio nuovo in fondo alla checklist, con le stesse regole dei passaggi che ci sono già.
+   *
+   * L'`id` comincia per `p-` di proposito: la rotta di salvataggio (`src/routes/progetti.ts`)
+   * riconosce proprio quel prefisso come «identificativo locale, non ancora a database» e crea la
+   * riga lasciando che sia il database a dare l'uuid. Un id locale di forma diversa verrebbe
+   * scambiato per un id esistente e la riga verrebbe scritta con una chiave inventata dal browser.
+   */
+  const handleCreateStep = (dati: {
+    title: string;
+    desc: string;
+    type: Passaggio['type'];
+    who: Passaggio['who'];
+    fields?: string[];
+  }) => {
+    const nuovo: Passaggio = {
+      id: `p-${Date.now()}`,
+      title: dati.title,
+      desc: dati.desc,
+      type: dati.type,
+      who: dati.who,
+      stato: 'pending',
+      fields: dati.fields,
+    };
+    const nextSteps = [...steps, nuovo];
+    setSteps(nextSteps);
+    voce.proc = nextSteps;
+    if (onSaveVoce) onSaveVoce(nextSteps, notes, documents.length);
+    setShowAddStepModal(false);
+    toast.successo(`Passaggio «${nuovo.title}» aggiunto alla checklist.`);
+  };
+
+  /**
+   * Le risposte raccolte sul form, legate al passaggio e salvate per intero.
+   *
+   * Si sostituisce l'oggetto invece di fondere i campi: la scheda manda **tutte** le caselle che ha
+   * disegnato, quindi un campo svuotato dall'operatore deve sparire. Fondere lascerebbe in vita il
+   * valore vecchio di una casella che a schermo è vuota — cioè un dato che l'operatore crede di
+   * aver cancellato e che invece è ancora nel fascicolo.
+   */
+  const handleSalvaRisposte = (stepId: string, risposte: Record<string, string>) => {
+    const nextSteps = steps.map(s => (s.id === stepId ? { ...s, risposte } : s));
+    setSteps(nextSteps);
+    voce.proc = nextSteps;
+    if (onSaveVoce) onSaveVoce(nextSteps, notes, documents.length);
+    setPreviewFormModalStep(null);
+    toast.successo('Dati del form salvati sul passaggio.');
   };
 
   const handleAddNote = (e: React.FormEvent) => {
@@ -363,16 +416,26 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const [messaggiMicrovoce, setMessaggiMicrovoce] = useState<MessaggioDiMicrovoce[]>([]);
   const [erroreMessaggi, setErroreMessaggi] = useState<string | null>(null);
   const [caricandoMessaggi, setCaricandoMessaggi] = useState(false);
+  /** Una lettura è già in volo: la rilettura in sottofondo non ne accoda una seconda. */
+  const letturaInCorso = useRef(false);
 
-  // Una funzione sola per il primo caricamento e per la rilettura dopo un invio: due versioni della
-  // stessa lettura darebbero due elenchi aggiornati in modo diverso a seconda di come ci si arriva.
-  const caricaMessaggi = useCallback(async () => {
+  // Una funzione sola per il primo caricamento, per la rilettura dopo un invio e per quella in
+  // sottofondo: due versioni della stessa lettura darebbero due elenchi aggiornati in modo diverso
+  // a seconda di come ci si arriva.
+  //
+  // `silenzioso` esiste per il giro automatico, e non è una comodità: `caricandoMessaggi` è ciò che
+  // la linguetta mostra come «…» al posto del conteggio, quindi un aggiornamento in sottofondo che
+  // la toccasse farebbe lampeggiare l'intestazione ogni trenta secondi. Il conteggio si aggiorna
+  // quando arrivano i dati, senza che nessuno debba vedere che li sta chiedendo.
+  const caricaMessaggi = useCallback(async (opzioni: { silenzioso?: boolean } = {}) => {
     if (!effMicrovoceId) {
       setMessaggiMicrovoce([]);
       setErroreMessaggi(null);
       return;
     }
-    setCaricandoMessaggi(true);
+    if (opzioni.silenzioso && letturaInCorso.current) return;
+    letturaInCorso.current = true;
+    if (!opzioni.silenzioso) setCaricandoMessaggi(true);
     try {
       const r = await fetchComunicazioniMicrovoceApi(effMicrovoceId);
       setMessaggiMicrovoce(r.messaggi);
@@ -382,11 +445,33 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       // che è una cosa diversa da «non sono riuscito a leggerlo» (regola 7).
       setErroreMessaggi(err instanceof Error ? err.message : 'Messaggi della micro-voce non disponibili.');
     } finally {
-      setCaricandoMessaggi(false);
+      letturaInCorso.current = false;
+      if (!opzioni.silenzioso) setCaricandoMessaggi(false);
     }
   }, [effMicrovoceId]);
 
-  useEffect(() => { caricaMessaggi(); }, [caricaMessaggi]);
+  useEffect(() => { void caricaMessaggi(); }, [caricaMessaggi]);
+
+  /**
+   * La rilettura in sottofondo, ogni 30 secondi, finché la scheda è aperta.
+   *
+   * **Senza, questa scheda mentiva.** I messaggi si leggevano una volta sola, al montaggio: un
+   * messaggio che arrivava dal cliente mentre l'operatore aveva la voce aperta non compariva mai, e
+   * per vederlo bisognava chiudere la voce e riaprirla — il giro che il titolare ha descritto come
+   * «devo andare nella chat generale e poi riaprire il modale». La chat della pratica lo fa già da
+   * sempre (`ComunicazioniTab`), ed è per questo che lì il messaggio si vedeva: la scheda della voce
+   * era l'unico posto dove i messaggi arrivavano e restavano invisibili.
+   *
+   * Trenta secondi e non cinque: è **lo stesso intervallo della chat**, scelto con l'audit del
+   * 21/09/2026 perché ogni giro è una query su `comunicazione_progetto` e la RLS la rende cara. Un
+   * intervallo diverso qui vorrebbe dire due tarature da difendere con lo stesso argomento.
+   *
+   * Il caso «nessun id a database» non costa niente: `caricaMessaggi` esce prima di chiedere.
+   */
+  useEffect(() => {
+    const interval = setInterval(() => { void caricaMessaggi({ silenzioso: true }); }, 30_000);
+    return () => clearInterval(interval);
+  }, [caricaMessaggi]);
 
   /**
    * Su che canale si risponde di solito in questa voce: quello dell'ultimo messaggio che c'è.
@@ -680,12 +765,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             view={view}
             setView={setView}
             visible={visible}
-            project={project}
             recommendation={recommendation}
             toggleDone={toggleDone}
             handleDeleteStep={handleDeleteStep}
             setShowAddStepModal={setShowAddStepModal}
-            setPreviewFormValues={setPreviewFormValues}
             setPreviewFormModalStep={setPreviewFormModalStep}
             setSelectedDocPreview={setSelectedDocPreview}
             handleUnlinkStepDoc={handleUnlinkStepDoc}
@@ -745,7 +828,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                 nomeCliente={project.cl}
                 cliente={cliente}
                 canalePredefinito={canalePredefinito}
-                onInviato={caricaMessaggi}
+                onInviato={() => void caricaMessaggi()}
               />
             ) : null}
           />
@@ -779,6 +862,23 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             configFirmaModal={configFirmaModal}
             setConfigFirmaModal={setConfigFirmaModal}
             eseguiSalvataggioConfigurato={eseguiSalvataggioConfigurato}
+          />
+        )}
+
+        {/* Le due schede della checklist, ripristinate: l'azione nuova, e i dati del form. */}
+        {showAddStepModal && (
+          <ModaleNuovaAzione
+            onChiudi={() => setShowAddStepModal(false)}
+            onCrea={handleCreateStep}
+          />
+        )}
+
+        {previewFormModalStep && (
+          <ModaleFormPassaggio
+            step={previewFormModalStep}
+            nomeCliente={project.cl}
+            onChiudi={() => setPreviewFormModalStep(null)}
+            onSalva={(risposte) => handleSalvaRisposte(previewFormModalStep.id, risposte)}
           />
         )}
       </div>

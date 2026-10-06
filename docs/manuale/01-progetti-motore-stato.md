@@ -17,6 +17,12 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   **2026-10-06** elenca i messaggi scambiati col cliente **che riguardano questa voce**, dice *perché*
   ciascuno è lì (badge colorato per origine) e — in fondo — ha il **compositore** per rispondere
   restando dove si sta leggendo. Il messaggio nasce **già abbinato** alla voce (§15).
+- **La checklist si modifica da qui**: **➕ Aggiungi Azione** crea un passaggio nuovo (titolo, tipo,
+  assegnatario; per il tipo *Form* si scrivono anche i campi da chiedere). Un passaggio di tipo *Form*
+  porta il tasto **📋 Compila / Visualizza Form**, dove si registrano le risposte che il cliente ha
+  comunicato a voce, per email o di persona; restano scritte sul passaggio e si rileggono alla
+  riapertura. **Un passaggio di tipo *Documento* nasce senza documento**: l'atto si collega dalla
+  scheda con «⚡ Collega Consigliato» o «📂 Scegli Modello», e nessun nome di file viene inventato.
 - **Chiusura / fine anno**: un progetto con fatture **non si elimina**, si **archivia** (resta
   consultabile con `?includiArchiviati=true`).
 
@@ -100,7 +106,9 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
 - **Schema** (`prisma/schema.prisma`): `Progetto`, `ModuloProgetto`, `MicrovoceProgetto`,
   `PassaggioProgetto`, `ModuloProgettoDipendenza`, `MicrovoceModuloCondiviso`.
 - **Frontend**: `pages/Projects.tsx` (elenco), `pages/ProjectDetail.tsx` + `components/projectDetail/`
-  (`ModuliTab`, `ModuloBlock`, grafo `GrafoModuliProgettoView`), `PassaggioModal`.
+  (`ModuliTab`, `ModuloBlock`, grafo `GrafoModuliProgettoView`), `PassaggioModal` (la shell delle
+  quattro schede) e `components/passaggio/` (`TabPassaggi`, `TabMessaggi`, `ModaleNuovaAzione`,
+  `ModaleFormPassaggio`).
 - **La scheda «💬 Messaggi» di una voce** (`components/passaggio/TabMessaggi.tsx`) è **proiezione**, non
   una seconda casella: il messaggio è **una riga sola** in `comunicazione_progetto`, e la scheda ne
   mostra quelle abbinate. «Compare in entrambi i posti» (voce e chat della pratica) è vero e gratis: non
@@ -110,4 +118,19 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
   (così aprire la checklist non fa una richiesta di rete che non serve). Abbinare e **slegare** restano
   nella chat, dove si vede la conversazione intorno: dalla voce c'è il ritorno «Apri nella chat della
   pratica →».
+- **I messaggi della voce si rileggono da soli ogni 30 s**, come la chat della pratica. La rilettura sta
+  in `PassaggioModal` e non in `TabMessaggi` perché il **conteggio sulla linguetta** deve restare fresco
+  quanto l'elenco; è «silenziosa» (non tocca lo stato di caricamento), o il conteggio lampeggerebbe ogni
+  mezzo minuto. Prima si leggeva **una volta sola al montaggio**: un messaggio arrivato da Telegram
+  compariva nella chat e non nella voce, e si vedeva solo riaprendo il modale.
+- **Le due schede della checklist** (`components/passaggio/ModaleNuovaAzione.tsx` e
+  `ModaleFormPassaggio.tsx`) erano state cancellate per sbaglio dal commit `8b1d9e21`, lasciando i
+  pulsanti a non fare niente; ripristinate il **2026-10-06** senza tre cose che non stanno in un
+  fascicolo — il documento inventato dal nome del cliente, la precompilazione con P.IVA/IBAN/codice
+  fiscale **falsi**, e la scritta «✓ Dati verificati dal sistema KYC», che nessun controllo aveva
+  prodotto. Le risposte si salvano in `passaggio_progetto.risposte_form_json` (il gemello
+  `campi_form_json` porta le domande e lo popola l'istanziazione dal modello): la rotta
+  `PUT /progetti/:id/stato-completo` accetta **solo** le forme che il rendering sa disegnare — elenco di
+  stringhe per i campi, oggetto di stringhe per le risposte — e un passaggio che non ne porta nessuna
+  **non azzera** quelle che ha.
 - **Fonti**: `AUDIT_2026-09-27/03-progetti-motore-stato.md`, `.agents/AGENTS.md`.

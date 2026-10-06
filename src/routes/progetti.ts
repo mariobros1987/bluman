@@ -1077,6 +1077,25 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               ? p.livelloFirmaRichiesto
               : undefined;
 
+            // I campi del form e le risposte raccolte: due colonne `Json?` che esistono dal
+            // primo giorno e che nessuno scriveva da qui. La prima la popola l'istanziazione
+            // dal modello (`prismaIstanziazionePort`), la seconda non aveva ancora nessuno
+            // scrittore — la scheda che doveva compilarla era stata cancellata per sbaglio
+            // (vedi `passaggio/ModaleFormPassaggio.tsx`).
+            //
+            // Si accettano **solo** le due forme che il rendering sa leggere — array di
+            // stringhe per i campi, oggetto di stringhe per le risposte — perché una colonna
+            // Json accetta qualunque cosa: un client che manda un numero, una stringa o un
+            // array dove serve un oggetto la scriverebbe senza che nessuno se ne accorga, e
+            // poi `TabPassaggi` chiamerebbe `.map` su un valore che non è un array. Meglio
+            // scartare la forma storta che salvare un dato che non si potrà più disegnare.
+            const campiForm = Array.isArray(p.fields) && p.fields.every((f: unknown) => typeof f === 'string')
+              ? (p.fields as string[])
+              : undefined;
+            const risposteForm = p.risposte && typeof p.risposte === 'object' && !Array.isArray(p.risposte)
+              ? (p.risposte as Record<string, string>)
+              : undefined;
+
             // Ogni passaggio si salva per conto suo: il vecchio catch avvolgeva l'intero
             // ciclo, quindi il primo errore trascinava nel silenzio tutti i passaggi
             // successivi. Chi fallisce si dichiara in «nonSalvate», che la risposta
@@ -1095,6 +1114,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
                     ...(livelloRichiesta && { livelloFirmaRichiesto: livelloRichiesta }),
+                    // `undefined` in un `update` significa «non toccare la colonna»: un
+                    // passaggio che non porta campi né risposte non azzera quelli che ha.
+                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
+                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
                   },
                   create: {
                     id: pId,
@@ -1109,6 +1132,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
                     livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
+                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
+                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
                   },
                 });
               } else {
@@ -1125,6 +1150,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
                     documentoAllegatoUrl: docAllegato,
                     richiedeFirmaCliente: richiedeFirma,
                     livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
+                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
+                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
                   },
                 });
               }

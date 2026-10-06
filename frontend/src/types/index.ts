@@ -134,6 +134,15 @@ export interface Passaggio {
   file?: string | null;
   fileSize?: number;
   fields?: string[];
+  /**
+   * Le risposte raccolte per un passaggio di tipo `form`: campo → valore.
+   *
+   * È il gemello di `fields` sul lato delle risposte, e sta a database in
+   * `passaggio_progetto.risposte_form_json`. L'operatore le registra da
+   * «Compila / Visualizza Form» quando il cliente gliele passa a voce, per email o
+   * di persona: il portale non ha ancora una scheda che le raccolga da solo.
+   */
+  risposte?: Record<string, string>;
   documentoAllegatoUrl?: string;
   formMasterId?: string;
   linkIstruzioni?: string;

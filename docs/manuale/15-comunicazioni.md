@@ -27,6 +27,10 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
     compositore, con tutti e cinque i canali e gli allegati. Il messaggio nasce **già abbinato**
     (`origine: microvoce`): non si risponde più uscendo dalla voce, andando in Comunicazioni e
     ritrovando la conversazione fra i messaggi di tutta la pratica.
+    - **L'elenco si aggiorna da sé ogni 30 s**, come la chat della pratica: un messaggio che arriva
+      da Telegram o dal portale compare nella voce **senza doverla chiudere e riaprire**. Prima si
+      leggeva una volta sola all'apertura, e la cosa si notava nel modo peggiore — il messaggio
+      c'era nella chat e non nella voce, e riaprire il modale lo faceva comparire.
     - Il canale predefinito è **quello dell'ultimo messaggio di quella voce** (se la voce è vuota:
       il **portale**, l'unico canale che non contatta nessuno). Resta un predefinito: appena
       l'operatore lo cambia, la sua scelta vince.
