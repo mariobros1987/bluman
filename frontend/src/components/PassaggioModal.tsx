@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './ui/ToastProvider';
 import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
@@ -15,8 +15,9 @@ import {
   scaricaDocumentoWordClient,
   urlFileArchivio,
 } from '../api/client';
-import type { Progetto, Passaggio } from '../types';
+import type { Progetto, Passaggio, Cliente } from '../types';
 import { fetchComunicazioniMicrovoceApi, type MessaggioDiMicrovoce } from '../api/progetti';
+import type { CanaleInvio } from '../hooks/useInvioComunicazione';
 import { ALL_STUDIO_TEMPLATES, getSmartDocumentRecommendation } from './passaggio/catalogoModelliStudio';
 import { getDefaultPassaggi } from './passaggio/passaggioUtils';
 import type { ConfigFirmaModalState, DocumentoEntry, NoteEntry } from './passaggio/types';
@@ -24,6 +25,7 @@ import { TabPassaggi } from './passaggio/TabPassaggi';
 import { TabNote } from './passaggio/TabNote';
 import { TabDocumenti } from './passaggio/TabDocumenti';
 import { TabMessaggi } from './passaggio/TabMessaggi';
+import { ComposerMicrovoce } from './passaggio/ComposerMicrovoce';
 import { ModaleCatalogo } from './passaggio/ModaleCatalogo';
 import { ModaleConfigFirma } from './passaggio/ModaleConfigFirma';
 import { closeBtnStyle } from './passaggio/passaggioStyles';
@@ -38,9 +40,30 @@ interface PassaggioModalProps {
   progettoDbId?: string;
   /** Id DB della microvoce (uuid), necessario per collegare il documento alla microvoce. */
   microvoceDbId?: string;
+  /**
+   * Porta alla chat della pratica. Lo fornisce `ProjectDetail`, che è l'unico a sapere che la
+   * chat è una scheda della pagina: il modale si limita a chiudersi e a chiedere il cambio.
+   */
+  onApriInChat?: () => void;
+  /**
+   * L'anagrafica del cliente della pratica, per i recapiti del compositore.
+   *
+   * Il modale non la cerca da sé: `ProjectDetail` ce l'ha già in memoria per la scheda
+   * Comunicazioni, e una seconda lettura qui darebbe due pareri diversi sullo stesso cliente — con
+   * il canale disponibile in una vista e non nell'altra.
+   */
+  cliente?: Cliente | null;
 }
 
-export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, progettoDbId, microvoceDbId }: PassaggioModalProps) {
+/**
+ * I canali che possono essere il «canale dell'ultimo messaggio» di una voce.
+ *
+ * Serve a riconoscere un `canale` che arriva dal database invece di fidarsi: la colonna è una
+ * stringa libera, e un valore che non è un canale non deve finire nel selettore del compositore.
+ */
+const CANALI_ULTIMO_MESSAGGIO: CanaleInvio[] = ['email', 'whatsapp', 'telegram', 'signal', 'portal'];
+
+export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, progettoDbId, microvoceDbId, onApriInChat, cliente }: PassaggioModalProps) {
   const toast = useToast();
   const effProgettoId = progettoDbId || (project as any)?.dbId || (project as any)?.id;
   const mod = project.mods.find(m => m.id === mid)!;
@@ -341,29 +364,41 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const [erroreMessaggi, setErroreMessaggi] = useState<string | null>(null);
   const [caricandoMessaggi, setCaricandoMessaggi] = useState(false);
 
-  useEffect(() => {
+  // Una funzione sola per il primo caricamento e per la rilettura dopo un invio: due versioni della
+  // stessa lettura darebbero due elenchi aggiornati in modo diverso a seconda di come ci si arriva.
+  const caricaMessaggi = useCallback(async () => {
     if (!effMicrovoceId) {
       setMessaggiMicrovoce([]);
       setErroreMessaggi(null);
       return;
     }
-    let montato = true;
     setCaricandoMessaggi(true);
-    fetchComunicazioniMicrovoceApi(effMicrovoceId)
-      .then((r) => {
-        if (!montato) return;
-        setMessaggiMicrovoce(r.messaggi);
-        setErroreMessaggi(null);
-      })
-      .catch((err) => {
-        if (!montato) return;
-        // Il motivo vero e non una lista vuota: una lista vuota direbbe «non ha scritto niente»,
-        // che è una cosa diversa da «non sono riuscito a leggerlo» (regola 7).
-        setErroreMessaggi(err instanceof Error ? err.message : 'Messaggi della micro-voce non disponibili.');
-      })
-      .finally(() => { if (montato) setCaricandoMessaggi(false); });
-    return () => { montato = false; };
+    try {
+      const r = await fetchComunicazioniMicrovoceApi(effMicrovoceId);
+      setMessaggiMicrovoce(r.messaggi);
+      setErroreMessaggi(null);
+    } catch (err) {
+      // Il motivo vero e non una lista vuota: una lista vuota direbbe «non ha scritto niente»,
+      // che è una cosa diversa da «non sono riuscito a leggerlo» (regola 7).
+      setErroreMessaggi(err instanceof Error ? err.message : 'Messaggi della micro-voce non disponibili.');
+    } finally {
+      setCaricandoMessaggi(false);
+    }
   }, [effMicrovoceId]);
+
+  useEffect(() => { caricaMessaggi(); }, [caricaMessaggi]);
+
+  /**
+   * Su che canale si risponde di solito in questa voce: quello dell'ultimo messaggio che c'è.
+   *
+   * È un predefinito e non un vincolo, e il ripiego è `portal` — l'unico canale che non contatta
+   * nessuno: se la voce è vuota non c'è nessuna abitudine da rispettare, e non si sceglie al posto
+   * dell'operatore un canale che spedisce davvero (Meta, un SMTP) solo perché è il primo dell'elenco.
+   */
+  const canaleUltimoMessaggio = messaggiMicrovoce[messaggiMicrovoce.length - 1]?.canale as CanaleInvio | undefined;
+  const canalePredefinito: CanaleInvio = canaleUltimoMessaggio && CANALI_ULTIMO_MESSAGGIO.includes(canaleUltimoMessaggio)
+    ? canaleUltimoMessaggio
+    : 'portal';
 
   const ricaricaDocumentiDb = async () => {
     if (!effProgettoId) return;
@@ -691,7 +726,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           />
         )}
 
-        {/* Body TAB 4: Messaggi del cliente su questa micro-voce (sola lettura) */}
+        {/* Body TAB 4: Messaggi del cliente su questa micro-voce */}
         {activeTab === 'messaggi' && (
           <TabMessaggi
             messaggi={messaggiMicrovoce}
@@ -699,6 +734,20 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             progettoId={effProgettoId ? String(effProgettoId) : undefined}
             microvoceId={effMicrovoceId ? String(effMicrovoceId) : undefined}
             microvoceNome={voce.n}
+            onApriInChat={onApriInChat}
+            // Si scrive da qui solo se la voce esiste a database: senza il suo id il messaggio non
+            // potrebbe nascere abbinato, e un compositore che scrive senza legare sarebbe la cosa
+            // peggiore — l'operatore crederebbe di aver risposto «dentro la voce» e non è vero.
+            composer={effProgettoId && effMicrovoceId ? (
+              <ComposerMicrovoce
+                progettoId={String(effProgettoId)}
+                microvoceProgettoId={String(effMicrovoceId)}
+                nomeCliente={project.cl}
+                cliente={cliente}
+                canalePredefinito={canalePredefinito}
+                onInviato={caricaMessaggi}
+              />
+            ) : null}
           />
         )}
 

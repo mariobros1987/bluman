@@ -17,7 +17,7 @@
  */
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { conStatoComunicazione, leggiMetaComunicazione } from './util/statoComunicazione.js';
+import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from './util/statoComunicazione.js';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -184,6 +184,59 @@ describe('external_id — lettura e scrittura dello stato', () => {
       .toBe('rifiutato da Meta');
     // `null` è una scelta esplicita: il motivo vecchio non resta appeso a un invio riuscito.
     expect(leggiMetaComunicazione(conStatoComunicazione(prima, { stato: 'inviato', errore: null })).errore).toBeNull();
+  });
+});
+
+describe('proiettaRecapito — la stessa lettura per il fascicolo e per la micro-voce', () => {
+  // La proiezione è stata estratta perché la scheda «💬 Messaggi» della micro-voce deve dire lo
+  // stesso stato della chat: due copie della regola «in entrata ⇒ consegnato» avrebbero dato due
+  // risposte sullo stesso messaggio, ed è la classe di guasto per cui questo file esiste.
+  const CREATO = new Date('2026-10-06T09:30:00Z');
+
+  it('in uscita senza meta non dichiara nessuno stato, e nessuna data', () => {
+    const recapito = proiettaRecapito('uscita', null, CREATO);
+
+    expect(recapito.stato).toBeNull();
+    // Il difetto gemello delle spunte blu: prendere `createdAt` come momento della consegna. Qui
+    // `createdAt` è quando l'operatore ha scritto, cioè l'opposto di un fatto del provider.
+    expect(recapito.consegnatoAt).toBeNull();
+    expect(recapito.inviatoAt).toBeNull();
+    expect(recapito.errore).toBeNull();
+  });
+
+  it('in entrata è consegnato, e la data di arrivo è il `createdAt`', () => {
+    const recapito = proiettaRecapito('entrata', 'telegram:12345', CREATO);
+
+    expect(recapito.stato).toBe('consegnato');
+    expect(recapito.consegnatoAt).toBe(CREATO.toISOString());
+  });
+
+  it('una riga in entrata già letta resta `letto`, con la sua data', () => {
+    const externalId = conStatoComunicazione('telegram:12345', { stato: 'letto', lettoAt: '2026-10-06T11:00:00.000Z' });
+    const recapito = proiettaRecapito('entrata', externalId, CREATO);
+
+    expect(recapito.stato).toBe('letto');
+    expect(recapito.lettoAt).toBe('2026-10-06T11:00:00.000Z');
+    // La deduzione non sovrascrive quello che la colonna dichiara.
+    expect(recapito.consegnatoAt).toBeNull();
+  });
+
+  it('un rifiuto porta il suo motivo, e non una consegna', () => {
+    const externalId = conStatoComunicazione(null, { stato: 'non-inviato', errore: 'Meta: numero non registrato' });
+    const recapito = proiettaRecapito('uscita', externalId, CREATO);
+
+    expect(recapito.stato).toBe('non-inviato');
+    expect(recapito.errore).toBe('Meta: numero non registrato');
+    expect(recapito.consegnatoAt).toBeNull();
+  });
+
+  it('la chiave di idempotenza del provider non diventa una consegna', () => {
+    // Sulle righe in entrata `externalId` porta `whatsapp:<wamid>`: leggerlo come stato
+    // inventerebbe un fatto che nessuno ha dichiarato.
+    const recapito = proiettaRecapito('uscita', 'whatsapp:wamid.ABCDEF', CREATO);
+
+    expect(recapito.stato).toBeNull();
+    expect(recapito.consegnatoAt).toBeNull();
   });
 });
 

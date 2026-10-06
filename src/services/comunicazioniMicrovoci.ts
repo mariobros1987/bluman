@@ -12,19 +12,34 @@
  * che indovinare *a chi appartiene*, quindi la stessa conclusione vale a maggior ragione — e questo
  * esclude sia i tag nel testo (li leggerebbe il cliente) sia un modello che decide da solo.
  *
- * Tre strade, in ordine di affidabilità:
+ * Quattro strade, in ordine di affidabilità:
  *
  *   1. **contesto** — la micro-voce di cui si sta parlando *adesso* in quella chat. La arma il
  *      cliente toccando il link della micro-voce, oppure l'operatore dalla scheda. Non si indovina:
  *      qualcuno l'ha detto.
  *   2. **manuale** — l'operatore abbina a mano. È la rete che non fallisce mai.
- *   3. **eredita** — una risposta a un messaggio già abbinato (non ancora cablata: dipende dal
+ *   3. **microvoce** — il messaggio è stato **scritto da dentro** la micro-voce, quindi nasce
+ *      abbinato: non c'è stato nessun abbinamento da fare, e non c'è niente da indovinare.
+ *   4. **eredita** — una risposta a un messaggio già abbinato (non ancora cablata: dipende dal
  *      payload dei provider, e va verificata per canale prima di prometterla).
  *
- * `origine` registra quale delle tre, perché un abbinamento senza motivo è indistinguibile da un
- * abbinamento sbagliato.
+ * `origine` registra quale delle quattro, perché un abbinamento senza motivo è indistinguibile da
+ * un abbinamento sbagliato.
  *
- * **La precedenza fra 1 e 3 è decisa qui, prima che la 3 esista.** Quando l'eredità arriverà, un
+ * **Perché la 3 non è `manuale`.** La metrica con cui si decide se la 4 vale il lavoro conta
+ * `manuale` come «il residuo che l'operatore ha dovuto sistemare a mano»: un messaggio nato
+ * abbinato la falserebbe in su, e le due voci dicono cose diverse — «una persona ha deciso questo
+ * legame» e «questo legame è la conseguenza di dove il messaggio è stato scritto». La card, senza
+ * una voce propria, direbbe «abbinata a mano dall'operatore» di un messaggio che nessuno ha
+ * abbinato.
+ *
+ * **Perché non arma il contesto.** Il contesto parla della **chat** («questa conversazione riguarda
+ * quella voce»), il legame nato parla di **quel messaggio**. Una risposta sola non rende tutta la
+ * conversazione una conversazione su quella voce — e il contesto resterebbe armato ad abbinare i
+ * messaggi successivi, che è esattamente il modo in cui un'etichetta sopravvive alla conversazione
+ * che l'aveva giustificata.
+ *
+ * **La precedenza fra 1 e 4 è decisa qui, prima che la 4 esista.** Quando l'eredità arriverà, un
  * messaggio che è *sia* risposta a un messaggio abbinato *sia* dentro un contesto armato per
  * un'altra micro-voce va abbinato all'**eredità**, e il contesto non lo tocca. La ragione è che le
  * due prove non sono della stessa forza: l'eredità parla di *quel messaggio* (qualcuno ha risposto
@@ -35,6 +50,7 @@
  */
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
+import { proiettaRecapito, type RecapitoComunicazione } from '../util/statoComunicazione.js';
 
 /**
  * Quanto resta armato un contesto senza che nessuno ci scriva dentro.
@@ -63,7 +79,7 @@ export const ORE_VALIDITA_CONTESTO = 24;
  */
 export const ORE_TETTO_CONTESTO = 168;
 
-export type OrigineAbbinamento = 'contesto' | 'manuale' | 'eredita';
+export type OrigineAbbinamento = 'contesto' | 'manuale' | 'microvoce' | 'eredita';
 export type ChiArmaContesto = 'link' | 'operatore';
 
 /** La scadenza di un contesto armato adesso. */
@@ -290,6 +306,19 @@ export interface MessaggioAbbinato {
   createdAt: Date;
   allegatiJson: string | null;
   origine: string;
+  /**
+   * Il recapito, proiettato da `proiettaRecapito` esattamente come nel fascicolo.
+   *
+   * Serve da quando si può **scrivere** da dentro una micro-voce: prima questa vista mostrava solo
+   * messaggi arrivati, e per un messaggio arrivato lo stato non è una domanda. Per uno scritto da
+   * qui la domanda è la prima cosa che ci si fa — «è partito?» — e una card muta lascerebbe
+   * l'operatore a ricaricare il fascicolo per scoprirlo.
+   */
+  stato: RecapitoComunicazione['stato'];
+  inviatoAt: string | null;
+  consegnatoAt: string | null;
+  lettoAt: string | null;
+  errore: string | null;
 }
 
 /**
@@ -317,12 +346,23 @@ export async function elencaComunicazioniMicrovoce(
           testo: true,
           createdAt: true,
           allegatiJson: true,
+          externalId: true,
         },
       },
     },
     orderBy: { comunicazione: { createdAt: 'asc' } },
   });
-  return righe.map((r) => ({ ...r.comunicazione, origine: r.origine }));
+  return righe.map((r) => {
+    // `externalId` non esce da qui: è la colonna da cui si legge lo stato e porta anche le chiavi
+    // del provider (`whatsapp:<wamid>`). Il browser riceve il recapito proiettato, non la materia
+    // prima.
+    const { externalId, ...messaggio } = r.comunicazione;
+    return {
+      ...messaggio,
+      ...proiettaRecapito(messaggio.direzione, externalId, messaggio.createdAt),
+      origine: r.origine,
+    };
+  });
 }
 
 /**

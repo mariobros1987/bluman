@@ -225,7 +225,7 @@ export async function slegaComunicazioneMicrovoceApi(
   return Boolean((await res.json())?.rimosso);
 }
 
-/** Un messaggio abbinato a una micro-voce, con l'origine dell'abbinamento. */
+/** Un messaggio abbinato a una micro-voce, con l'origine dell'abbinamento e il suo recapito. */
 export interface MessaggioDiMicrovoce {
   id: string;
   canale: string;
@@ -236,6 +236,17 @@ export interface MessaggioDiMicrovoce {
   createdAt: string;
   allegatiJson: string | null;
   origine: string;
+  /**
+   * Il recapito, proiettato dal server come nel fascicolo (`proiettaRecapito`).
+   *
+   * `null` significa «la riga non lo dichiara» — non è un campo da riempire con un ripiego: era il
+   * ripiego `'consegnato'` a disegnare le spunte blu su messaggi che nessun canale aveva accettato.
+   */
+  stato: 'da-inviare' | 'inviato' | 'consegnato' | 'letto' | 'non-inviato' | null;
+  inviatoAt: string | null;
+  consegnatoAt: string | null;
+  lettoAt: string | null;
+  errore: string | null;
 }
 
 /** I messaggi abbinati a una micro-voce, dal più vecchio al più nuovo. */
@@ -493,7 +504,7 @@ export async function fetchComunicazioniApi(progettoId: string) {
   }
 }
 
-export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any }) {
+export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any; microvoceProgettoId?: string }) {
   // §3.3 — una comunicazione nel fascicolo cliente è un invio reale: se non viene persistita
   // il messaggio non esiste. L'errore si propaga (i chiamanti fire-and-forget lo catturano).
   const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {

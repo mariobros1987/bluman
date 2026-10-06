@@ -116,6 +116,52 @@ export function leggiMetaComunicazione(externalId: string | null | undefined): M
   };
 }
 
+/**
+ * Il recapito di una riga come va **mostrato**: lo stato, le sue date, il motivo di un rifiuto.
+ *
+ * `consegnatoAt` è una stringa ISO e non un `Date` anche quando è dedotta da `createdAt`: sul filo
+ * era già una stringa (Fastify serializza le date), quindi normalizzarla qui non cambia niente di
+ * quello che il browser riceve — toglie solo un tipo sporco a chi legge.
+ */
+export interface RecapitoComunicazione {
+  stato: StatoComunicazione | null;
+  inviatoAt: string | null;
+  consegnatoAt: string | null;
+  lettoAt: string | null;
+  errore: string | null;
+}
+
+/**
+ * Lo stato di recapito di una riga, con l'unica deduzione che il codice si concede.
+ *
+ * `stato: null` significa «la riga non lo dichiara», e non è un caso da riempire: era il ripiego
+ * `'consegnato'` a disegnare le spunte blu su messaggi che nessun canale aveva accettato. Le righe
+ * **in entrata** scritte dai webhook fanno eccezione, e non per indulgenza: lì `external_id` porta la
+ * chiave di idempotenza del provider (`whatsapp:<wamid>`) e non c'è spazio per uno stato, quindi la
+ * colonna tace per costruzione. Ma la direzione è il fatto: una riga in entrata sta nel fascicolo
+ * perché il messaggio è arrivato, e per lei `createdAt` **è** il momento dell'arrivo. In uscita non si
+ * deduce niente: lì `createdAt` è quando l'operatore ha scritto, e la consegna deve ancora avvenire.
+ *
+ * Sta qui e non nella rotta perché le rotte che mostrano una comunicazione sono due — il fascicolo e
+ * la micro-voce — e questa regola era già stata sbagliata due volte prima di essere scritta bene.
+ */
+export function proiettaRecapito(
+  direzione: string,
+  externalId: string | null | undefined,
+  createdAt: Date,
+): RecapitoComunicazione {
+  const meta = leggiMetaComunicazione(externalId);
+  const inEntrata = direzione === 'entrata' || direzione === 'ingresso';
+  const stato = meta.stato ?? (inEntrata ? 'consegnato' : null);
+  return {
+    stato,
+    inviatoAt: meta.inviatoAt,
+    lettoAt: meta.lettoAt,
+    errore: meta.errore,
+    consegnatoAt: meta.consegnatoAt ?? (stato === 'consegnato' && inEntrata ? createdAt.toISOString() : null),
+  };
+}
+
 /** Il nuovo `external_id` con le sole chiavi indicate cambiate: le altre restano come sono. */
 export function conStatoComunicazione(
   externalId: string | null | undefined,

@@ -937,7 +937,12 @@ export function ProjectDetail() {
           <ComunicazioniTab
             progettoId={String(project.id)}
             nomeCliente={project.cl}
-            emailCliente={currentClient?.email || "client@holdingbeta.advisory"}
+            // Qui c'era `|| "client@holdingbeta.advisory"`: un indirizzo scritto nel codice che
+            // diventava il destinatario di un'email quando l'anagrafica non si caricava. Il
+            // messaggio partiva verso un estraneo e l'interfaccia diceva «recapitato». Un recapito
+            // che non c'è resta vuoto e blocca l'invio: è la regola che `recapitiDaAnagrafica`
+            // applica a tutti gli altri canali, e l'email non fa eccezione.
+            emailCliente={currentClient?.email}
             cliente={currentClient}
           />
         )}
@@ -962,6 +967,19 @@ export function ProjectDetail() {
             onSaveVoce={(steps, notes, docCount) => handleSavePassaggiModal(procV.mid, procV.vidx, steps, notes, docCount)}
             progettoDbId={resolvedProgettoDbId}
             microvoceDbId={resolvedMicrovoceDbId}
+            // L'anagrafica serve anche alla scheda «Messaggi» della voce: da lì si risponde, e senza
+            // i recapiti del cliente il compositore non saprebbe dove. È la stessa che usa la chat,
+            // non una seconda lettura: due letture darebbero due pareri sullo stesso cliente.
+            cliente={currentClient}
+            // Il ritorno dalla scheda «Messaggi» alla conversazione intera: il modale non sa
+            // dove sta la chat della pratica (è una scheda di questa pagina, non una rotta),
+            // quindi chiude sé stesso e chiede alla pagina di cambiare scheda. Senza questo,
+            // l'unico modo di leggere il contesto di un messaggio era chiudere, ritrovare la
+            // linguetta e ricercare il messaggio a mano.
+            onApriInChat={() => {
+              setProcV(null);
+              setTab('comunicazioni');
+            }}
           />
         );
       })()}

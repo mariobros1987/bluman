@@ -29,7 +29,7 @@ import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
-import { conStatoComunicazione, leggiMetaComunicazione } from '../util/statoComunicazione.js';
+import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from '../util/statoComunicazione.js';
 import {
   abbinaAlContesto,
   abbinaManuale,
@@ -79,27 +79,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     // da uno che il contesto ha dedotto, ed è la differenza che permette di correggere il secondo.
     const abbinamenti = await mappaAbbinamentiDelProgetto(req.tenantId, req.params.id);
     return msgs.map((m) => {
-      const meta = leggiMetaComunicazione(m.externalId);
-      // `null` quando la riga non dichiara uno stato — e non `'consegnato'`, che era il ripiego
-      // di prima: la UI disegnava ✓✓ «consegnato» su qualunque riga senza stato, comprese le
-      // sei del 17/09/2026 che Meta aveva rifiutato. Stessa cosa per `consegnatoAt`, che
-      // ripiegava su `createdAt`: la data di creazione spacciata per data di consegna.
-      //
-      // Le righe **in entrata** scritte dai webhook fanno eccezione, e non per indulgenza: lì
-      // `external_id` porta la chiave di idempotenza del provider (`whatsapp:<wamid>`) e non c'è
-      // spazio per uno stato, quindi la colonna tace per costruzione. Ma la direzione è il fatto:
-      // una riga in entrata sta nel fascicolo perché il messaggio è arrivato, e per una riga in
-      // entrata `createdAt` **è** il momento dell'arrivo. In uscita non si deduce niente: lì
-      // `createdAt` è quando l'operatore ha scritto, e la consegna deve ancora avvenire.
-      const inEntrata = m.direzione === 'entrata' || m.direzione === 'ingresso';
-      const stato = meta.stato ?? (inEntrata ? 'consegnato' : null);
+      // Lo stato di recapito, con la sua unica deduzione («in entrata ⇒ consegnato»), sta in
+      // `proiettaRecapito`: la stessa regola serve alla scheda della micro-voce, e duplicarla qui
+      // sarebbe la terza copia di una cosa già sbagliata due volte (le spunte blu su messaggi che
+      // Meta aveva rifiutato, 17/09/2026).
       return {
         ...m,
-        stato,
-        inviatoAt: meta.inviatoAt,
-        lettoAt: meta.lettoAt,
-        consegnatoAt: meta.consegnatoAt ?? (stato === 'consegnato' && inEntrata ? m.createdAt : null),
-        errore: meta.errore,
+        ...proiettaRecapito(m.direzione, m.externalId, m.createdAt),
         microvoci: abbinamenti.get(m.id) ?? [],
       };
     });
@@ -158,6 +144,20 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     return reply.send({ ok: true, aggiornati });
   });
 
+  /**
+   * Chi può decidere un abbinamento messaggio ↔ micro-voce.
+   *
+   * Il ruolo `cliente` è fuori. Può **dichiarare** la micro-voce toccando il link — quella è la sua
+   * parte, e resta tracciata come `contesto` — ma scegliere a mano dentro il fascicolo, o scrivere
+   * *da* una micro-voce, è un atto dell'operatore: il portale non ha né il selettore né la vista dei
+   * moduli, e una rotta aperta al token del portale sarebbe una superficie che l'interfaccia non
+   * mostra a nessuno.
+   *
+   * Sta qui, e non accanto all'abbinamento, perché la usano **due** rotte: l'abbinamento a mano e la
+   * scrittura da dentro una micro-voce, che nasce già abbinata.
+   */
+  const RUOLI_ABBINAMENTO = ['super_admin', 'advisor', 'collaboratore_interno', 'operator'];
+
   server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
     const tenantId = req.tenantId;
     if (req.ruolo === 'cliente') {
@@ -173,6 +173,23 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     const testo = typeof body.testo === 'string' ? body.testo.trim() : '';
     if (!canale || !testo) {
       return reply.code(400).send({ errore: 'Canale e testo sono obbligatori.' });
+    }
+
+    // Un messaggio può **nascere abbinato**: chi scrive da dentro una micro-voce non sta abbinando
+    // niente a posteriori, sta scrivendo *lì*, e il legame è la conseguenza di dove è stato scritto.
+    //
+    // La voce dev'essere di **questa** pratica, e `microvoceDiProgetto` filtra anche sul tenant:
+    // senza quel controllo l'id di una voce altrui basterebbe ad appendere un messaggio al fascicolo
+    // di un altro studio — lo stesso ragionamento già scritto nella `where` di `scollegaPerId`.
+    const microvoceProgettoId = typeof body.microvoceProgettoId === 'string' ? body.microvoceProgettoId.trim() : '';
+    if (microvoceProgettoId) {
+      if (!RUOLI_ABBINAMENTO.includes(req.ruolo ?? '')) {
+        return reply.code(403).send({ errore: 'Non autorizzato a scrivere da dentro una micro-voce.' });
+      }
+      const voce = await microvoceDiProgetto(tenantId, microvoceProgettoId, req.params.id);
+      if (!voce) {
+        return reply.code(400).send({ errore: 'Micro-voce non trovata in questa pratica.' });
+      }
     }
     try {
       // Per il portale identità e direzione vengono imposte dal server: un cliente non può
@@ -233,10 +250,21 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           });
           // Solo in **entrata**: il contesto armato dice «questa conversazione parla di questa
           // voce», e lo dice dei messaggi che *arrivano* — è ciò che fanno già Telegram, WhatsApp
-          // e Signal. Un messaggio in uscita scritto da dentro una micro-voce nascerebbe abbinato
-          // per costruzione: è la seconda regola della Fase 3, non ancora cablata, e non va
-          // confusa con questa.
-          if (chatId && inEntrata) {
+          // e Signal. Un messaggio in uscita scritto da dentro una micro-voce non ha bisogno di
+          // questa deduzione: il legame è **nato** con lui (ramo sotto), e farlo passare anche di
+          // qui gli darebbe due origini per lo stesso fatto.
+          if (microvoceProgettoId) {
+            // `create` e non `upsert`: il messaggio è appena nato, la coppia non può esistere, e il
+            // vincolo unico resta come rete invece che come percorso normale.
+            await tx.comunicazioneMicrovoce.create({
+              data: {
+                tenantId,
+                comunicazioneId: creato.id,
+                microvoceProgettoId,
+                origine: 'microvoce',
+              },
+            });
+          } else if (chatId && inEntrata) {
             await abbinaAlContesto(tx, tenantId, canale, chatId, req.params.id, creato.id);
           }
           return creato;
@@ -287,13 +315,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
    * si riscrive in `manuale` quando l'operatore conferma un legame già presente: da quel momento il
    * legame è suo, e dirlo è più onesto che lasciare scritto «contesto».
    *
-   * Vietate al ruolo cliente. Il cliente può **dichiarare** la micro-voce toccando il link — quella
-   * è la sua parte, e resta tracciata come `contesto`. Ma scegliere a mano dentro il fascicolo è un
-   * atto dell'operatore: il portale non ha né il selettore né la vista dei moduli, e una rotta
-   * aperta al token del portale sarebbe una superficie che l'interfaccia non mostra a nessuno.
+   * Vietate al ruolo cliente, per la stessa ragione per cui è fuori da `RUOLI_ABBINAMENTO`: scegliere
+   * a mano dentro il fascicolo è un atto dell'operatore, e il portale non ha né il selettore né la
+   * vista dei moduli.
    */
-  const RUOLI_ABBINAMENTO = ['super_admin', 'advisor', 'collaboratore_interno', 'operator'];
-
   server.post<{ Params: { id: string; msgId: string }; Body: { microvoceProgettoId?: string } }>(
     '/progetti/:id/comunicazioni/:msgId/microvoci',
     async (req, reply) => {

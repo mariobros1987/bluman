@@ -23,9 +23,24 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
     compare nell'elenco delle chat col nome del cliente.
   - **L'email non si abbina**, e non è una mancanza: la posta in arrivo si legge dalla casella e si
     **mostra** nel fascicolo, non diventa una riga archiviata — non c'è nessuna riga da legare.
-  - **Un messaggio in *uscita* non eredita il contesto**: quello dice «questa conversazione parla di
-    questa voce» dei messaggi che arrivano. Che un messaggio scritto *da dentro* una micro-voce nasca
-    abbinato è un'altra regola, non ancora cablata (l'«eredità»).
+  - **L'operatore scrive da dentro la voce**: dal tab «💬 Messaggi» di una micro-voce c'è il
+    compositore, con tutti e cinque i canali e gli allegati. Il messaggio nasce **già abbinato**
+    (`origine: microvoce`): non si risponde più uscendo dalla voce, andando in Comunicazioni e
+    ritrovando la conversazione fra i messaggi di tutta la pratica.
+    - Il canale predefinito è **quello dell'ultimo messaggio di quella voce** (se la voce è vuota:
+      il **portale**, l'unico canale che non contatta nessuno). Resta un predefinito: appena
+      l'operatore lo cambia, la sua scelta vince.
+    - **Slegare non si fa da qui**, si fa dalla chat, dove si vede la conversazione intorno. Nella
+      voce c'è solo il ritorno («Apri nella chat della pratica →»), che è a un clic.
+    - **Il cliente vede una conversazione sola.** La voce è una lente dell'operatore, non un canale:
+      il messaggio gli arriva sul canale scelto come tutti gli altri, e resta nel fascicolo abbinato
+      a quella voce. Il compositore lo dice, perché dalla schermata non si vede.
+  - **Un messaggio in *uscita* non eredita il contesto armato**: quello dice «questa conversazione
+    parla di questa voce» dei messaggi che *arrivano*. Un messaggio scritto da dentro una voce nasce
+    legato per un'altra via — il legame è **nato con lui**, non dedotto dalla chat (vedi «quattro
+    origini» nella nota tecnica). L'«eredità» vera e propria (una **risposta** a un messaggio già
+    abbinato) resta l'unica parte non cablata: dipende dal payload del provider e va verificata per
+    canale.
 - I canali si configurano in **Impostazioni** (§16).
 
 ## 📐 Calcoli & logica
@@ -73,14 +88,22 @@ tengono onesto, e sono tutte necessarie:
   messaggio dal fascicolo.
 - **Il ruolo cliente non può abbinare a mano** (403): può solo *dichiarare* la voce toccando il link
   — e sul **portale**, dove un link non esiste, è l'operatore ad armare il contesto per lui. Non ha
-  né il selettore né la vista dei moduli.
+  né il selettore né la vista dei moduli, **né può scrivere da dentro una voce**.
+- **Da una voce si scrive solo se la voce esiste a database**: se la micro-voce non è mai stata
+  salvata, il compositore non compare. Un compositore che scrivesse senza legare sarebbe peggio di
+  nessun compositore — l'operatore crederebbe di aver risposto «dentro la voce» e non è vero.
+- **Un messaggio scritto dalla voce resta nel fascicolo** anche se poi lo si slega: si toglie
+  l'etichetta, non il messaggio.
 
 ## 🔧 Nota tecnica
 - Servizi: `src/services/emailRelay.ts`, `imapInbound.ts`, `collegamentoChat.ts`,
   `comunicazioniMicrovoci.ts`; funzione Vercel `api/send-email.ts` (relay). Rotte: comunicazioni
   (`/comunicazioni/invia-*`), webhooks, `collegamentoChat.ts`, `progetti.ts`.
-- Frontend: `components/ComunicazioniTab.tsx`, `components/settings/TabChannels.tsx`,
-  `components/projectDetail/LinkTelegramProgetto.tsx`, `components/passaggio/TabMessaggi.tsx`.
+- Frontend: `components/ComunicazioniTab.tsx`, `components/ComposerComunicazione.tsx`,
+  `hooks/useInvioComunicazione.ts`, `hooks/useCanaliStudio.ts`, `utils/recapitiCliente.ts`,
+  `utils/origineAbbinamento.ts`, `components/settings/TabChannels.tsx`,
+  `components/projectDetail/LinkTelegramProgetto.tsx`, `components/passaggio/TabMessaggi.tsx`,
+  `components/passaggio/ComposerMicrovoce.tsx`.
 - **L'indirizzo pubblico del backend**: `src/util/urlPubblica.ts` — `urlPubblicaBackend()`,
   `urlWebhookWhatsapp(slug)`, `urlWebhookTelegram()`, `slugValido()`. Fino al **01/10/2026** il modulo
   leggeva solo `RAILWAY_PUBLIC_DOMAIN`: sul VPS quella variabile **non esiste**, quindi i callback si
@@ -105,12 +128,34 @@ tengono onesto, e sono tutte necessarie:
   conversazione dedotta dal messaggio, sul **portale è il cliente**. Presidio:
   `src/collegamentoChat.test.ts` (7 test sul solo portale: abbinamento, isolamento fra clienti e fra
   pratiche, scadenza, e il confine dell'uscita).
-- **Le tre origini di un abbinamento** (`comunicazione_microvoce.origine`): `contesto` (il cliente ha
-  toccato il link), `manuale` (l'operatore), `eredita` (una risposta a un messaggio già abbinato —
+- **Le quattro origini di un abbinamento** (`comunicazione_microvoce.origine`): `contesto` (il cliente
+  ha toccato il link della voce), `manuale` (l'operatore, a mano dalla chat), `microvoce` (il messaggio
+  è **nato** scritto da dentro quella voce) ed `eredita` (una risposta a un messaggio già abbinato —
   **non ancora cablata**: dipende dal payload del provider e va verificata per canale prima di
   prometterla). Si mostra, perché un abbinamento automatico sbagliato si riconosce solo sapendo che
-  era automatico. **Regola di precedenza, decisa prima che l'eredità esista:** quando entrambe
+  era automatico — e **il colore lo dice**: azzurro il cliente, grigio una persona, indaco questa voce,
+  ambra l'inferenza da controllare (`frontend/src/utils/origineAbbinamento.ts`, una tabella sola per
+  entrambe le viste). **Regola di precedenza, decisa prima che l'eredità esista:** quando entrambe
   potrebbero valere, vince l'**eredità**, perché parla di *quel messaggio* invece che della *chat*.
+  `microvoce` **non** è `manuale`, e non è un cavillo: la metrica con cui si deciderà la Fase 3 legge
+  `manuale` come «il residuo che l'operatore ha dovuto sistemare a mano», e contarci un messaggio nato
+  abbinato la falserebbe in su.
+- **Il compositore è uno, i punti di montaggio due.** La consegna (upload → scrittura → dispatch →
+  esito) sta in `frontend/src/hooks/useInvioComunicazione.ts`; il form in
+  `components/ComposerComunicazione.tsx`, che è sola presentazione. Lo monta la chat
+  (`ComunicazioniTab`) e la voce (`passaggio/ComposerMicrovoce.tsx`). **Due copie della consegna
+  sarebbero due verità su una cosa sola** — è il guasto che `SpunteStato.tsx` racconta (sei messaggi
+  rifiutati da Meta per mesi con le spunte blu disegnate, perché il ternario che le disegnava era
+  stato copiato in due file). I recapiti dell'anagrafica si leggono in un posto solo,
+  `frontend/src/utils/recapitiCliente.ts`: due letture darebbero due pareri sullo stesso cliente,
+  col canale disponibile in una vista e non nell'altra.
+- **Scrivere da dentro una voce è un atto dell'operatore** (`RUOLI_ABBINAMENTO` in
+  `src/routes/progetti.ts`): il ruolo `cliente` — che usa la stessa rotta `POST /comunicazioni` dal
+  portale — riceve **403** se prova a passare `microvoceProgettoId`. Può solo *dichiarare* la voce
+  toccando il link. E la voce dev'essere di **questa** pratica e di **questo** studio
+  (`microvoceDiProgetto`), o la rotta risponde 400 senza scrivere niente: senza il filtro, l'id di una
+  voce basterebbe ad appendere un messaggio al fascicolo di un'altra pratica. Presidio:
+  `src/comunicazioneDaMicrovoce.test.ts`.
 - Schema: `ComunicazioneProgetto`, `CollegamentoChatProgetto`, `ComunicazioneMicrovoce`,
   `ContestoMicrovoceChat` (con `progetto_id` denormalizzato: rende il controllo «la voce armata è di
   *questa* pratica?» un confronto fra due campi).

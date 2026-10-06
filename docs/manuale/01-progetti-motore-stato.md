@@ -12,6 +12,11 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   dipendenze**, comunicazioni, fatture e scadenze.
 - **Cosa fa l'operatore su una micro-voce**: **consuntiva le ore**, la marca **completata**, la mette
   **in ritardo** (con motivo obbligatorio) o la sblocca; apre i **passaggi**.
+- **Cosa si trova aprendo una micro-voce**: quattro schede — **Checklist Passaggi**, **Note & Registro
+  Attività**, **Documenti & Workflow** e **💬 Messaggi**. L'ultima non è più in sola lettura: dal
+  **2026-10-06** elenca i messaggi scambiati col cliente **che riguardano questa voce**, dice *perché*
+  ciascuno è lì (badge colorato per origine) e — in fondo — ha il **compositore** per rispondere
+  restando dove si sta leggendo. Il messaggio nasce **già abbinato** alla voce (§15).
 - **Chiusura / fine anno**: un progetto con fatture **non si elimina**, si **archivia** (resta
   consultabile con `?includiArchiviati=true`).
 
@@ -96,4 +101,13 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
   `PassaggioProgetto`, `ModuloProgettoDipendenza`, `MicrovoceModuloCondiviso`.
 - **Frontend**: `pages/Projects.tsx` (elenco), `pages/ProjectDetail.tsx` + `components/projectDetail/`
   (`ModuliTab`, `ModuloBlock`, grafo `GrafoModuliProgettoView`), `PassaggioModal`.
+- **La scheda «💬 Messaggi» di una voce** (`components/passaggio/TabMessaggi.tsx`) è **proiezione**, non
+  una seconda casella: il messaggio è **una riga sola** in `comunicazione_progetto`, e la scheda ne
+  mostra quelle abbinate. «Compare in entrambi i posti» (voce e chat della pratica) è vero e gratis: non
+  c'è nessuna copia da tenere allineata. Il compositore che vi si monta è lo **stesso** della chat —
+  `hooks/useInvioComunicazione.ts` + `components/ComposerComunicazione.tsx`, avvolti da
+  `components/passaggio/ComposerMicrovoce.tsx`, che è l'unico a leggere le impostazioni dello studio
+  (così aprire la checklist non fa una richiesta di rete che non serve). Abbinare e **slegare** restano
+  nella chat, dove si vede la conversazione intorno: dalla voce c'è il ritorno «Apri nella chat della
+  pratica →».
 - **Fonti**: `AUDIT_2026-09-27/03-progetti-motore-stato.md`, `.agents/AGENTS.md`.
