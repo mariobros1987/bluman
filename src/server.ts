@@ -325,7 +325,20 @@ export function buildServer(app: AppPort): FastifyInstance {
   // La condizione sul rate-limit va letta QUI, nella parte sincrona di buildServer:
   // il corpo del plugin viene eseguito solo al primo ready(), quando NODE_ENV
   // potrebbe essere già cambiato (i test lo ripristinano dopo la costruzione).
-  const abilitaRateLimit = process.env.NODE_ENV !== 'test';
+  //
+  // La seconda condizione è per l'ambiente E2E, ed è un'eccezione **dichiarata** della stessa forma
+  // di PERMETTI_ENDPOINT_LOCALI (src/util/networkPolicy.ts): vale solo in development, quindi in
+  // produzione la variabile non ha effetto alcuno. Serve perché il backend E2E deve girare in
+  // development — l'SMTP di prova è un endpoint locale, e la policy di rete lo ammette solo lì — ma
+  // in development il limitatore è acceso, e le rotte che verificano credenziali ammettono **5
+  // richieste al minuto** (src/routes/auth.ts). La suite e2e ne fa più di cinque in un minuto appena
+  // i flussi sono veloci, e il risultato era una suite che passava o falliva a seconda di quanto ci
+  // mettevano i flussi precedenti: il 06/10/2026 il flusso del portale è morto in 556 ms con un 429
+  // mentre un'ora prima, con gli stessi test, era passato. Le protezioni anti brute-force restano
+  // verificate dai test unitari, che è il posto giusto: qui non si sta provando il limitatore, si
+  // sta provando l'applicazione.
+  const ambienteE2E = process.env.NODE_ENV === 'development' && process.env.E2E_SENZA_RATE_LIMIT === '1';
+  const abilitaRateLimit = process.env.NODE_ENV !== 'test' && !ambienteE2E;
   server.register(async (server) => {
   // Fase 1 — rate limiting. Protezione contro brute-force sulle tre rotte che
   // verificano credenziali (/auth/login, /auth/magic-login, /auth/client-login:

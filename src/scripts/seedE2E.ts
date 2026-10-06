@@ -117,9 +117,30 @@ async function main(): Promise<void> {
     // fatturate e il flusso della fattura resterebbe senza voci da selezionare.
     // Righe e scadenze seguono la fattura in cascata (onDelete: Cascade).
     const fatture = await prisma.fattura.deleteMany({ where: { progettoId: esistente.id } });
+    // Le firme **prima** degli OTP: una FirmaElettronica punta al CodiceOtp che l'ha verificata,
+    // e cancellare prima il codice lascerebbe la firma appesa a una riga che non esiste più.
+    //
+    // Senza questo passo il flusso della firma è a **colpo singolo**: la lettera d'incarico resta
+    // firmata, e il portale — che decide se mostrare «Firma online con codice OTP» leggendo le
+    // firme del cliente — alla corsa successiva non le offre più. Il test moriva aspettando un
+    // elemento che il prodotto, giustamente, non disegnava più. Vale per tutti gli ambiti: le
+    // firme del cliente E2E sono solo quelle che i test hanno apposto.
+    const firme = await prisma.firmaElettronica.deleteMany({ where: { clienteId: 'cli-03' } });
     const otp = await prisma.codiceOtp.deleteMany({ where: { clienteId: 'cli-03' } });
+    // Anche il fascicolo, e per la stessa ragione. Da quando il compositore della
+    // micro-voce scrive **da dentro la voce**, la risposta nasce abbinata e resta lì:
+    // alla corsa successiva lo spec che verifica «slegato, la voce torna vuota»
+    // troverebbe invece il messaggio di ieri, e la sua prima asserzione — il testo
+    // del messaggio è unico — andrebbe in violazione di strict mode. È il gemello
+    // esatto del reset delle fatture: stesso inquinamento fra una corsa e l'altra.
+    // Gli abbinamenti seguono il messaggio in cascata
+    // (ComunicazioneMicrovoce.comunicazione è onDelete: Cascade), quindi non
+    // servono cancellazioni separate.
+    const comunicazioni = await prisma.comunicazioneProgetto.deleteMany({
+      where: { progettoId: esistente.id },
+    });
     console.log(
-      `✓ Progetto E2E già presente (${esistente.id}): resettate ${fatture.count} fatture e ${otp.count} sessioni OTP delle corse precedenti`,
+      `✓ Progetto E2E già presente (${esistente.id}): resettate ${fatture.count} fatture, ${firme.count} firme, ${otp.count} sessioni OTP e ${comunicazioni.count} comunicazioni delle corse precedenti`,
     );
   } else {
     const progetto = await prisma.progetto.create({

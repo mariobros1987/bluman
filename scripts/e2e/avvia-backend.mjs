@@ -28,6 +28,15 @@ const env = {
   // permette l'SMTP di test verso Mailpit in container. Valido solo perché
   // NODE_ENV è development — vedi src/util/networkPolicy.ts.
   PERMETTI_ENDPOINT_LOCALI: '1',
+  // Il limitatore anti brute-force resta spento per tutta la durata della suite.
+  // Serve perché le due condizioni qui sopra sono in tensione: l'SMTP di prova
+  // vuole NODE_ENV=development, ma in development il limitatore è acceso e
+  // /auth/login ammette **5 richieste al minuto** (src/routes/auth.ts) — mentre i
+  // quattro flussi fanno più di cinque login in un minuto appena girano veloci.
+  // La suite passava o falliva a seconda di quanto ci mettevano i flussi
+  // precedenti. Vale solo in development, quindi in produzione non ha effetto:
+  // la condizione è scritta in src/server.ts accanto a quella di NODE_ENV=test.
+  E2E_SENZA_RATE_LIMIT: '1',
   APP_BASE_URL: 'http://localhost:5173',
   PORT: '3000',
 };

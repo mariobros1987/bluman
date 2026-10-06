@@ -25,6 +25,21 @@ Le protezioni, in ordine:
   `E2E_DATABASE_URL`, rifiuta di girare senza, e in più esige che punti a
   `localhost`.
 
+Una deroga dichiarata, e una sola: `avvia-backend.mjs` esporta
+`E2E_SENZA_RATE_LIMIT=1`, che spegne il limitatore anti brute-force per la durata
+della suite. Non è una comodità, è una tensione fra due regole giuste — l'SMTP di
+prova verso Mailpit è un endpoint locale e la policy di rete lo ammette solo con
+`NODE_ENV=development`, ma in development il limitatore è acceso e `/auth/login`
+ammette **5 richieste al minuto** (`src/routes/auth.ts`), mentre i quattro flussi
+ne fanno più di cinque in un minuto appena girano veloci. Prima della deroga la
+suite passava o falliva a seconda di quanto ci mettevano i flussi precedenti: il
+06/10/2026 il flusso del portale è morto in 556 ms con un `429`, mentre un'ora
+prima — stessi test, stesso codice — era passato. La condizione è scritta in
+`src/server.ts` accanto a quella di `NODE_ENV=test`, ed è **doppiamente
+guardata**: vale solo in development, quindi in produzione la variabile non ha
+effetto alcuno. Le protezioni anti brute-force restano verificate dai test
+unitari, che è il posto giusto per provarle.
+
 Le email dell'OTP di firma finiscono in **Mailpit** (`bluman-e2e-mailpit`,
 SMTP su 1025, API su http://localhost:8025): un SMTP vero, per quanto di test,
 perché `/portal/request-otp` annulla il codice e risponde 502 se l'invio
@@ -47,10 +62,16 @@ Prerequisiti: Docker Desktop in esecuzione e i browser Playwright
 La preparazione è idempotente: riavvia i container fermi, applica
 `prisma migrate deploy`, esegue il seed master solo a database vuoto, poi
 l'overlay E2E che ridefinisce sempre utenti, SMTP e progetto di test ai valori
-noti, e infine **svuota la coda di Mailpit**: i container sopravvivono tra le
-corse e senza flush le email della corsa precedente resterebbero leggibili
-dagli helper. La suite gira con `workers: 1`: i flussi condividono lo stesso
-database e quello del portale consuma magic link e OTP soggetti a anti-abuso.
+noti — **compreso lo stato che la corsa precedente ha lasciato**: fatture, sessioni
+OTP e comunicazioni del progetto di test vengono cancellate. È quello che rende la
+suite ri-eseguibile: senza, «Tutte da Fatturare» non troverebbe più voci da
+selezionare, il modale del primo accesso non comparirebbe più, e la risposta
+scritta dal compositore della voce resterebbe abbinata. Per questo si esegue con
+`npm run test:e2e`, non con `npx playwright test` da solo — e infine si **svuota la
+coda di Mailpit**: i container sopravvivono tra le corse e senza flush le email
+della corsa precedente resterebbero leggibili dagli helper. La suite gira con
+`workers: 1`: i flussi condividono lo stesso database e quello del portale consuma
+magic link e OTP soggetti a anti-abuso.
 
 ## Utenti e dati di test (dall'overlay)
 
@@ -74,11 +95,14 @@ I quattro flussi:
   registro `GET /invoices`.
 - `flusso-abbinamento-microvoce.spec.ts` — scheda Comunicazioni, selezione di un
   messaggio del portale, «🔗 Abbina a micro-voce», badge con il motivo sulla
-  bolla, il messaggio nella scheda «💬 Messaggi» della micro-voce, e lo
-  slegamento che lo lascia nel fascicolo. È il passo 3 del piano
-  `starry-percolating-hearth.md` eseguito dal browser; il messaggio lo crea
-  l'API e non il compositore, perché la cosa da provare è il **legame**, e il
-  canale è il portale perché non ha un passo di consegna dopo la scrittura.
+  bolla, il messaggio nella scheda «💬 Messaggi» della micro-voce, lo slegamento
+  che lo lascia nel fascicolo, e infine **la risposta scritta dal compositore
+  dentro la voce**: nasce abbinata (`origine: 'microvoce'`), con il badge «✍
+  scritto da qui» in entrambe le viste. È il passo 3 del piano
+  `starry-percolating-hearth.md` eseguito dal browser; il messaggio in ingresso
+  lo crea l'API e non il compositore, perché la cosa da provare è il **legame**,
+  e il canale è il portale perché non ha un passo di consegna dopo la scrittura —
+  nessuna riga di questo test contatta Meta o un SMTP.
 
 ## Pulizia
 

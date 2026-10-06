@@ -45,13 +45,19 @@ test('compositore fatture: microvoci del progetto Belfort → fattura nel regist
   // fiscale in serie FT.
   await page.getByRole('button', { name: '☑️ Tutte da Fatturare' }).click();
 
-  // Il successo arriva via window.alert: senza handler Playwright chiuderebbe
-  // il dialogo di default senza farci leggere il messaggio.
-  const dialogo = page.waitForEvent('dialog');
-  await page.getByRole('button', { name: '🚀 Emetti Fattura Fiscale (Serie FT)' }).click();
-  const alert = await dialogo;
-  expect(alert.message()).toContain('emesso con successo');
-  await alert.accept();
+  // L'esito arriva come TOAST, non più come window.alert: dal 21/09/2026 (commit e34d6de1,
+  // «sistema toast custom al posto di 166 alert() nativi») la fatturazione lo riporta con
+  // `toast.successo` — vedi FatturazioneTab.tsx. Questo spec era rimasto indietro di sei giorni
+  // e aspettava un evento `dialog` che nessuno emette più: il flusso era rosso dal 21/09 mentre
+  // l'emissione funzionava, e la fattura si creava regolarmente a database.
+  //
+  // L'attesa parte prima del click e in parallelo: il toast di successo vive 3,5 secondi
+  // (DURATA_DEFAULT in ToastProvider.tsx), e un'attesa avviata dopo il click rischia di
+  // trovarlo già sparito — un rosso che parlerebbe di una corsa lenta, non di un guasto.
+  await Promise.all([
+    expect(page.getByRole('region', { name: 'Notifiche' }).getByText(/emesso con successo/)).toBeVisible(),
+    page.getByRole('button', { name: '🚀 Emetti Fattura Fiscale (Serie FT)' }).click(),
+  ]);
 
   // Verifica dal registro dello studio: la fattura del progetto E2E esiste.
   const resDopo = await request.get(`${AMBIENTE_E2E.apiBase}/invoices`, { headers });
