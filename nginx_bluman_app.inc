@@ -72,9 +72,39 @@ location = /health {
 
 # ─────────────────────────────────────────────────────────────────────
 # Frontend SPA — tutto il resto.
+#
+# Le due scadenze qui sotto sono la metà che mancava, e la loro assenza si manifesta in un
+# modo che NON sembra un guasto: **l'app resta quella di prima**. Fino all'08/10/2026 questa
+# origine non mandava nessun `Cache-Control`, quindi il browser applicava la scadenza
+# euristica (≈10% dell'età del file) e per ore serviva dalla cache il vecchio `index.html` —
+# che è il file che NOMINA gli asset. Il risultato è la peggiore combinazione possibile:
+# deploy verde, `git` allineato, il bundle nuovo che esce davvero dalla porta 80, e l'utente
+# che continua a vedere la versione precedente senza un errore da nessuna parte. Su Vercel
+# non succedeva perché la piattaforma manda `max-age=0, must-revalidate`: lo stesso identico
+# codice «arrivava» là e non qui. Segnalato dal titolare l'08/10/2026 con le parole «nel VPS
+# non sono arrivate le modifiche fatte».
+#
+# `expires` e non `add_header`: un `add_header` dentro un `location` ANNULLA quelli ereditati
+# dal server — le tre intestazioni di sicurezza in cima a questo file sparirebbero proprio
+# dalle risposte del frontend. `expires` non partecipa a quella regola.
 # ─────────────────────────────────────────────────────────────────────
 location / {
     root /usr/share/nginx/html;
     index index.html;
     try_files $uri $uri/ /index.html;
+
+    # `-1` = «in cache sì, ma rivalidando sempre» (`Cache-Control: no-cache` + `Expires` nel
+    # passato). Il browser tiene il file e lo richiede; nginx risponde **304** finché non
+    # cambia, quindi non si riscarica niente per niente. `no-store` sarebbe stato più
+    # semplice e più sbagliato: rifarebbe scaricare l'app intera a ogni caricamento.
+    expires -1;
+}
+
+# Gli asset che produce Vite portano l'hash del contenuto nel NOME: sotto lo stesso nome il
+# contenuto non cambia mai, quindi possono stare in cache un anno senza rivalidare. È l'altra
+# metà della coppia — `index.html` si rivalida sempre, gli asset mai.
+# Il `root` va ripetuto: è dichiarato dentro `location /` e non si eredita fra location sorelle.
+location /assets/ {
+    root /usr/share/nginx/html;
+    expires 1y;
 }

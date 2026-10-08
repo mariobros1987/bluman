@@ -372,6 +372,30 @@ if [ "$VPS" -eq 1 ]; then
     exit 1
   fi
 
+  #    E la radice NON deve essere cacheabile senza rivalidazione. Sonda nata l'08/10/2026, e
+  #    nasce dal difetto opposto a tutti gli altri di questo passo: gli altri si vedono quando
+  #    manca qualcosa, questo si vede come «non è cambiato niente». Il VPS non mandava nessun
+  #    `Cache-Control`, quindi il browser applicava la scadenza euristica (≈10% dell'età del
+  #    file) e per ore continuava a servire il vecchio `index.html` — che è il file che NOMINA
+  #    gli asset. Deploy verde, `git` allineato, bundle nuovo davvero in uscita dalla porta 80,
+  #    e il titolare che dice «nel VPS non sono arrivate le modifiche fatte». Senza intestazione
+  #    la sonda sarebbe cieca per costruzione, quindi si pretende che ci sia E che imponga la
+  #    rivalidazione: `expires -1` in `location /` la produce (`Cache-Control: no-cache`).
+  echo "• Cache della radice: index.html deve rivalidare a ogni caricamento..."
+  CACHE_FE=$(curl -s -o /dev/null -D - --max-time 10 "$VPS_BASE/" | tr -d '\r' \
+    | awk 'tolower($1) == "cache-control:" { print tolower($0); exit }' || true)
+  case "$CACHE_FE" in
+    *no-cache*|*no-store*|*must-revalidate*|*max-age=0*)
+      successo "Radice non cacheabile senza rivalidazione." ;;
+    *)
+      echo "ERRORE: $VPS_BASE/ non manda un Cache-Control che imponga la rivalidazione (trovato: «${CACHE_FE:-nessuno}»)." >&2
+      echo "  Il browser servirebbe l'index.html vecchio dalla cache — e con esso gli asset che quello" >&2
+      echo "  nomina — quindi un deploy verde resterebbe invisibile a chi ha già aperto l'app." >&2
+      echo "  Atteso: \`expires -1;\` dentro \`location /\` in nginx_bluman_app.inc." >&2
+      exit 1
+      ;;
+  esac
+
   #    Questa sonda è quella che mancava, ed è la lezione del 02/10/2026. Sette percorsi della
   #    SPA — /portal, /invoices, /fornitori, /timesheet, /liquidazione-iva, /reports e
   #    /admin/tenants — si chiamano come rotte dell'API, e il vecchio elenco di prefissi se li

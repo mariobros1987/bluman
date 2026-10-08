@@ -94,6 +94,19 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   monitor). Il presidio è `src/infrastrutturaDeploy.test.ts`, che confronta le rotte della SPA con i
   percorsi serviti in radice: **è il confronto che mancava**, e la sua assenza è la ragione per cui il
   guasto è vissuto per giorni.
+- **Le scadenze della cache sul frontend del VPS** (dall'08/10/2026): `expires -1` su `location /`
+  (`Cache-Control: no-cache`: il browser tiene il file ma lo **rivalida**, e nginx risponde `304`
+  finché non cambia) e `expires 1y` su `location /assets/` (il nome porta l'hash del contenuto,
+  quindi sotto lo stesso nome il file non cambia mai). Prima di questo **il VPS non mandava nessun
+  `Cache-Control`**, quindi il browser applicava la scadenza euristica (≈10% dell'età del file) e per
+  ore serviva dalla cache il vecchio `index.html` — che è il file che *nomina* gli asset. Il sintomo
+  è il peggiore possibile, perché non sembra un guasto: deploy verde, `git` allineato, il bundle
+  nuovo che esce davvero dalla porta 80, e l'utente che continua a vedere la versione precedente.
+  Su Vercel non capitava mai, perché la piattaforma manda `max-age=0, must-revalidate`: **lo stesso
+  codice arrivava là e non qui** — ed è per questo che il difetto è vissuto a lungo senza farsi
+  vedere. ⚠️ Si usa `expires` e **non** `add_header`: un `add_header` dentro un `location` **annulla**
+  quelli ereditati dal server, quindi le tre intestazioni di sicurezza (`X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`) sarebbero sparite proprio dalle risposte del frontend.
 - **`pg_stat_statements`** (dal 02/10/2026): dichiarato nel compose sul servizio `postgres`, rende
   visibili le query lente. Precaricabile solo all'avvio del server, quindi non basta `CREATE EXTENSION`.
 - **Le connessioni al database non si controllano con `pg_stat_activity`**: con PgBouncer davanti
