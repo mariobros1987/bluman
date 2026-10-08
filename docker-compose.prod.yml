@@ -192,21 +192,35 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      # Corpo condiviso dei server block :80 e :443. Estensione `.inc` e non `.conf`:
-      # nginx carica da solo tutti i `*.conf` di conf.d/, e un secondo `.conf` con un
-      # `location` fuori da un `server` farebbe fallire l'avvio.
-      - ./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro
-      # Direttive di proxy condivise dai quattro location che parlano con l'API (`/api/`,
-      # `/webhooks/`, `/uploads/`, `/health`). Stesso motivo dell'estensione `.inc` qui sopra.
-      - ./nginx_bluman_proxy.inc:/etc/nginx/conf.d/bluman_proxy.inc:ro
+      # I tre file (default.conf, bluman_app.inc, bluman_proxy.inc) stanno nella CARTELLA
+      # `nginx/`, e si monta la **cartella** — non i singoli file.
+      #
+      # Non è una preferenza di stile: è la differenza fra un deploy che applica la
+      # configurazione e uno che si limita a dirlo. `git` non riscrive i file sul posto — li
+      # scrive a parte e li rinomina, cioè **cambia inode**. Docker, su un bind mount di un
+      # FILE SINGOLO, lega l'inode e non il percorso: dopo un `git pull` il container
+      # continuava a servire il file vecchio, `nginx -t` e `nginx -s reload` **riuscivano**
+      # rileggendolo, e il deploy risultava verde con la configurazione di giorni prima.
+      # Montata la CARTELLA il percorso si risolve a ogni accesso, quindi le sostituzioni di
+      # git si vedono subito: `nginx -t` valida finalmente il file nuovo e il reload resta a
+      # zero downtime. È la stessa ragione per cui `frontend/dist` — montata come cartella —
+      # si è sempre aggiornata.
+      #
+      # Successo l'08/10/2026: il container serviva `bluman_app.inc` del 02/10 (inode 840680)
+      # mentre sull'host c'era quello del giorno (inode 840706), senza un errore da nessuna
+      # parte. Il presidio è in `src/infrastrutturaDeploy.test.ts`.
+      #
+      # Estensione `.inc` e non `.conf` per due dei tre: nginx carica da solo tutti i `*.conf`
+      # di conf.d/, e un secondo `.conf` con un `location` fuori da un `server` farebbe
+      # fallire l'avvio.
+      - ./nginx:/etc/nginx/conf.d:ro
       - ./frontend/dist:/usr/share/nginx/html:ro
       # Il volume `bluman_uploads` NON si monta qui. Serviti da nginx come file statici, i
       # documenti del vault sarebbero scaricabili da chiunque conoscesse il nome del file:
       # nessun token, nessun tenant, nessuna firma. `GET /uploads/:filename` in
       # src/routes/catalogo.ts pretende il Bearer oppure una firma HMAC a scadenza e
       # verifica il percorso risolto contro il path traversal — quindi /uploads/ va
-      # proxato all'API come ogni altra rotta (vedi nginx.conf).
+      # proxato all'API come ogni altra rotta (vedi nginx/default.conf).
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
     networks:
@@ -216,7 +230,7 @@ services:
   # PRIMA EMISSIONE (una tantum, con nginx :80 già su e il dominio che punta al VPS):
   #   docker compose -f docker-compose.prod.yml run --rm --entrypoint \
   #     "certbot certonly --webroot -w /var/www/certbot -d IL.TUO.DOMINIO --email TUA@EMAIL --agree-tos --no-eff-email" certbot
-  # Poi in nginx.conf scommenta il blocco server :443 e il `return 301` su :80, sostituisci
+  # Poi in nginx/default.conf scommenta il blocco server :443 e il `return 301` su :80, sostituisci
   # IL.TUO.DOMINIO, e ricarica: `docker compose exec nginx nginx -s reload`.
   # Da lì in poi questo servizio rinnova da solo (Let's Encrypt scade a 90 giorni).
   certbot:

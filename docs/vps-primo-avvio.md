@@ -92,7 +92,7 @@ errore visibile.
 Da **fuori** (o dal server su `127.0.0.1`) passando da nginx: l'API non pubblica la 3000 sull'host,
 quindi `curl http://127.0.0.1:3000/health` **non risponde** e non significa che l'API sia giù.
 L'unica porta pubblicata è nginx (80/443), che proxa le API **sotto `/api`** e toglie il prefisso
-prima di consegnare la richiesta a Fastify (`nginx_bluman_app.inc`). Restano in radice solo tre
+prima di consegnare la richiesta a Fastify (`nginx/bluman_app.inc`). Restano in radice solo tre
 eccezioni con un motivo che non dipende da questo repository: `/webhooks/` (l'indirizzo è già in
 mano a Meta e Telegram), `/uploads/` (gli URL sono salvati a database e dentro email spedite) e
 `/health` (lo interroga il monitor del VPS, `scripts/monitor-vps.sh`).
@@ -111,7 +111,7 @@ mano a Meta e Telegram), `/uploads/` (gli URL sono salvati a database e dentro e
 docker compose -f docker-compose.prod.yml run --rm --entrypoint \
   "certbot certonly --webroot -w /var/www/certbot -d IL.TUO.DOMINIO --email TUA@EMAIL --agree-tos --no-eff-email" certbot
 ```
-Poi in `nginx.conf` scommenta il blocco `server :443` e il `return 301` su :80, sostituisci il dominio,
+Poi in `nginx/default.conf` scommenta il blocco `server :443` e il `return 301` su :80, sostituisci il dominio,
 e `docker compose … exec nginx nginx -s reload`. Il servizio `certbot` rinnova poi da solo.
 
 ### Telegram: un bot, un webhook — e il VPS **non** può prenderlo (02/10/2026)
@@ -404,7 +404,7 @@ terminale e il container se lo mangia: la sessione si interrompe **a metà senza
 script tutte le chiamate passano da `ssh_vps`, che mette `</dev/null` e non manda mai script sullo
 stdin. Vale anche a mano: aggiungi `-T` e `< /dev/null`.
 
-⚠️ **Ricreare `api` obbliga a ricaricare nginx.** `nginx_bluman_app.inc` fa `proxy_pass
+⚠️ **Ricreare `api` obbliga a ricaricare nginx.** `nginx/bluman_app.inc` fa `proxy_pass
 http://api:3000;` e **non c'è nessuna direttiva `resolver`**: nginx risolve il nome del servizio
 **una volta sola, all'avvio**, e poi tiene quell'indirizzo IP finché non glielo si fa rileggere.
 Ricreando il container `api` il suo IP cambia, e nginx continua a bussare all'indirizzo vecchio:
@@ -418,6 +418,22 @@ docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload
 La soluzione strutturale sarebbe un `resolver 127.0.0.11 valid=10s;` con `proxy_pass` su una
 variabile; finché non c'è, la ricarica è obbligatoria — e **`distribuisci.sh --solo-vps` la fa da
 sé** dal 02/10/2026 (passo *d-bis*).
+
+⚠️ **E la ricarica, da sola, non basta a far arrivare una modifica alla configurazione** (scoperto
+l'**08/10/2026**). I tre file di nginx stanno in `nginx/` e il compose monta la **cartella**
+(`./nginx:/etc/nginx/conf.d:ro`), non i singoli file. Non è estetica: un bind mount di un **file
+singolo** lega l'**inode**, non il percorso, e `git` non riscrive sul posto ma **rinomina** — quindi
+dopo un `git pull` il container continuava a servire il file del **02/10** mentre sull'host c'era
+quello dell'08/10. `nginx -t` e `nginx -s reload` **riuscivano**, rileggendo però il file vecchio:
+deploy verde, configurazione di sei giorni prima, nessun errore da nessuna parte. Con la cartella
+montata il percorso si risolve a ogni accesso, quindi il reload è corretto per costruzione. Se
+dubiti, confronta gli inode:
+
+```bash
+cd /opt/bluman
+stat -c %i nginx/bluman_app.inc
+docker compose -f docker-compose.prod.yml exec -T nginx stat -c %i /etc/nginx/conf.d/bluman_app.inc
+```
 
 **Non è ipotetico.** Il log di nginx mostra `/health` → **502** l'**01/10/2026** alle 11:53, 13:35 e
 15:05, dall'IP di casa del titolare: sono i deploy di quel giorno. Il 02/10 non si è ripetuto solo

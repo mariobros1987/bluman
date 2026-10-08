@@ -81,7 +81,7 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   continua a bussare al vecchio → **502 su tutte le rotte API mentre l'API è viva** (successo davvero
   il 01/10/2026). Dal 02/10/2026 lo fa `distribuisci.sh --solo-vps` da sé.
 - **Sul VPS le API stanno sotto `/api`**, e nginx toglie il prefisso prima di consegnare la richiesta
-  a Fastify (`nginx_bluman_app.inc`: `proxy_pass http://api:3000/`). Non è un gusto: senza prefisso
+  a Fastify (`nginx/bluman_app.inc`: `proxy_pass http://api:3000/`). Non è un gusto: senza prefisso
   una pagina e una rotta possono avere lo stesso percorso (`/invoices` è la pagina Fatture **e** la
   rotta che ne restituisce i dati) e nginx non può servire tutte e due. Fino al **02/10/2026** si
   usava la stessa origine senza prefisso più un **elenco di 45 prefissi**: sette pagine — `/portal`,
@@ -107,6 +107,18 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   vedere. ⚠️ Si usa `expires` e **non** `add_header`: un `add_header` dentro un `location` **annulla**
   quelli ereditati dal server, quindi le tre intestazioni di sicurezza (`X-Content-Type-Options`,
   `X-Frame-Options`, `Referrer-Policy`) sarebbero sparite proprio dalle risposte del frontend.
+- **I file di nginx si montano come CARTELLA** (dall'08/10/2026): stanno in `nginx/`
+  (`default.conf`, `bluman_app.inc`, `bluman_proxy.inc`) e il compose monta
+  `./nginx:/etc/nginx/conf.d:ro`. ⚠️ Un bind mount di un **file singolo** lega l'**inode**, non il
+  percorso, e `git` non riscrive sul posto ma **rinomina**: dopo un `git pull` il container
+  continuava a servire il file vecchio — `bluman_app.inc` del 02/10 contro quello dell'08/10 —
+  mentre `nginx -t` e `nginx -s reload` **riuscivano**, perché rileggevano il file vecchio. Deploy
+  verde, configurazione di sei giorni prima, nessun errore da nessuna parte. Montata la cartella il
+  percorso si risolve a ogni accesso: le sostituzioni di git si vedono subito, il reload resta a
+  zero downtime e `nginx -t` valida finalmente il file **nuovo**. È la stessa ragione per cui
+  `frontend/dist`, montata come cartella, si è sempre aggiornata. ⚠️ Davanti a un «deploy verde ma
+  non si vede», **prima** si confronta l'inode host/container (`stat -c %i` da entrambe le parti) e
+  **poi** si dubita del browser. Presidio: `src/infrastrutturaDeploy.test.ts`.
 - **`pg_stat_statements`** (dal 02/10/2026): dichiarato nel compose sul servizio `postgres`, rende
   visibili le query lente. Precaricabile solo all'avvio del server, quindi non basta `CREATE EXTENSION`.
 - **Le connessioni al database non si controllano con `pg_stat_activity`**: con PgBouncer davanti

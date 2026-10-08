@@ -295,7 +295,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   });
 
   // Header di sicurezza su OGNI risposta, anche dove non c'è nginx a metterli. Il deploy
-  // self-hosted li riceve da `nginx_bluman_app.inc`, ma su Railway il container è esposto
+  // self-hosted li riceve da `nginx/bluman_app.inc`, ma su Railway il container è esposto
   // direttamente: senza helmet nessuna risposta API portava X-Content-Type-Options,
   // X-Frame-Options o una CSP. La CSP qui è la stessa della rotta uploads (`default-src
   // 'none'`): un'API che serve JSON non ha legittimità di caricare risorse. Swagger UI

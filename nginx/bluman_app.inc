@@ -1,5 +1,5 @@
 # ═════════════════════════════════════════════════════════════════════
-# BLUMAN — corpo condiviso dei server block (incluso da nginx.conf su :80 e :443)
+# BLUMAN — corpo condiviso dei server block (incluso da nginx/default.conf su :80 e :443)
 # Sta in un file a parte per non duplicare l'instradamento in due posti:
 # una sola copia significa che non possono divergere.
 # ═════════════════════════════════════════════════════════════════════

@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
- * Presidio dell'infrastruttura di deployment (`docker-compose.prod.yml`, `nginx.conf`,
- * `nginx_bluman_app.inc`, `nginx_bluman_proxy.inc`, `scripts/distribuisci.sh`).
+ * Presidio dell'infrastruttura di deployment (`docker-compose.prod.yml`, `nginx/default.conf`,
+ * `nginx/bluman_app.inc`, `nginx/bluman_proxy.inc`, `scripts/distribuisci.sh`).
  *
  * Nasce da due difetti che nessun test copriva, perché i presidi esistenti guardano solo
  * `.ts`/`.tsx` (vedi `CARTELLE_DA_ISPEZIONARE` in `src/credenziali.test.ts`):
@@ -56,7 +56,7 @@ function rotteDellaSpa(): string[] {
 }
 
 describe('🚦 nginx — API sotto /api, pagine in radice', () => {
-  const sorgente = () => leggi('nginx_bluman_app.inc');
+  const sorgente = () => leggi('nginx', 'bluman_app.inc');
 
   it('proxa le API sotto /api togliendo il prefisso', () => {
     // `proxy_pass` CON uri in un location di prefisso sostituisce il prefisso: `/api/invoices`
@@ -119,7 +119,7 @@ describe('🚦 nginx — API sotto /api, pagine in radice', () => {
     const inclusioni = inc.match(/include \/etc\/nginx\/conf\.d\/bluman_proxy\.inc;/g) ?? [];
     expect(inclusioni.length, 'i quattro location che parlano con l API devono includere il file condiviso').toBe(4);
 
-    const proxy = leggi('nginx_bluman_proxy.inc');
+    const proxy = leggi('nginx', 'bluman_proxy.inc');
     expect(proxy).not.toMatch(/^\s*location\s/m); // viene incluso DENTRO un blocco
     expect(proxy).toContain('proxy_set_header X-Real-IP $remote_addr;');
     expect(proxy).toContain('proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;');
@@ -129,17 +129,39 @@ describe('🚦 nginx — API sotto /api, pagine in radice', () => {
   });
 
   it('tiene l instradamento in un solo file, incluso da entrambi i server block', () => {
-    const conf = leggi('nginx.conf');
+    const conf = leggi('nginx', 'default.conf');
     expect(conf).not.toMatch(/location\s+\^~\s+\/api\//);
     expect(conf).toContain('include /etc/nginx/conf.d/bluman_app.inc;');
   });
 
-  it('monta in nginx entrambi i file inclusi', () => {
+  it('monta in nginx l intera cartella dei file inclusi', () => {
     // Un `include` che punta a un file non montato fa fallire l'avvio di nginx. Il sintomo è il
     // VPS intero giù con un errore che parla di un percorso nel container, non del compose.
     const compose = leggi('docker-compose.prod.yml');
-    expect(compose).toContain('./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro');
-    expect(compose).toContain('./nginx_bluman_proxy.inc:/etc/nginx/conf.d/bluman_proxy.inc:ro');
+    expect(compose).toContain('./nginx:/etc/nginx/conf.d:ro');
+  });
+
+  it('non monta i file di nginx uno per uno, o il deploy mentirebbe', () => {
+    // Il presidio che mancava, e nasce da un guasto vero (08/10/2026). Un bind mount di un FILE
+    // SINGOLO lega l'**inode**, non il percorso; `git` non riscrive sul posto ma rinomina,
+    // quindi cambia inode. Il container continuava a servire il file vecchio — in quel caso
+    // `bluman_app.inc` del 02/10 contro quello dell'08/10 — mentre `nginx -t` e
+    // `nginx -s reload` riuscivano, perché rileggevano il file vecchio. Deploy verde,
+    // configurazione di giorni prima, nessun errore da nessuna parte.
+    //
+    // Montata la CARTELLA il percorso si risolve a ogni accesso, e il reload diventa corretto
+    // per costruzione. Questo test esiste per impedire che qualcuno «semplifichi» tornando ai
+    // tre mount singoli: il guasto che ne segue non si vede, si vede solo il deploy dire ✔.
+    const compose = leggi('docker-compose.prod.yml');
+    const montaggi = [...compose.matchAll(/^\s*-\s*\.\/([^\s:]+):/gm)].map((m) => m[1]!);
+    const fileSingoli = montaggi.filter(
+      (sorgente) => sorgente.endsWith('.conf') || sorgente.endsWith('.inc'),
+    );
+    expect(
+      fileSingoli,
+      `montaggi di file singoli in docker-compose.prod.yml: ${fileSingoli.join(', ')} — ` +
+        'usare la cartella `./nginx:/etc/nginx/conf.d:ro`',
+    ).toEqual([]);
   });
 
   it('proxa /uploads/ all API invece di servirlo come file statico', () => {

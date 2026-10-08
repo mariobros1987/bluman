@@ -80,7 +80,7 @@
 >
 > **Difetto trovato e corretto l'08/10/2026, fuori dall'audit** — e non è di sicurezza, è di
 > *distribuzione*: il VPS non mandava **nessun `Cache-Control`** sulle risposte del frontend
-> (`nginx_bluman_app.inc`, `location /`), quindi il browser applicava la scadenza euristica (≈10%
+> (`nginx/bluman_app.inc`, `location /`), quindi il browser applicava la scadenza euristica (≈10%
 > dell'età del file) e per ore continuava a servire dalla cache il **vecchio `index.html`** — che è il
 > file che *nomina* gli asset. Sintomo riportato dal titolare: «nel VPS non sono arrivate le modifiche
 > fatte», con `git` allineato, bundle nuovo realmente servito dalla porta 80 e nessun errore da nessuna
@@ -91,6 +91,23 @@
 > ereditati dal server — le tre intestazioni di sicurezza sarebbero sparite proprio dal frontend.
 > Config validata in un container usa-e-getta sul VPS (`nginx -t`, con la rete del compose perché
 > `api` si risolva) **prima** di distribuire.
+>
+> **E il primo deploy della correzione è FALLITO — al passo 7, con la sonda che ha funzionato.**
+> Causa diversa, sintomo identico: `docker-compose.prod.yml` montava i tre file di nginx **uno per
+> uno** (`./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro`), e un bind mount di un **file
+> singolo** lega l'**inode**, non il percorso. `git` non riscrive sul posto: scrive a parte e
+> **rinomina**, quindi cambia inode — il container serviva il file del **02/10** (inode 840680)
+> mentre sull'host c'era quello dell'**08/10** (inode 840706). `nginx -t` e `nginx -s reload`
+> riuscivano *davvero*, rileggendo però il file vecchio: passi 1, 2 e 6 tutti verdi, «nginx
+> ricaricato» ✔, e la configurazione in produzione ferma a sei giorni prima. La sonda della cache ha
+> bocciato il deploy (`trovato: «nessuno»`) e lo script è uscito **con 1**: il guasto l'ha visto la
+> sonda, non il browser. Il 02/10 non era emerso solo perché quel giorno cambiò anche il compose,
+> quindi `up -d` **ricreò** nginx e il mount fu rifatto. **Rimedio strutturale**: i tre file stanno
+> in `nginx/` e il compose monta la **cartella** (`./nginx:/etc/nginx/conf.d:ro`) — il mount di una
+> cartella risolve il percorso a ogni accesso, quindi le sostituzioni di git si vedono subito, il
+> reload resta a **zero downtime** e `nginx -t` valida finalmente il file **nuovo** invece di quello
+> in esecuzione. È la stessa ragione per cui `frontend/dist` — montata come cartella — si è sempre
+> aggiornata. Presidio: `src/infrastrutturaDeploy.test.ts` (vieta i montaggi di file singoli).
 
 | # | Cosa | Dove | Come si chiude |
 |---|------|------|----------------|

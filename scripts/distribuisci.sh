@@ -321,8 +321,42 @@ if [ "$VPS" -eq 1 ]; then
   ssh_vps "cd $VPS_DIR && $COMPOSE_PROD up -d" >/dev/null
   successo "Container aggiornati."
 
+  # d-ter) Il container deve servire la configurazione del REPOSITORY, non una copia vecchia.
+  #
+  #    Nato l'08/10/2026 da un guasto che nessun altro controllo vedeva. I tre file di nginx
+  #    erano montati UNO PER UNO (`./nginx_bluman_app.inc:/etc/nginx/conf.d/bluman_app.inc:ro`),
+  #    e un bind mount di un file singolo lega l'**inode**, non il percorso: `git` non riscrive
+  #    sul posto ma **rinomina**, quindi cambia inode, e il container continuava a servire il
+  #    file del 02/10 mentre sull'host c'era quello dell'08/10. `nginx -t` e `nginx -s reload`
+  #    riuscivano — rileggevano il file vecchio — quindi il deploy diceva ✔ su tutti i passi con
+  #    la configurazione di sei giorni prima. È la versione «infrastruttura» del difetto della
+  #    cache: non manca qualcosa, è cambiato qualcosa e non si vede.
+  #
+  #    Il rimedio strutturale è montare la CARTELLA (`./nginx:/etc/nginx/conf.d:ro`), dove il
+  #    percorso si risolve a ogni accesso — e il presidio in `src/infrastrutturaDeploy.test.ts`
+  #    impedisce che i mount singoli rientrino. Questo confronto è la rete SOTTO il rimedio, e
+  #    copre il caso che il presidio non può coprire: la transizione. Se il compose cambia ma
+  #    `up -d` non ricrea nginx (o lo fa a metà), il container resta sul file vecchio e nessun
+  #    altro controllo se ne accorge; qui lo si vede e lo si ripara da sé.
+  CONF_NEL_REPO=$(ssh_vps "cd $VPS_DIR && sha256sum nginx/bluman_app.inc | awk '{print \$1}'")
+  CONF_NEL_CONTAINER=$(ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T nginx sha256sum /etc/nginx/conf.d/bluman_app.inc | awk '{print \$1}' | tr -d '\r'")
+  if [ "$CONF_NEL_REPO" != "$CONF_NEL_CONTAINER" ]; then
+    avviso "Il container serve una configurazione nginx diversa da quella del repository: lo ricreo."
+    ssh_vps "cd $VPS_DIR && $COMPOSE_PROD up -d --force-recreate --no-deps nginx" >/dev/null
+    CONF_NEL_CONTAINER=$(ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T nginx sha256sum /etc/nginx/conf.d/bluman_app.inc | awk '{print \$1}' | tr -d '\r'")
+  fi
+  if [ -n "$CONF_NEL_REPO" ] && [ "$CONF_NEL_REPO" = "$CONF_NEL_CONTAINER" ]; then
+    successo "Configurazione nginx allineata al repository."
+  else
+    echo "ERRORE: il container nginx non serve la configurazione del repository (repo=${CONF_NEL_REPO:-vuoto}, container=${CONF_NEL_CONTAINER:-vuoto})." >&2
+    echo "  Una modifica sotto \`nginx/\` resterebbe invisibile: il deploy direbbe ✔ con la configurazione" >&2
+    echo "  vecchia, ed è il guasto dell'08/10/2026. Atteso in docker-compose.prod.yml: il montaggio" >&2
+    echo "  della cartella \`./nginx:/etc/nginx/conf.d:ro\`, non dei singoli file." >&2
+    exit 1
+  fi
+
   # d-bis) nginx va RICARICATO a mano, e saltarlo rompe l'API in modo silenzioso.
-  #    `nginx_bluman_app.inc` fa `proxy_pass http://api:3000;` e non ha nessuna direttiva
+  #    `nginx/bluman_app.inc` fa `proxy_pass http://api:3000;` e non ha nessuna direttiva
   #    `resolver`: nginx risolve il nome `api` **una volta sola, all'avvio**, e tiene quell'IP.
   #    Ricreando il container l'IP cambia — e nginx continua a bussare a quello vecchio, quindi
   #    risponde **502 su tutte le rotte API mentre l'API è viva e risponde**. Il sintomo manda a
@@ -391,7 +425,7 @@ if [ "$VPS" -eq 1 ]; then
       echo "ERRORE: $VPS_BASE/ non manda un Cache-Control che imponga la rivalidazione (trovato: «${CACHE_FE:-nessuno}»)." >&2
       echo "  Il browser servirebbe l'index.html vecchio dalla cache — e con esso gli asset che quello" >&2
       echo "  nomina — quindi un deploy verde resterebbe invisibile a chi ha già aperto l'app." >&2
-      echo "  Atteso: \`expires -1;\` dentro \`location /\` in nginx_bluman_app.inc." >&2
+      echo "  Atteso: \`expires -1;\` dentro \`location /\` in nginx/bluman_app.inc." >&2
       exit 1
       ;;
   esac
@@ -408,7 +442,7 @@ if [ "$VPS" -eq 1 ]; then
     case "$TIPO" in
       text/html*) ;;
       *)
-        echo "ERRORE: $VPS_BASE$PAGINA ha risposto «$TIPO» invece di HTML: la richiesta è finita all'API invece che al frontend. Il location /api/ di nginx_bluman_app.inc è quello giusto?" >&2
+        echo "ERRORE: $VPS_BASE$PAGINA ha risposto «$TIPO» invece di HTML: la richiesta è finita all'API invece che al frontend. Il location /api/ di nginx/bluman_app.inc è quello giusto?" >&2
         exit 1
         ;;
     esac
