@@ -12,10 +12,10 @@
 
 | | |
 |---|---|
-| Ultimo commit | `413a2e42` — 09/10/2026, **distribuito in produzione** (Vercel + Railway + VPS) |
+| Ultimo commit | `41a9276c` — 09/10/2026, **distribuito in produzione** (Vercel + Railway + VPS), `EXIT=0` |
 | Branch | `main`, **allineato a `origin/main`** |
-| Working tree | **voci 4, 5, 6 e 9(c) fatte e distribuite**; in questo momento contiene le modifiche delle **voci 6 + 9(c)** (vedi §«Voci 6 e 9(c)») |
-| VPS | ✅ **Allineato a `413a2e42`** il 09/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (RLS attivo, `checkRls` «spento su 0») |
+| Working tree | **pulito.** Le voci **4, 5, 6 e 9(c)** sono fatte e in produzione |
+| VPS | ✅ **Allineato a `41a9276c`** il 09/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle») |
 | Prossimo passo | La **18** (secondo studio reale), e — in parallelo — la **voce 8**, sbloccata dallo spike dello 09/10 (non serve il dominio) |
 | ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
 
@@ -338,7 +338,8 @@ cosa **manca**. Qui la sintesi.
 | **6 — perché `azione=anagrafica`** | `?client=` da solo apre il modale del **Magic Link**, e ci arrivano `Dashboard.tsx:351` e `ProjectDetail.tsx:869` passando il **nome**. Ripuntarlo all'anagrafica avrebbe rotto quei due; un parametro in più no. |
 | **6 — perché `fetchCliente` e non la lista** | La pagina legge **quel** cliente per id (`GET /clienti/:id`, già esistente) invece di cercarlo fra i clienti caricati: il cliente può stare in un'altra pagina o essere escluso dai filtri, e il modale non si aprirebbe — cioè il clic resterebbe un vicolo cieco, lo stesso difetto con un'altra faccia. Un `useRef` impedisce che il modale si riapra dopo che l'operatore l'ha chiuso. Se il cliente non c'è più (cancellato, o di un altro tenant e nascosto da RLS) si dice così, invece di aprire un modale vuoto. |
 | **9(c) — il filtro «senza fascicolo»** | Nuovo `frontend/src/utils/notificheFiltro.ts` (helper puri, verificabili senza montare il pannello) + i chip in `NotificationModal`. **Filtra sul tipo d'evento, non sul tipo visivo**: `messaggio_non_instradabile` e l'euristica KYC condividono `type: 'blocked'`, quindi un filtro su `type` mostrerebbe anche i KYC. Per questo `NotificationItem` porta ora anche `tipoEvento`, riempito in `mapNotificaBackend`. Il chip **compare solo se c'è almeno un avviso da isolare** (un filtro che porta al vuoto è peggio di un filtro assente), il badge «N nuove» conta **dentro il filtro** (altrimenti direbbe «3 nuove» mostrandone 1) e il vuoto ha una frase sua. |
-| **Presidi** | `npx vitest run` → **1588 passati** (backend, +4 sul servizio: le quattro destinazioni), **152 passati** (frontend, +8 su `notificheFiltro`), `tsc --noEmit` pulito su entrambi i lati. Documentazione allineata: `docs/manuale/15-comunicazioni.md`, `PIANO_DI_MIGLIORAMENTO.md` (voci 6 e 9(c)). |
+| **Presidi** | `npx vitest run` → **1588 passati** (backend, 127 file, +4 sul servizio: le quattro destinazioni), **152 passati** (frontend, 19 file, +8 su `notificheFiltro`), `tsc --noEmit` pulito su entrambi i lati, `npm run build` verde, grafo aggiornato (5143 nodi, 12161 archi). Documentazione allineata: `docs/manuale/15-comunicazioni.md`, `PIANO_DI_MIGLIORAMENTO.md` (voci 6 e 9(c)). |
+| **Distribuzione** | ✅ **Commit `41a9276c`, distribuito il 09/10/2026** con `./scripts/distribuisci.sh` — `EXIT=0`: push su GitHub, Vercel `Ready` via CLI, `railway up` con health verde e sonda rotta 401, VPS allineato al commit con container ricreati, `migrate` + `rls` applicati, nginx ricaricato e tutte le sonde verdi. **Nota per la prossima volta:** il passo 1 dello script esegue **solo** la suite backend — i test frontend vanno lanciati a parte, e l'hook di pre-commit gira `oxlint --fix` *dopo* l'ultima esecuzione, quindi conviene rilanciarli sul codice committato. |
 
 ### ℹ️ I 2 secondi per query nei test — una scelta, non un difetto (chiarito il 09/10/2026)
 
