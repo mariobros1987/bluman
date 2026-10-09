@@ -12,11 +12,12 @@
 
 | | |
 |---|---|
-| Ultimo commit | `87a77482` — 08/10/2026 19:32 |
-| Branch | `main`, **allineato a `origin/main`** (nessun commit da pushare) |
-| Working tree | 17 file modificati + 2 nuovi, **non committati**: 9 di documentazione (questo file, `PIANO_DI_MIGLIORAMENTO.md`, `PIANO_MIGRAZIONE_VPS.md`, `.agents/AGENTS.md`, `docs/vps-primo-avvio.md`, `docs/manuale/19-infra-deploy.md`, `docs/manuale/README.md`, `docs/manuale/17-rbac.md`, `docs/manuale/15-comunicazioni.md`) e 8 di codice + 2 nuovi per le **voci 4 e 5** (vedi §«Deciso il 09/10/2026») |
-| VPS | ✅ **Allineato e verificato il 09/10/2026** — `87a77482` è in esecuzione e la configurazione nginx combacia byte per byte (vedi §5.1) |
-| Prossimo passo | **Voci 6 + 9(c)** (l'avviso «non instradabile» cliccabile + il filtro «senza fascicolo»), poi la **18** (secondo studio). La **voce 8-bis** è **sbloccata**: lo spike del 09/10 ha stabilito che non serve il dominio |
+| Ultimo commit | `413a2e42` — 09/10/2026, **distribuito in produzione** (Vercel + Railway + VPS) |
+| Branch | `main`, **allineato a `origin/main`** |
+| Working tree | **voci 4, 5, 6 e 9(c) fatte e distribuite**; in questo momento contiene le modifiche delle **voci 6 + 9(c)** (vedi §«Voci 6 e 9(c)») |
+| VPS | ✅ **Allineato a `413a2e42`** il 09/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (RLS attivo, `checkRls` «spento su 0») |
+| Prossimo passo | La **18** (secondo studio reale), e — in parallelo — la **voce 8**, sbloccata dallo spike dello 09/10 (non serve il dominio) |
+| ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
 
 ---
 
@@ -319,7 +320,7 @@ cosa **manca**. Qui la sintesi.
 | **Dove vive la credenziale rclone** (voce 8-bis) | **Nel form del superadmin**, non a mano sul server. Comporta tabella di piattaforma + cifratura a riposo con chiave **fuori** dal `.env` + rotta `/admin/*` + file di stato + **controllo di freschezza** sulla copia remota. **✅ Spike fatto il 09/10/2026: il dominio NON serve.** Il code flow Dropbox funziona **senza `redirect_uri`** (il codice si legge su dropbox.com e si incolla), PKCE è supportato, `token_access_type=offline` dà il **refresh token**, e **rclone non richiede un'app nostra** (`app_key`/`app_secret` si lasciano vuoti: usa la sua). Quindi la forma più semplice è «il superadmin incolla il **token rclone** generato con `rclone authorize dropbox` su una macchina con browser» — niente app Dropbox di BluMan, niente redirect URI, niente dominio |
 | **Lettura posta in ingresso** (voce 4) | **Governata come l'invio**: `communications = denied` non legge la posta in arrivo. **✅ fatta il 09/10/2026** — vedi sotto. |
 | **Errore di lettura matrice** (voce 5) | **Fail-closed sul default per ruolo**: si accetta che un guasto di lettura possa negare accessi legittimi, in cambio di non allargare mai i permessi per errore. **✅ fatta il 09/10/2026** — vedi sotto. |
-| **Messaggio senza pratiche aperte** (voci 6 e 9(c)) | **Campanella cliccabile + filtro «senza fascicolo»**: il link apre l'anagrafica del cliente. **Niente fascicolo generico** — il messaggio resta visibile finché non c'è una pratica, senza archivi finti. |
+| **Messaggio senza pratiche aperte** (voci 6 e 9(c)) | **Campanella cliccabile + filtro «senza fascicolo»**: il link apre l'anagrafica del cliente. **Niente fascicolo generico** — il messaggio resta visibile finché non c'è una pratica, senza archivi finti. **✅ fatta il 09/10/2026** — vedi sotto. |
 
 ### ✅ Voci 4 e 5 — fatte il 09/10/2026
 
@@ -329,23 +330,73 @@ cosa **manca**. Qui la sintesi.
 | **5 — fail-closed sull'errore di lettura** | Il `catch` dell'hook in `server.ts` ricade su `permessoDefaultPerRuolo` e logga che il livello applicato è un **ripiego**. L'argomento del fail-open era vero, ma l'effetto era che **l'error-path risultava più permissivo del percorso normale**: il rilievo chiuso il 27/09 tornava vivo a ogni lettura fallita. Il test che asseriva 200 ora asserisce 403; un secondo test fissa che il ripiego è il default **del ruolo**, non un blocco totale. |
 | **Presidi** | `npx vitest run` → **1584 passati** (backend, +3 nuovi: due sul fail-closed e uno sulla voce 4), **144 passati** (frontend, +5 nuovi su `comunicazioniAccesso`), `tsc --noEmit` pulito su entrambi i lati. Documentazione allineata: `docs/manuale/17-rbac.md` e `15-comunicazioni.md`. |
 
+### ✅ Voci 6 e 9(c) — fatte il 09/10/2026
+
+| Voce | Cosa è cambiato |
+|---|---|
+| **6 — l'avviso porta da qualche parte** | La destinazione la compone `destinazione()` in `src/services/ingressoSenzaFascicolo.ts`, in un posto solo: i sette punti che chiamano il servizio dichiarano **cosa conoscono** — `clienteId`, `progettoId` — non come si scrive un URL. Priorità: la **pratica** quando è nota (`/projects/<id>`; è il caso della chat collegata a una pratica poi chiusa, `webhooks.ts:644`, dove il gesto richiesto è «ripristinala» e l'anagrafica sarebbe un giro a vuoto), altrimenti l'**anagrafica** (`/clients?client=<id>&azione=anagrafica` — i tre rami «cliente noto, fascicolo non scegliibile»: `webhooks.ts:507` WhatsApp, `webhooks.ts:706` Telegram, `signalInbound.ts:179` Signal). Quando il mittente **non è identificato** il link resta `null`: non c'è nessuna scheda da aprire, e il `motivo` già dice cosa cercare. |
+| **6 — perché `azione=anagrafica`** | `?client=` da solo apre il modale del **Magic Link**, e ci arrivano `Dashboard.tsx:351` e `ProjectDetail.tsx:869` passando il **nome**. Ripuntarlo all'anagrafica avrebbe rotto quei due; un parametro in più no. |
+| **6 — perché `fetchCliente` e non la lista** | La pagina legge **quel** cliente per id (`GET /clienti/:id`, già esistente) invece di cercarlo fra i clienti caricati: il cliente può stare in un'altra pagina o essere escluso dai filtri, e il modale non si aprirebbe — cioè il clic resterebbe un vicolo cieco, lo stesso difetto con un'altra faccia. Un `useRef` impedisce che il modale si riapra dopo che l'operatore l'ha chiuso. Se il cliente non c'è più (cancellato, o di un altro tenant e nascosto da RLS) si dice così, invece di aprire un modale vuoto. |
+| **9(c) — il filtro «senza fascicolo»** | Nuovo `frontend/src/utils/notificheFiltro.ts` (helper puri, verificabili senza montare il pannello) + i chip in `NotificationModal`. **Filtra sul tipo d'evento, non sul tipo visivo**: `messaggio_non_instradabile` e l'euristica KYC condividono `type: 'blocked'`, quindi un filtro su `type` mostrerebbe anche i KYC. Per questo `NotificationItem` porta ora anche `tipoEvento`, riempito in `mapNotificaBackend`. Il chip **compare solo se c'è almeno un avviso da isolare** (un filtro che porta al vuoto è peggio di un filtro assente), il badge «N nuove» conta **dentro il filtro** (altrimenti direbbe «3 nuove» mostrandone 1) e il vuoto ha una frase sua. |
+| **Presidi** | `npx vitest run` → **1588 passati** (backend, +4 sul servizio: le quattro destinazioni), **152 passati** (frontend, +8 su `notificheFiltro`), `tsc --noEmit` pulito su entrambi i lati. Documentazione allineata: `docs/manuale/15-comunicazioni.md`, `PIANO_DI_MIGLIORAMENTO.md` (voci 6 e 9(c)). |
+
+### ℹ️ I 2 secondi per query nei test — una scelta, non un difetto (chiarito il 09/10/2026)
+
+**Questo non è una voce aperta e non c'è niente da correggere.** Va scritto perché il 09/10/2026 è
+stato attribuito per errore alla voce 5, e l'errore è istruttivo.
+
+I test **non usano un database, di proposito**: `vitest.setup.ts` neutralizza il `DATABASE_URL` di
+`.env` puntandolo a un indirizzo irraggiungibile prima che `new PrismaClient()` lo legga, così
+nessuna suite tocca mai dati veri. È la scelta del commit `c40b9a09` (**19/08/2026**, «rimozione
+credenziali hardcoded, isolamento test dal DB reale»), ed è una buona scelta. La conseguenza è che
+**ogni** query paga il tentativo di connessione prima di cadere sul ripiego in memoria, e
+`vitest.config.ts` lo dice dal primo giorno:
+
+```
+// Ogni query verso il DATABASE_URL irraggiungibile costa ~2s di tentativo di
+// connessione prima di cadere sul fallback in-memory: i 5s di default non bastano
+// per i test che percorrono più rotte di fila.
+testTimeout: 30_000,
+```
+
+**Misurato il 09/10/2026** su un database irraggiungibile: **2060 / 2038 / 2042 ms** su tre giri —
+deterministico, non una raffica di tentativi. `src/server.test.ts` dura **327 s** per 91 test
+(≈3,6 s l'uno, cioè più di una query per test), la suite backend intera **~6 minuti**.
+
+**Perché la voce 5 non c'entra: la lettura c'era già.** Il blocco RBAC *prima* della voce 5 era
+`try { await prisma.permessoModulo.findUnique(…) … } catch { /* fail-open, si lascia passare */ }`:
+l'`await` e i suoi 2 secondi erano già sul percorso di **ogni** richiesta autenticata. La voce 5 ha
+cambiato **solo il corpo del `catch`** — da «lascia passare» a «ricadi sul default di ruolo» — cioè
+quattro righe che non toccano né il numero né la durata delle query. **La voce 5 non ha allungato la
+suite.**
+
+**L'errore da non rifare:** il numero grosso (`327 s`) è stato visto *dopo* aver scritto la voce 5 ed
+è stato attribuito a essa senza misurare il *prima*. Era una correlazione nel tempo, non una causa.
+La proposta che ne è uscita — «mockare `permessoModulo` in 19 suite» — è stata **ritirata**: riparava
+un guasto inesistente, e avrebbe aggiunto 19 file di test finti a un impianto che è deliberatamente
+senza database.
+
+Se un giorno i ~6 minuti di suite daranno fastidio, la domanda vera è un'altra e va posta da capo
+(es. un database usa-e-getta per le suite che oggi non ne hanno uno) — **non** è un seguito della
+voce 5.
+
+
 ### Da affrontare per prime (scelte il 09/10/2026)
 
-Le voci 4 e 5 sono **chiuse** (tabella sopra). Restano:
+Le voci 4, 5, 6 e 9(c) sono **chiuse** (tabelle sopra). Restano:
 
-1. **Voce 6 + 9(c)** — l'avviso «messaggio non instradabile» ha `link` `null`
-   (`src/services/ingressoSenzaFascicolo.ts:57`). **Deciso**: cliccabile + filtro «senza fascicolo».
-   **Conseguenza attuale da sanare: `comunicazione_progetto` è vuota — nessun messaggio è mai stato
-   archiviato da nessun canale d'ingresso.**
-2. **Secondo studio reale** (voce 18) — è la prova end-to-end che manca ed è **sbloccata**: la
+1. **Secondo studio reale** (voce 18) — è la prova end-to-end che manca ed è **sbloccata**: la
    voce 7 (tenant dinamico) è risolta. **Resta la sola domanda aperta: quanti studi e chi li crea.**
    È il presupposto di `PIANO_MULTITENANT.md`, che resta una **decisione** prima di essere codice.
-3. ~~**Spike OAuth Dropbox** (voce 8-bis, ~15 minuti)~~ ✅ **Fatto il 09/10/2026: il dominio non
+2. ~~**Spike OAuth Dropbox** (voce 8-bis, ~15 minuti)~~ ✅ **Fatto il 09/10/2026: il dominio non
    serve.** Il code flow Dropbox accetta l'assenza di `redirect_uri` (il codice si legge su
    dropbox.com e si incolla nell'app), PKCE è supportato, `token_access_type=offline` restituisce il
    refresh token, e rclone non richiede un'app Dropbox nostra. La voce 8-bis si può fare subito,
    nella forma «il superadmin incolla il token rclone». Vedi la riga 8-bis di
    `PIANO_DI_MIGLIORAMENTO.md` §1bis.
+3. **Nient'altro.** I ~2 s per query nei test **non** sono una voce da fare: sono la scelta
+   deliberata del 19/08/2026 (§«I 2 secondi per query nei test»), e la voce 5 non li ha introdotti
+   né allungati. Un'eventuale revisione dei tempi della suite è un discorso a sé, da aprire da capo.
 
 ### Configurazione esterna (non è codice, è lavoro sul pannello o sul server)
 
@@ -389,12 +440,17 @@ Le voci 4 e 5 sono **chiuse** (tabella sopra). Restano:
    fascicoli; con `denied` risponde 403 e la scheda non compare (§«Voci 4 e 5»).
 3. ~~**Voce 5**~~ ✅ **Fatta il 09/10/2026** — l'errore di lettura della matrice ricade sul default
    per ruolo invece di lasciar passare (§«Voci 4 e 5»).
-4. **Voce 6 + 9(c)** — l'avviso «non instradabile» cliccabile e il filtro «senza fascicolo».
+4. ~~**Voce 6 + 9(c)**~~ ✅ **Fatte il 09/10/2026** — l'avviso «non instradabile» porta alla pratica o
+   all'anagrafica, e la campanella ha il filtro «senza fascicolo» (§«Voci 6 e 9(c)»).
 5. **Voce 18** — il secondo studio reale (resta la domanda: quanti e chi li crea).
 6. **Voce 8-bis** — ✅ **sbloccata il 09/10/2026** (il dominio non serve): form del superadmin in cui
    si incolla il token rclone. Resta da implementare: tabella di piattaforma, cifratura a riposo con
    chiave **fuori** dal `.env`, rotta `/admin/*`, file di stato, controllo di freschezza.
 7. **Attivare il backup off-site su Dropbox** con il controllo di freschezza.
+
+Nient'altro in coda. In particolare i **~2 s per query nei test** e la suite a ~6 minuti **non** sono
+una voce aperta: sono la scelta deliberata del 19/08/2026 descritta in §«I 2 secondi per query nei
+test», e la voce 5 non li ha né introdotti né allungati.
 
 ### Prima di toccare qualsiasi cosa
 

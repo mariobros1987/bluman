@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useToast } from './ui/ToastProvider';
+import {
+  haNotificheSenzaFascicolo,
+  nonLetteVisibili,
+  notificheVisibili,
+  type FiltroNotifiche,
+} from '../utils/notificheFiltro';
 
 export interface NotificationItem {
   id: string;
@@ -9,6 +15,12 @@ export interface NotificationItem {
   read: boolean;
   type: 'delay' | 'blocked' | 'system' | 'signature';
   link?: string;
+  /**
+   * Il tipo d'evento del backend (`modulo_completato`, `messaggio_non_instradabile`, …).
+   * `type` è il tipo *visivo*: due eventi diversi possono condividerlo, quindi per filtrare
+   * serve questo. Assente sulle notifiche vecchie. Vedi `utils/notificheFiltro.ts`.
+   */
+  tipoEvento?: string;
   /** Epoch ms: quando presente il pannello mostra il tempo relativo ("5 min fa"). */
   timestamp?: number;
 }
@@ -54,6 +66,19 @@ interface NotificationModalProps {
 export function NotificationModal({ notifications, onClose, onMarkAllRead, onSelectNotif }: NotificationModalProps) {
   const toast = useToast();
   const unreadCount = notifications.filter(n => !n.read).length;
+  // Voce 9(c), 09/10/2026 — «senza fascicolo»: isola gli avvisi di messaggio non archiviato.
+  // Il filtro è locale al pannello e riparte da «tutte» a ogni apertura, come il resto dello
+  // stato del pannello: nessuna memoria nascosta da qualche altra parte.
+  const [filtro, setFiltro] = useState<FiltroNotifiche>('tutte');
+  const mostraFiltro = haNotificheSenzaFascicolo(notifications);
+  // Se il filtro è attivo e l'ultimo avviso non instradabile sparisce (letto e rimosso dalla
+  // lista), il filtro tornerebbe a puntare su una lista vuota con il comando nascosto: nessun
+  // modo di uscirne. Si rientra su «tutte».
+  useEffect(() => {
+    if (filtro === 'senza_fascicolo' && !mostraFiltro) setFiltro('tutte');
+  }, [filtro, mostraFiltro]);
+  const visibili = notificheVisibili(notifications, filtro);
+  const nonLetteNelFiltro = nonLetteVisibili(notifications, filtro);
   const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       return Notification.permission;
@@ -117,9 +142,9 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>🔔</span>
           <span style={{ fontWeight: 600, fontSize: 13 }}>Centro Notifiche Studio</span>
-          {unreadCount > 0 && (
+          {nonLetteNelFiltro > 0 && (
             <span style={{ background: 'var(--red)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 10 }}>
-              {unreadCount} nuove
+              {nonLetteNelFiltro} nuove
             </span>
           )}
         </div>
@@ -165,17 +190,54 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
         )}
       </div>
 
+      {/* Filtro «senza fascicolo» (voce 9(c), 09/10/2026).
+          Compare solo quando c'è almeno un avviso da isolare: un filtro che porta al vuoto
+          è peggio di un filtro assente. */}
+      {mostraFiltro && (
+        <div style={{ display: 'flex', gap: 6, padding: '8px 12px', borderBottom: '1px solid var(--pill-slate-bd)', background: 'var(--surface-2)' }}>
+          {([
+            { chiave: 'tutte' as const, etichetta: `Tutte (${notifications.length})` },
+            { chiave: 'senza_fascicolo' as const, etichetta: `Senza fascicolo (${notificheVisibili(notifications, 'senza_fascicolo').length})` },
+          ]).map(({ chiave, etichetta }) => {
+            const attivo = filtro === chiave;
+            return (
+              <button
+                key={chiave}
+                type="button"
+                onClick={() => setFiltro(chiave)}
+                style={{
+                  background: attivo ? 'var(--indigo)' : 'var(--pill-slate-bg)',
+                  color: attivo ? '#fff' : 'var(--pill-slate-fg)',
+                  border: `1px solid ${attivo ? 'var(--indigo)' : 'var(--pill-slate-bd)'}`,
+                  borderRadius: 999,
+                  padding: '3px 10px',
+                  fontSize: 10.5,
+                  fontWeight: attivo ? 700 : 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {etichetta}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Notifiche List — timeline raggruppata per giorno */}
       <div style={{ maxHeight: 360, overflowY: 'auto', padding: 8 }}>
-        {notifications.length === 0 ? (
+        {visibili.length === 0 ? (
           <div style={{ padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>
             <div style={{ fontSize: 24, marginBottom: 6 }}>📭</div>
-            Nessuna notifica in sospeso
+            {/* Il vuoto del filtro non è il vuoto della campanella: dirlo aiuta a capire che
+                non manca niente, è che si sta guardando un sottoinsieme. */}
+            {filtro === 'senza_fascicolo'
+              ? 'Nessun messaggio in attesa di fascicolo'
+              : 'Nessuna notifica in sospeso'}
           </div>
         ) : (
           (() => {
             let ultimoGiorno = '';
-            return notifications.map((n) => {
+            return visibili.map((n) => {
               const stile = STILE_TIPO[n.type] || STILE_TIPO.system;
               // Separatore di giorno: compare quando si cambia data rispetto alla notifica sopra.
               let separatore: string | null = null;

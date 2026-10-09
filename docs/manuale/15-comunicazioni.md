@@ -6,6 +6,17 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
 - **Invio**: dallo studio (scheda Comunicazioni del progetto) via il canale configurato; ogni invio è
   registrato come comunicazione in uscita.
 - **Ingestione**: i messaggi in arrivo (webhook/IMAP) entrano nel fascicolo del cliente/pratica.
+- **Quando il messaggio non si può archiviare**, non si butta e non si indovina: se il mittente non
+  è univoco, o il cliente ha **più di una pratica aperta** (o nessuna), scegliere il fascicolo
+  sarebbe un'invenzione. Il messaggio vive allora in **campanella** come avviso «messaggio non
+  archiviato», che dice chi ha scritto, cosa ha scritto e **cosa fare** perché il prossimo entri da
+  solo. **Dal 09/10/2026 l'avviso è cliccabile**: porta alla scheda della **pratica** quando la
+  pratica è nota (chat collegata a una pratica poi chiusa), altrimenti all'**anagrafica** di quel
+  cliente. Se il mittente non è stato identificato il clic non porta da nessuna parte, ed è
+  voluto: non c'è una scheda da aprire, e l'avviso dice cosa cercare. La campanella ha un filtro
+  **«senza fascicolo»** che isola questi avvisi dagli altri, e compare solo quando ce n'è almeno uno.
+  **Non** si crea un fascicolo generico: un messaggio che a nessuna pratica appartiene non ha un
+  fascicolo, e inventarne uno sarebbe un archivio finto.
 - **Collegamento chat per pratica**: un link `t.me/<bot>?start=<payload>` aggancia la chat Telegram del
   cliente a **quella** pratica (il payload è firmato HMAC); si copia o si invia via email/WhatsApp.
 - **Messaggi ↔ micro-voci**: ogni messaggio può essere legato alla micro-voce di cui parla, così
@@ -105,6 +116,12 @@ tengono onesto, e sono tutte necessarie:
   nessun compositore — l'operatore crederebbe di aver risposto «dentro la voce» e non è vero.
 - **Un messaggio scritto dalla voce resta nel fascicolo** anche se poi lo si slega: si toglie
   l'etichetta, non il messaggio.
+- **Un messaggio non archiviabile non sparisce in silenzio.** Prima il webhook rispondeva «ok» al
+  provider e usciva: Telegram e Meta, soddisfatti, non riprovavano, il fascicolo restava vuoto e
+  nessuno sapeva che un messaggio era esistito. Ora l'avviso arriva in campanella, e se l'avviso
+  stesso non parte la riga di idempotenza viene **rimossa** perché il provider ritenti — altrimenti
+  al rinvio si troverebbe la riga già scritta e uscirebbe in silenzio, cioè lo stesso guasto per
+  una porta più stretta.
 
 ## 🔧 Nota tecnica
 - Servizi: `src/services/emailRelay.ts`, `imapInbound.ts`, `collegamentoChat.ts`,

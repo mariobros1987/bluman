@@ -511,6 +511,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
                 ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
                 : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
                   + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+              clienteId: matchingClient.id,
             });
             continue;
           }
@@ -648,6 +649,9 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
               + `${collegato.progetto.stato === 'archived' ? 'archiviata' : 'conclusa'}: `
               + 'non raccoglie più messaggi. Ripristinala, oppure manda al cliente il link di una '
               + 'pratica aperta — toccandolo, questa chat passerà lì.',
+            // La pratica è nota e il gesto richiesto («ripristinala») si fa sulla sua scheda:
+            // mandare all'anagrafica del cliente sarebbe un giro a vuoto.
+            progettoId: collegato.progetto.id,
           });
           return reply.status(202).send({ ok: true, ignored: 'progetto_chiuso' });
         }
@@ -710,6 +714,7 @@ export async function registraRotteWebhooks(server: FastifyInstance): Promise<vo
             ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
             : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
               + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+          clienteId: cliente.id,
         });
         return reply.status(202).send({ ok: true, ignored: 'project_not_unique' });
       }

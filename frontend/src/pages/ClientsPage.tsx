@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { fetchClienti, creaClienteApi, resetPasswordClienteApi } from '../api/client';
+import React, { useState, useEffect, useRef } from 'react';
+import { fetchClienti, fetchCliente, creaClienteApi, resetPasswordClienteApi } from '../api/client';
 import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
@@ -47,6 +47,11 @@ export function ClientsPage() {
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const targetClientQuery = searchParams.get('client') || '';
+  // `?client=<id>` da solo apre il modale del Magic Link (ci arrivano Dashboard e ProjectDetail,
+  // che passano il **nome** del cliente). L'avviso «messaggio non instradabile» vuole un'altra
+  // cosa — l'anagrafica — e passa l'**id**, perché il nome può ripetersi fra due clienti e
+  // aprire la scheda sbagliata sarebbe peggio che non aprire niente. Da qui il parametro in più.
+  const apriAnagrafica = searchParams.get('azione') === 'anagrafica';
 
   const [clienti, setClienti] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
@@ -236,7 +241,8 @@ export function ClientsPage() {
     }
     setClienti(visibleClients);
 
-    if (targetClientQuery) {
+    // Il Magic Link è il comportamento di `?client=` quando non c'è `azione=anagrafica`.
+    if (targetClientQuery && !apriAnagrafica) {
       const found = visibleClients.find(c => c.nome.toLowerCase().includes(targetClientQuery.toLowerCase()) || c.id.includes(targetClientQuery));
       if (found) {
         setMagicLinkModal(found);
@@ -244,6 +250,50 @@ export function ClientsPage() {
     }
     setLoading(false);
   };
+
+  // ── Voce 6 (09/10/2026): l'avviso «messaggio non instradabile» apre l'anagrafica ──────────
+  // Si legge **quel** cliente per id (`GET /clienti/:id`), non lo si cerca dentro la lista
+  // caricata: il cliente può stare in un'altra pagina, o essere escluso dai filtri attivi, e in
+  // quel caso il modale non si aprirebbe proprio — cioè il clic resterebbe un vicolo cieco, che
+  // è esattamente il difetto che questa voce chiude. Per lo stesso motivo l'id e non il nome:
+  // due clienti possono chiamarsi uguale, e aprire la scheda sbagliata è peggio che non aprire.
+  //
+  // `apriAnagraficaFatta` è un guardiano, non uno stato: senza, un re-render o un ritorno sulla
+  // pagina riaprirebbe il modale che l'operatore ha appena chiuso.
+  const apriAnagraficaFatta = useRef(false);
+  useEffect(() => {
+    if (!apriAnagrafica || !targetClientQuery || apriAnagraficaFatta.current) return;
+    apriAnagraficaFatta.current = true;
+
+    let annullato = false;
+    fetchCliente(targetClientQuery)
+      .then(cliente => {
+        if (annullato) return;
+        if (cliente) {
+          openEditModal(cliente as Cliente);
+          return;
+        }
+        // Il cliente è stato cancellato, o l'id non è di questo tenant (le policy RLS lo
+        // nascondono, ed è giusto così). Non si apre un modale vuoto e non si inventa un
+        // cliente: si dice che non c'è più, che è l'unica cosa vera.
+        toast.attenzione('Il cliente di questo avviso non esiste più: potrebbe essere stato cancellato.');
+      })
+      .catch(err => {
+        if (annullato) return;
+        console.warn('Apertura anagrafica da avviso fallita:', err);
+        // Il caso più probabile è che il cliente non ci sia più: la rotta risponde 404 quando
+        // l'id non esiste **o** quando è di un altro tenant (RLS lo nasconde, giustamente). Non
+        // si distingue, perché dal client non si può: si dice che potrebbe non esserci più
+        // invece di affermarlo, e non si apre un modale vuoto.
+        toast.attenzione("Non è stato possibile aprire l'anagrafica: il cliente potrebbe non esistere più.");
+      });
+
+    return () => { annullato = true; };
+    // `openEditModal` e `toast` sono ricreati a ogni render e non sono memoizzati: metterli fra
+    // le dipendenze farebbe ripartire l'effetto a ogni render. Il guardiano rende comunque
+    // l'esecuzione una sola volta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apriAnagrafica, targetClientQuery]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

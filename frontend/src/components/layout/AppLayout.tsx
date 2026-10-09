@@ -60,6 +60,9 @@ function mapNotificaBackend(n: any): NotificationItem {
     read: n.statoLettura === 'letta',
     type: tipo,
     link: n.link || undefined,
+    // Il tipo d'evento grezzo viaggia con la notifica perché serve al filtro «senza fascicolo»
+    // (voce 9(c)): `type` è solo l'aspetto visivo, e due eventi diversi lo condividono.
+    tipoEvento: n.tipoEvento || undefined,
     timestamp: tsRaw ? new Date(tsRaw).getTime() : undefined,
   };
 }

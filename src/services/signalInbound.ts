@@ -183,6 +183,7 @@ export async function riceviMessaggiSignal(tenantId: string): Promise<EsitoRicez
             ? 'Non ha nessun progetto aperto: aprine uno, oppure scrivi al cliente da qui.'
             : `Ha ${attivi.length} progetti aperti (${attivi.map(p => p.nome).join(', ')}): `
               + 'chiudi quelli conclusi così i prossimi messaggi entrano da soli.',
+          clienteId: cliente.id,
         }).catch((err) => {
           // L'avviso non deve fermare il ciclo: se fallisce, il conteggio scartati è
           // già stato incrementato e il caller vede che il messaggio non è entrato.

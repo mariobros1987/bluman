@@ -8,6 +8,8 @@
  *    ricevuto, per non intasare la campanella.
  * 3. **Motivo che nomina i progetti**: l'operatore deve sapere *perché* il messaggio non è
  *    entrato e *come* sbloccarlo — il motivo elenca i nomi dei progetti aperti.
+ * 4. **Destinazione del clic** (voce 6, 09/10/2026): il link porta all'anagrafica del cliente o
+ *    alla pratica, e resta `null` quando il mittente non è stato identificato.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -220,5 +222,73 @@ describe('registraIngressoSenzaFascicolo', () => {
     });
 
     expect(ordine).toEqual(['inbox', 'notifica']);
+  });
+
+  // ─── 5. La destinazione del clic (voce 6, 09/10/2026) ────────────────────
+  // L'avviso aveva `link: null`: la campanella diceva che un messaggio esisteva e non portava
+  // da nessuna parte. Qui si presidia che la destinazione sia quella giusta, e soprattutto che
+  // resti `null` quando non c'è nessuna scheda da aprire — perché inventare un link a vuoto
+  // sarebbe lo stesso difetto con un'altra faccia.
+  describe('la destinazione del clic', () => {
+    /** Il `link` passato a `notificaStudio` nell'unica chiamata fatta. */
+    async function linkDi(dati: Parameters<typeof registraIngressoSenzaFascicolo>[3]) {
+      await registraIngressoSenzaFascicolo(TENANT, CANALE, 'update-link', dati);
+      const chiamata = mockNotificaStudio.mock.calls[0];
+      expect(chiamata).toBeDefined();
+      return chiamata![1].link as string | null;
+    }
+
+    it("con il cliente noto apre l'anagrafica, con il parametro che la distingue dal Magic Link", async () => {
+      const link = await linkDi({
+        mittente: 'Anna Verdi',
+        testo: 'Buongiorno',
+        motivo: 'Ha 2 progetti aperti.',
+        clienteId: 'cl-123',
+      });
+
+      expect(link).toBe('/clients?client=cl-123&azione=anagrafica');
+      // `?client=` da solo apre il modale del Magic Link: senza `azione=anagrafica` l'operatore
+      // finirebbe davanti la finestra sbagliata credendola quella giusta.
+      expect(link).toContain('azione=anagrafica');
+    });
+
+    it('con la pratica nota apre la pratica, e vince sul cliente', async () => {
+      const link = await linkDi({
+        mittente: 'Anna Verdi',
+        testo: 'Buongiorno',
+        motivo: 'La chat è collegata a una pratica conclusa.',
+        clienteId: 'cl-123',
+        progettoId: 'pr-9',
+      });
+
+      // La pratica è la destinazione più specifica: il gesto richiesto («ripristinala») si fa
+      // sulla sua scheda, mentre l'anagrafica sarebbe un giro a vuoto.
+      expect(link).toBe('/projects/pr-9');
+    });
+
+    it('senza cliente e senza pratica il link resta null: non c\'è nessuna scheda da aprire', async () => {
+      const link = await linkDi({
+        mittente: 'Chat Telegram 245520495',
+        testo: 'Ciao',
+        motivo: 'Il chat id non è in nessuna scheda cliente.',
+      });
+
+      // Il mittente non è stato identificato: aprire una ricerca vuota sarebbe un finto rimedio.
+      // Il `motivo` dice cosa cercare, ed è l'unica indicazione onesta che si possa dare.
+      expect(link).toBeNull();
+    });
+
+    it("l'id finisce nell'URL codificato, non grezzo", async () => {
+      const link = await linkDi({
+        mittente: 'Anna Verdi',
+        testo: 'Buongiorno',
+        motivo: 'Ha 2 progetti aperti.',
+        clienteId: 'cl/123 & altro',
+      });
+
+      // Gli id oggi non contengono caratteri da codificare, ma il giorno in cui li contenessero
+      // un link rotto passerebbe inosservato fino a che qualcuno non lo clicca.
+      expect(link).toBe('/clients?client=cl%2F123%20%26%20altro&azione=anagrafica');
+    });
   });
 });
