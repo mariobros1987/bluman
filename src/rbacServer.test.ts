@@ -148,13 +148,59 @@ describe('server — enforcement della Matrice Permessi (RBAC)', () => {
     await server.close();
   });
 
-  it('un database irraggiungibile non trasforma la matrice in un blocco totale (fail-open)', async () => {
+  it('un database irraggiungibile NON apre: si ricade sul default per ruolo (fail-closed)', async () => {
+    // Fino al 09/10/2026 questo test asseriva l'opposto (200): la scelta argomentata era che la
+    // sessione è verificata sullo stesso database un attimo prima, quindi un errore di lettura
+    // della matrice non è un attacco. Il difetto era un altro, e stava nell'asimmetria:
+    // **l'error-path era più permissivo del percorso normale**. Con la matrice raggiungibile
+    // questo collaboratore prende 403 (default `denied` su invoices); con la matrice
+    // irraggiungibile prendeva l'accesso pieno. Cioè il rilievo di sicurezza chiuso il 27/09
+    // tornava vivo ogni volta che una query falliva — e per accorgersene sarebbe servito
+    // guardare i log, non l'API.
+    // Voce 5, decisa col titolare: si sbaglia dal lato che si vede (una porta chiusa per errore
+    // si nota e si riapre; una porta aperta per errore non si nota).
     permessiTest.errore = new Error('DB irraggiungibile');
     const server = await serverDiTest();
     const res = await server.inject({ method: 'GET', url: '/fatture/tutte', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
-    // La sessione era stata verificata sullo stesso DB un attimo prima: qui si
-    // logga e si lascia passare, non si 403-a raffica.
+    expect(res.statusCode).toBe(403);
+    expect(res.json().errore).toContain('invoices');
+    await server.close();
+  });
+
+  it('col database irraggiungibile il ripiego è il default del RUOLO, non un blocco totale', async () => {
+    // La stessa caduta, su un modulo dove il ruolo ha davvero accesso: `clients` è `read` nel
+    // default di collaboratore_interno, quindi la lettura passa lo stesso. Serve a fissare che
+    // il fail-closed sia «ricadi sul default», non «nega tutto quando qualcosa va storto».
+    permessiTest.errore = new Error('DB irraggiungibile');
+    const server = await serverDiTest();
+    const res = await server.inject({ method: 'GET', url: '/clienti', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
     expect(res.statusCode).toBe(200);
+    await server.close();
+  });
+
+  it('voce 4 — la lettura della casella comunicazioni è governata come l\'invio', async () => {
+    // Prima del 09/10/2026 queste rotte non erano in mappa: un collaboratore con
+    // `communications: denied` non poteva scrivere ai clienti ma leggeva tutta la loro
+    // corrispondenza. Ora il 403 arriva prima del handler, quindi il test non tocca IMAP.
+    permessiTest.perModulo = { communications: 'denied' };
+    const server = await serverDiTest();
+    const posta = await server.inject({ method: 'POST', url: '/comunicazioni/email-in-arrivo', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
+    expect(posta.statusCode).toBe(403);
+    expect(posta.json().errore).toContain('communications');
+    const fascicolo = await server.inject({ method: 'GET', url: '/progetti/abc/comunicazioni', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
+    expect(fascicolo.statusCode).toBe(403);
+    // E la matrice è stata interrogata davvero, non aggirata.
+    expect(permessiTest.viste.map(v => v.moduloChiave)).toEqual(['communications', 'communications']);
+    await server.close();
+  });
+
+  it('«read» su communications lascia leggere la casella e blocca l\'invio', async () => {
+    // La semantica di voce 4: `read` è «consulta la conversazione ma non scrivere», e vale
+    // identica per la posta in ingresso e per l'invio.
+    permessiTest.perModulo = { communications: 'read' };
+    const server = await serverDiTest();
+    const invio = await server.inject({ method: 'POST', url: '/comunicazioni/invia-email', headers: { authorization: `Bearer ${token('collaboratore_interno')}` } });
+    expect(invio.statusCode).toBe(403);
     await server.close();
   });
 });

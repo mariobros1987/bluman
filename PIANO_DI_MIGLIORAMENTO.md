@@ -51,7 +51,7 @@
 
 ---
 
-## 1bis. Lavori aperti — scaletta al 03/10/2026, registro dal 17/09/2026
+## 1bis. Lavori aperti — scaletta al 03/10/2026, voci 4 e 5 chiuse il 09/10/2026, registro dal 17/09/2026
 
 > Questa sezione è il posto dove si scrive cosa **manca**, perché il grafo (`graphify-out/`) è
 > generato e non può ospitarlo. Va tenuta corta e cancellata man mano che le voci si chiudono.
@@ -72,6 +72,34 @@
 > Il materiale di partenza è in **`AUDIT_2026-09-27/`** (ora versionato, commit `752e9c63`): la
 > sintesi `00-AUDIT_COMPLETO.md`, le sette sezioni e la revisione avversariale `08`. La
 > remediation è deployata; quello che resta è qui sotto.
+>
+> **Deciso col titolare il 09/10/2026, e le prime due sono già fatte.** (a) **Le prime quattro voci
+> da chiudere**, scelte fra tutte quelle aperte: la **6** insieme alla **9(c)** (l'avviso «messaggio
+> non instradabile» va reso cliccabile e va deciso il caso del cliente **senza pratiche aperte**), la
+> **4** (la lettura della posta in ingresso governata come l'invio) — **✅ fatta il 09/10/2026**, la
+> **5** (l'error-path della matrice che deve ricadere sul **default per ruolo** invece di lasciar
+> passare) — **✅ fatta il 09/10/2026** — e la **18** (il **secondo studio reale**, ora sbloccato
+> dalla voce 7). (b) Il provider della copia off-site (**voce 8**): **Dropbox**.
+> (c) Il **VPS è verificato allineato** al 09/10/2026 — vedi la nota di verifica nella sezione qui
+> sotto (nessuna voce nuova, nessuna voce chiusa in questa sede: sono decisioni d'ordine).
+> **Restano da fare, in quest'ordine**: la **6 + 9(c)**, poi la **18**, e — in parallelo — la **8**,
+> che parte da uno spike OAuth di ~15 minuti (vedi la riga 8-bis).
+>
+> **Le risposte alle quattro voci, decise col titolare il 09/10/2026** (le domande di progetto erano
+> aperte, ora non lo sono più):
+> - **Voce 4** — la lettura della posta in ingresso **va governata come l'invio**: chi ha
+>   `communications = denied` **non** legge la posta in arrivo. Da verificare che nessun ruolo
+>   legittimo perda accesso (i ruoli interni dello studio restano il caso da controllare).
+> - **Voce 5** — l'error-path della matrice **ricade sul default per ruolo** (`permessoDefaultPerRuolo`,
+>   già chiuso il 27/09): preferito il **fail-closed**, accettando che un guasto di lettura possa
+>   negare accessi legittimi.
+> - **Voci 6 e 9(c)** — l'avviso «non instradabile» diventa **cliccabile** (apre l'anagrafica del
+>   cliente) e la campanella prende un **filtro «senza fascicolo»**. **Non** si crea un fascicolo
+>   generico: finché non c'è una pratica aperta il messaggio resta visibile in campanella, senza
+>   archivi finti.
+> - **Voce 8 — dove vive la credenziale rclone**: scelto il **form nel superadmin** (le credenziali
+>   Dropbox si inseriscono dall'app, non a mano sul server). Comporta un lavoro che la voce 8 non
+>   prevedeva — vedi la voce 8-bis qui sotto.
 
 #### 🔴 Aperto — sicurezza (residuo dell'audit)
 
@@ -108,6 +136,21 @@
 > reload resta a **zero downtime** e `nginx -t` valida finalmente il file **nuovo** invece di quello
 > in esecuzione. È la stessa ragione per cui `frontend/dist` — montata come cartella — si è sempre
 > aggiornata. Presidio: `src/infrastrutturaDeploy.test.ts` (vieta i montaggi di file singoli).
+>
+> **Verificato il 09/10/2026: il deploy era arrivato — e non era scritto da nessuna parte.** Il
+> dubbio aperto dopo lo spegnimento del PC era «il secondo tentativo è andato a termine?». La
+> risposta, presa dal server e non dai documenti: `git rev-parse HEAD` in `/opt/bluman` →
+> `87a77482…`, cioè l'ultimo commit di `main`; **sha256 di `nginx/bluman_app.inc` identico** tra
+> repository e container (`15d1bb90…5f85a`), che è precisamente il confronto del passo 6-d-ter e
+> l'unica prova che la configurazione **in esecuzione** è quella del repository; `nginx` e `api`
+> ricreati ~13 minuti dopo il commit, `postgres`/`pgbouncer` Up, `migrate` e `rls` **Exited (0)**
+> nello stesso giro; l'ultima migrazione applicata è `20261005120000_comunicazione_microvoce`
+> (05/10 16:44 UTC), che è anche l'ultima del repository. Dal frontend: `/` risponde
+> `Cache-Control: no-cache` e `/assets/*.js` `max-age=31536000` (il rimedio della cache è attivo),
+> le **sette** pagine della SPA tornano `text/html` e `/api/health` `200 JSON`. **Il guasto
+> dell'08/10 è guarito**: la lezione che ne resta è che «il deploy è arrivato» va **verificato sul
+> server**, perché lo script che lo dice è lo stesso che può mentire (era il caso del 02/10), e
+> nessun documento lo registrava.
 
 | # | Cosa | Dove | Come si chiude |
 |---|------|------|----------------|
@@ -117,10 +160,15 @@
 
 #### 🟡 Da decidere col titolare — non per forza da correggere
 
+> **Le voci 4 e 5 sono chiuse** (decise e implementate il 09/10/2026). Restano in questa tabella —
+> invece che nella tabella dei lavori chiusi — perché la loro riga racconta *perché* la scelta è
+> caduta da quel lato, ed è la parte che serve rileggere fra sei mesi: la colonna «La domanda» porta
+> ora la risposta. L'unica voce ancora aperta qui è la **6**.
+
 | # | Cosa | Dove | La domanda |
 |---|------|------|------------|
-| 4 | **La posta in ingresso non è governata dalla matrice permessi** — `ROTTE_MODULO` mappa solo le rotte di **invio** `/comunicazioni/invia-*`; il commento dice che è deliberato («la lettura fascicolo comunicazioni resta libera»). Ma un collaboratore con `communications = denied` legge comunque la posta in arrivo | `src/util/rbacModuli.ts:64-71` | La lettura della posta in ingresso dev'essere governata come l'invio? |
-| 5 | **Fail-open sulla lettura della matrice RBAC** — se la query della matrice fallisce si passa, e quell'error-path è ora **più permissivo** del default per ruolo (il default per ruolo è stato chiuso il 27/09 con `permessoDefaultPerRuolo`). Il design è deliberato (la sessione è già verificata sullo stesso DB) | `src/util/rbacModuli.ts:109-119`, `server.ts` | Rivalutare: l'errore di lettura deve ricadere sul default per ruolo invece di lasciar passare? |
+| 4 | ✅ **La posta in ingresso è governata dalla matrice permessi** — **deciso e fatto il 09/10/2026**. `ROTTE_MODULO` mappa ora l'intero prefisso `/comunicazioni` (non più le sole quattro rotte `/comunicazioni/invia-*`) più `/progetti/:id/comunicazioni` e `/microvoci/:id/comunicazioni`. L'eccezione è `PATCH /progetti/:id/comunicazioni/segna-lette`, che resta su `projects`: con `communications: read` il livello `read` bloccherebbe ogni metodo non-GET, e il contatore dei non letti non si spegnerebbe più per nessuno che non abbia `write`. Presidi: `src/rbacModuli.test.ts` (voce 4) e `src/rbacServer.test.ts` — 403 su `POST /comunicazioni/email-in-arrivo` e `GET /progetti/:id/comunicazioni` per un collaboratore con `denied`, più il caso `read` che lascia leggere e blocca l'invio. Frontend: `frontend/src/utils/comunicazioniAccesso.ts` (`haAccessoComunicazioni`) — la scheda «Comunicazioni & Ingestion» di `ProjectDetail` e la linguetta «Messaggi» di `PassaggioModal` non compaiono a chi la matrice nega, altrimenti mostrerebbero una porta che risponde 403 | `src/util/rbacModuli.ts`, `src/rbacServer.test.ts`, `frontend/src/utils/comunicazioniAccesso.ts` | — |
+| 5 | ✅ **Fail-closed sulla lettura della matrice RBAC** — **deciso e fatto il 09/10/2026**. Il `catch` dell'hook in `server.ts` ricade su `permessoDefaultPerRuolo` e **logga che il livello applicato è un ripiego**, invece di lasciar passare. L'argomento a favore del fail-open era vero (la sessione è verificata sullo stesso database un attimo prima) ma l'effetto era un altro: **l'error-path risultava più permissivo del percorso normale**. Con la matrice raggiungibile quel collaboratore su `invoices` prende 403; con la matrice irraggiungibile otteneva l'accesso pieno — cioè il rilievo chiuso il 27/09 con `permessoDefaultPerRuolo` tornava vivo a ogni lettura fallita. Il test che asseriva il vecchio comportamento (200) ora asserisce l'opposto (403), e un secondo test fissa che il ripiego è il default **del ruolo** e non un blocco totale (`clients: read` per un collaboratore → 200) | `src/server.ts`, `src/rbacServer.test.ts` | — |
 | 6 | **L'avviso «messaggio non instradabile» non porta da nessuna parte** — la campanella dice che il messaggio esiste ma il `link` è `null`. Conseguenza: `comunicazione_progetto` è vuota, nessun messaggio è mai stato archiviato da nessun canale d'ingresso | `src/services/ingressoSenzaFascicolo.ts:57` | Renderlo cliccabile (aprire l'anagrafica di quel cliente) e: il messaggio di un cliente **senza pratiche aperte** deve restare solo in campanella? (vedi anche la voce 9(c) qui sotto) |
 
 #### ⚙️ Configurazione esterna — non è codice, è lavoro sul pannello / sul server
@@ -128,7 +176,8 @@
 | # | Cosa | Dove si chiude | Stato al 03/10/2026 |
 |---|------|----------------|---------------------|
 | 7 | **CI come cancello di deploy** — decisione già presa («sì») | dashboard Railway/Vercel («wait for CI») | Meno urgente di prima: `distribuisci.sh` valida (typecheck BE/FE, lint, build, suite intera) **prima** di pushare, ed è bloccante |
-| 8 | **Backup off-site** — il VPS ha **un solo filesystem**: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco | `rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE` | Decisione presa (spazio cloud già pagato, non Backblaze); **manca quale** (Drive/OneDrive/Dropbox) e un **controllo di freschezza** — con Drive l'auth scade in silenzio e la copia smette senza avvisare |
+| 8 | **Backup off-site** — il VPS ha **un solo filesystem**: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco | `rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE` | **✅ Il provider è deciso: Dropbox** (09/10/2026 — spazio cloud già pagato, non Backblaze). **Resta da fare**: configurare `rclone` sul VPS e `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, **più un controllo di freschezza** — l'autenticazione rclone può scadere in silenzio e la copia smette senza avvisare, quindi senza quel controllo si sostituisce un buco con un buco più silenzioso |
+| 8-bis | **Credenziali Dropbox dal superadmin** (conseguenza della voce 8, decisa il 09/10/2026): il token rclone si inserisce **dall'app**, non a mano sul server. Comporta una **tabella di piattaforma** nuova (`super_admin` ha `tenant_id` NULL, quindi non può stare in una riga tenant) + **cifratura a riposo** con una chiave che **non** stia dentro il `.env` (altrimenti il dump su Dropbox conterrebbe cifrato **e** chiave) + una rotta `/admin/*` riservata al super_admin + la scrittura di un **file di stato** che `backup-vps.sh` aggiorna e la UI legge, **più un controllo di freschezza** sulla copia remota (l'auth rclone scade in silenzio: senza quel controllo si sostituirebbe un buco con un buco più silenzioso) | `src/routes/tenant.ts` (`/admin/*`), `prisma/schema.prisma`, `frontend/src/pages/SuperAdminPage.tsx`, `scripts/backup-vps.sh` | **✅ Spike fatto il 09/10/2026 — il dominio NON serve, e non serve nemmeno un'app Dropbox nostra.** Le quattro cose verificate sulla documentazione: **(1)** il code flow Dropbox funziona **senza `redirect_uri`**: «*The redirect_uri is optional with the code flow — if unspecified, the authorization code is displayed on dropbox.com for the user to copy and paste to your app*». Il callback HTTPS ospitato è una comodità, non un requisito. **(2)** PKCE è supportato ed è la raccomandazione per i client che non possono custodire un `client_secret`. **(3)** con `token_access_type=offline` sull'URL di autorizzazione lo scambio su `/oauth2/token` restituisce un **refresh token**: è la credenziale lunga che serve a un cron notturno, perché l'access token scade. **(4)** **rclone non ha bisogno di un'app nostra**: `rclone config` per Dropbox dice «app_key/app_secret — leave blank normally» e usa **la sua** app registrata; sulla macchina senza browser il percorso documentato è `rclone authorize dropbox` altrove e **incollare il token**. La credenziale che deve vivere sul VPS è quindi il **token rclone in JSON** (contiene il refresh token; rclone rinnova da sé l'access token) e si può passare con `--config` (flag globale) o `RCLONE_CONFIG`/`RCLONE_DROPBOX_TOKEN`. **Conseguenza: la voce si sblocca con la sola forma «il superadmin incolla il token rclone nel form»** (generato con `rclone authorize dropbox` su una macchina con browser): niente app Dropbox di BluMan, niente redirect URI, niente dominio. Il pulsante «Collega Dropbox» diventa un campo «incolla qui il token», che è anche più onesto su cosa sta succedendo. Il flusso OAuth con pulsante e callback resta fattibile **in un secondo momento**, senza dominio, con lo stesso trucco del codice incollato a mano — non è un prerequisito |
 | 9 | **Custodia di `BACKUP_ENCRYPTION_KEY`** — la chiave sta dentro il `.env` che viene cifrato con sé stessa: se il server muore, senza una copia **fuori dal server** i backup non si aprono più | foglio a mano in cassaforte (data + nome della variabile) | Decisione presa; va **verificata** riscrivendo la chiave dal foglio e aprendo un backup vero |
 | 10 | **TLS sul VPS** | `docs/vps-primo-avvio.md` §6 | Quando il DNS punterà al server |
 | 11 | **Telegram sul VPS** — `TELEGRAM_WEBHOOK_SECRET` è assente dal container, e Telegram ammette **un solo webhook per bot** (occupato da Railway). Oggi il 400 sul VPS **protegge la produzione**: se passasse, il webhook si sposterebbe via da Railway in silenzio | secondo bot da BotFather; `docs/vps-primo-avvio.md` §6 | Al cut-over. Il bot di produzione si sposta **solo** allora, e mai su entrambi insieme |

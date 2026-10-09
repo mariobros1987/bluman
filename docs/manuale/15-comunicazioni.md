@@ -48,8 +48,13 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
 - I canali si configurano in **Impostazioni** (§16).
 
 ## 📐 Calcoli & logica
-- **Invio governato dalla Matrice Permessi** (modulo `communications`, §17): l'admin decide chi può
-  spedire (write) o solo consultare (read); ogni invio è **auditato**.
+- **Tutto il modulo è governato dalla Matrice Permessi** (`communications`, §17): l'admin decide chi
+  può scrivere ai clienti e chi può soltanto **consultare**. Dal 09/10/2026 la matrice copre anche la
+  **lettura** — casella in arrivo (`/comunicazioni/email-in-arrivo`, `/comunicazioni/poll-imap-allegati`,
+  `/comunicazioni/signal-in-arrivo`) e fascicoli (`/progetti/:id/comunicazioni`,
+  `/microvoci/:id/comunicazioni`). Prima erano mappate le sole rotte di invio: un collaboratore con
+  `communications: denied` non poteva scrivere ma leggeva tutta la corrispondenza dei clienti. Ogni
+  invio è **auditato**.
 - **Relay fail-closed**: senza `EMAIL_RELAY_SECRET` l'endpoint di relay è **disattivato** (non un open
   relay); il segreto è condiviso fra backend (Railway) e la funzione serverless (Vercel).
 - **Ingestione solo sul backend**: niente «ponte» su Vercel che scartava le intestazioni di autenticità
@@ -87,7 +92,9 @@ tengono onesto, e sono tutte necessarie:
 ## ⚠️ Stati limite & errori
 - Relay non configurato → invio email non parte (fail-closed).
 - Bot Telegram con username errato / id numerico → messaggi guidati diversi per rimedi diversi.
-- Chi non ha il permesso `communications=write` → invio bloccato.
+- Chi non ha il permesso `communications=write` → invio bloccato; chi non ha nemmeno `read` non vede
+  né la scheda del fascicolo né la linguetta «Messaggi» della micro-voce, e le rotte rispondono **403**
+  anche se le chiama a mano.
 - **Un messaggio abbinato non si perde mai**: togliere l'abbinamento toglie l'etichetta, non il
   messaggio dal fascicolo.
 - **Il ruolo cliente non può abbinare a mano** (403): può solo *dichiarare* la voce toccando il link

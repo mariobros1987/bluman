@@ -208,7 +208,10 @@ export function OperatorDetailModal({
     { key: 'reports', label: '📈 Report & Analytics Direzionali', desc: 'Ore, margini, ricavi, scadenzario e redditività con export PDF/Excel' },
     { key: 'library', label: '📚 Libreria Moduli & Distinta Base', desc: 'Catalogo articoli, template e moduli studio' },
     { key: 'calendar', label: '🗓 Calendario Studio & Scadenziario', desc: 'Calendario condiviso e gestione scadenze' },
-    { key: 'communications', label: '💬 Comunicazioni & Canali Cliente', desc: 'Invio email/WhatsApp/Telegram/Signal ai clienti dai canali dello studio' },
+    // «Lettura e invio», non più solo «Invio»: dal 09/10/2026 la matrice governa anche la casella
+    // in arrivo e il fascicolo del cliente (voce 4). Il livello «read» significa qui «consulta la
+    // conversazione senza poter scrivere», e vale identico per la posta e per l'invio.
+    { key: 'communications', label: '💬 Comunicazioni & Canali Cliente', desc: 'Lettura e invio email/WhatsApp/Telegram/Signal, casella in arrivo e fascicolo del cliente' },
     { key: 'audit', label: '🔍 Log Audit & Attività Operatori', desc: 'Tracciamento completo azioni operatori' },
     { key: 'settings', label: '⚙️ Impostazioni Studio & Canali', desc: 'Anagrafica studio, SMTP, IMAP e configurazioni' },
   ];

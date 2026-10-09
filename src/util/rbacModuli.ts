@@ -49,8 +49,19 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   // La via adapter per emettere fattura da scheda progetto: muove la
   // contabilità, non il progetto.
   ['/progetti/:id/fatture', 'invoices'],
+  // «Segna come letto» è un'azione di servizio sulla scheda progetto, non una lettura della
+  // conversazione: resta su `projects`. Così chi ha `communications = read` (vede la chat ma non
+  // scrive) può comunque azzerare il contatore dei non letti — altrimenti la campanella non si
+  // spegnerebbe mai, perché `read` blocca ogni metodo diverso da GET/HEAD.
+  ['/progetti/:id/comunicazioni/segna-lette', 'projects'],
+  // Il fascicolo comunicazioni del progetto appartiene al modulo Comunicazioni, non al progetto:
+  // dentro ci sono i messaggi dei clienti. Sta PRIMA di `/progetti` perché la prima
+  // corrispondenza vince. Vedi la nota su `/comunicazioni` più in basso (voce 4, 09/10/2026).
+  ['/progetti/:id/comunicazioni', 'communications'],
   ['/progetti', 'projects'],
   ['/preventivi', 'projects'],
+  // La chat della micro-voce è la stessa conversazione del cliente, quindi lo stesso modulo.
+  ['/microvoci/:id/comunicazioni', 'communications'],
   ['/microvoci', 'projects'],
   ['/passaggi', 'projects'],
   ['/checklist', 'projects'],
@@ -61,14 +72,19 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   ['/contratti-ricorrenti', 'retainers'],
   ['/prima-nota', 'primanota'],
   ['/conti-bancari', 'banks'],
-  // L'invio dai canali dello studio è governato dalla matrice: l'admin decide, per ogni
-  // collaboratore (interno o esterno), chi può spedire (write), chi solo consultare la chat
-  // (read → il POST di invio è bloccato) e chi no (denied). Nessuna riga = permesso (default).
-  // Solo le rotte di INVIO, non quelle in arrivo. La lettura fascicolo comunicazioni resta libera.
-  ['/comunicazioni/invia-email', 'communications'],
-  ['/comunicazioni/invia-whatsapp', 'communications'],
-  ['/comunicazioni/invia-signal', 'communications'],
-  ['/comunicazioni/invia-telegram', 'communications'],
+  // L'intero modulo Comunicazioni è governato dalla matrice — invio E lettura della casella.
+  // L'admin decide, per ogni collaboratore (interno o esterno), chi può scrivere ai clienti
+  // (write), chi può solo consultare la conversazione (read → l'invio è bloccato, la lettura no)
+  // e chi non vede nulla (denied). Nessuna riga = default per ruolo (vedi `permessoDefaultPerRuolo`).
+  //
+  // Fino al 09/10/2026 erano mappate le sole quattro rotte `/comunicazioni/invia-*` (voce 4 del
+  // piano: la lettura della posta in ingresso resta libera — mentre l'invio no — era una
+  // asimmetria che nessuno aveva chiesto). Adesso è un prefisso solo: `/comunicazioni/email-in-arrivo`,
+  // `/comunicazioni/poll-imap-allegati` e `/comunicazioni/signal-in-arrivo` leggono la casella
+  // dello studio e i messaggi dei clienti, ed è esattamente la materia del modulo.
+  // Stanno tutte dietro l'autenticazione (non sono in ROTTE_PUBBLICHE): le chiama il frontend
+  // col JWT dell'operatore, non un relay esterno.
+  ['/comunicazioni', 'communications'],
   // Vault documentale e Document Studio (§01): la matrice vale anche via API, non solo nell'UI. Un
   // collaboratore con documents=read consulta ma non carica/firma/elimina; denied blocca; write pieno.
   // NB: il portale cliente (/portal/documenti) NON è qui (ruolo cliente, gestito a parte).

@@ -142,10 +142,14 @@ async function rifiutaInvio(
 }
 
 export async function registraRotteComunicazioni(server: FastifyInstance): Promise<void> {
-  // §06 (decisione titolare 27/09) — chi può inviare dai canali dello studio lo decide l'admin del
-  // tenant tramite la Matrice Permessi (modulo `communications`): l'enforcement è nell'hook onRequest
-  // (rbacModuli), non qui. Un collaboratore interno o esterno con `write` invia, `read`/`denied` no,
-  // nessuna riga = permesso (default). Qui resta l'AUDIT: ogni dispatch lascia traccia (mittente,
+  // §06 (decisione titolare 27/09, estesa il 09/10/2026) — chi può usare i canali dello studio lo
+  // decide l'admin del tenant tramite la Matrice Permessi (modulo `communications`): l'enforcement è
+  // nell'hook onRequest (rbacModuli), non qui. Un collaboratore interno o esterno con `write` invia
+  // e legge, `read` legge soltanto (l'invio è 403), `denied` non vede nient'altro, nessuna riga =
+  // default per ruolo. Fino al 09/10/2026 la matrice copriva le sole rotte di INVIO: la lettura
+  // della casella e dei fascicoli restava libera (voce 4 del piano di miglioramento), e un
+  // collaboratore a cui era stata negata la scrittura leggeva comunque la corrispondenza dei
+  // clienti. Qui resta l'AUDIT: ogni dispatch lascia traccia (mittente,
   // canale, destinatario), così un invio con `comunicazioneId` omesso non è senza traccia forense.
   const auditDispatch = async (req: FastifyRequest, canale: string, destinatario: string, esito: string) => {
     await recordAudit({

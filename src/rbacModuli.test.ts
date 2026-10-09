@@ -19,6 +19,12 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/progetti')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id/moduli/:moduloId')).toBe('projects');
+    // Eccezione speculare, dallo stesso criterio: la chat del cliente è materia del modulo
+    // Comunicazioni, non del progetto. «Segna come letto» invece resta un'azione di servizio
+    // sulla scheda — se stesse su communications, chi ha `read` non riuscirebbe mai a spegnere
+    // la campanella, perché `read` blocca ogni metodo diverso da GET/HEAD.
+    expect(moduloDellaRotta('/progetti/:id/comunicazioni')).toBe('communications');
+    expect(moduloDellaRotta('/progetti/:id/comunicazioni/segna-lette')).toBe('projects');
   });
 
   it('mappa i prefissi dei moduli della matrice', () => {
@@ -45,6 +51,19 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/comunicazioni/invia-whatsapp')).toBe('communications');
   });
 
+  it('voce 4 — anche la LETTURA della casella passa dalla matrice, come l\'invio (09/10/2026)', () => {
+    // Prima erano mappate le sole quattro rotte di invio, e la lettura della posta in ingresso
+    // restava libera: un collaboratore con `communications: denied` non poteva scrivere ai
+    // clienti ma poteva leggere tutta la loro corrispondenza chiamando queste rotte con curl.
+    // Non era una scelta, era un'asimmetria che nessuno aveva chiesto.
+    expect(moduloDellaRotta('/comunicazioni/email-in-arrivo')).toBe('communications');
+    expect(moduloDellaRotta('/comunicazioni/poll-imap-allegati')).toBe('communications');
+    expect(moduloDellaRotta('/comunicazioni/signal-in-arrivo')).toBe('communications');
+    // Il fascicolo dentro le schede è la stessa conversazione del cliente, quindi lo stesso modulo.
+    expect(moduloDellaRotta('/progetti/:id/comunicazioni')).toBe('communications');
+    expect(moduloDellaRotta('/microvoci/:id/comunicazioni')).toBe('communications');
+  });
+
   it('le rotte fuori dalla matrice non passano dal RBAC per modulo', () => {
     // Hanno i loro guard (autenticazione, ruolo cliente, segreti webhook):
     // mapparle a chiavi che la matrice non gestisce sarebbe codice morto.
@@ -58,7 +77,6 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/portal/fatture')).toBeUndefined();
     // Reference-data condivise fuori mappa di proposito (servono al wizard anche a chi non ha 'library').
     expect(moduloDellaRotta('/giurisdizioni')).toBeUndefined();
-    expect(moduloDellaRotta('/comunicazioni/email-in-arrivo')).toBeUndefined();
     expect(moduloDellaRotta(undefined)).toBeUndefined();
   });
 

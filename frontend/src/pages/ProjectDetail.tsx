@@ -19,6 +19,7 @@ import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiPr
 import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
 import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
 import { creaEventoCalendario } from '../api/calendario';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
@@ -27,6 +28,20 @@ import { useToast } from '../components/ui/ToastProvider';
 import { confirm } from '../components/ui/ConfirmProvider';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
+
+/**
+ * Le schede visibili a chi sta guardando.
+ *
+ * Dal 09/10/2026 la matrice Permessi governa anche la LETTURA del fascicolo comunicazioni, non
+ * solo l'invio (voce 4): senza questo filtro un collaboratore con `communications: denied`
+ * vedrebbe la scheda «Comunicazioni & Ingestion» e ogni richiesta dentro di lei risponderebbe
+ * 403. Il guard server-side resta quello che conta — questo evita solo di mostrare una porta
+ * che non si apre.
+ */
+function schedeVisibili(): Tab[] {
+  const tutte: Tab[] = ['moduli', 'grafo', 'fatturazione', 'redditivita', 'storico', 'comunicazioni', 'documenti', 'calendario'];
+  return tutte.filter(t => t !== 'comunicazioni' || haAccessoComunicazioni());
+}
 
 export function ProjectDetail() {
   const toast = useToast();
@@ -861,7 +876,7 @@ export function ProjectDetail() {
 
       {/* Tabs */}
       <div className={styles.tabs}>
-        {(['moduli', 'grafo', 'fatturazione', 'redditivita', 'storico', 'comunicazioni', 'documenti', 'calendario'] as Tab[]).map(t => (
+        {schedeVisibili().map(t => (
           <button key={t} className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`} onClick={() => setTab(t)}>
             {{ moduli: '🗂 Moduli & Microvoci', grafo: '🕸 Grafo & Dipendenze Moduli', fatturazione: '💶 Fatturazione & SDI', redditivita: '📊 Redditività & Margini', storico: '📜 Storico Contratti & Addendum', comunicazioni: '💬 Comunicazioni & Ingestion', documenti: '📄 Documenti', calendario: '📅 Calendario' }[t]}
           </button>
@@ -936,7 +951,7 @@ export function ProjectDetail() {
         )}
         {tab === 'redditivita' && <RedditivitaTab project={project} />}
         {tab === 'storico' && <StoricoContrattiTab project={project} />}
-        {tab === 'comunicazioni' && (
+        {tab === 'comunicazioni' && schedeVisibili().includes('comunicazioni') && (
           <ComunicazioniTab
             progettoId={String(project.id)}
             nomeCliente={project.cl}

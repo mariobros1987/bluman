@@ -3,6 +3,7 @@ import { useToast } from './ui/ToastProvider';
 import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
 import { nomeFileLeggibile } from '../utils';
+import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
 import {
   salvaDocumentoApi,
   generaDocumentoApi,
@@ -428,6 +429,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // la toccasse farebbe lampeggiare l'intestazione ogni trenta secondi. Il conteggio si aggiorna
   // quando arrivano i dati, senza che nessuno debba vedere che li sta chiedendo.
   const caricaMessaggi = useCallback(async (opzioni: { silenzioso?: boolean } = {}) => {
+    // Senza accesso al modulo Comunicazioni la lettura è 403 (voce 4): non si chiede, così
+    // l'operatore non vede un errore di permesso al posto di una linguetta che non gli spetta.
+    if (!haAccessoComunicazioni()) {
+      setMessaggiMicrovoce([]);
+      setErroreMessaggi(null);
+      return;
+    }
     if (!effMicrovoceId) {
       setMessaggiMicrovoce([]);
       setErroreMessaggi(null);
@@ -749,14 +757,18 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
             >
               📎 Documenti & Workflow ({documents.length})
             </button>
-            <button
-              onClick={() => setActiveTab('messaggi')}
-              title="I messaggi scambiati con il cliente che riguardano questa voce"
-              style={tabBtnStyle(activeTab === 'messaggi')}
-            >
-              💬 Messaggi ({caricandoMessaggi ? '…' : messaggiMicrovoce.length})
-            </button>
-          </div>
+            {/* La linguetta compare solo a chi può leggere il fascicolo (voce 4, 09/10/2026):
+                il guard server la negherebbe, e una linguetta che apre su un 403 è peggio di
+                una linguetta che non c'è. */}
+            {haAccessoComunicazioni() && (
+              <button
+                onClick={() => setActiveTab('messaggi')}
+                title="I messaggi scambiati con il cliente che riguardano questa voce"
+                style={tabBtnStyle(activeTab === 'messaggi')}
+              >
+                💬 Messaggi ({caricandoMessaggi ? '…' : messaggiMicrovoce.length})
+              </button>
+            )}          </div>
         </div>
 
         {/* Body TAB 1: Passaggi */}

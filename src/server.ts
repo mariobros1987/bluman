@@ -537,10 +537,16 @@ export function buildServer(app: AppPort): FastifyInstance {
     //   pieno lato API, e un collaboratore_esterno senza matrice configurata
     //   leggeva via API IBAN/CF/UBO di tutti i clienti (rilievo audit sicurezza).
     // - «denied» blocca tutto il modulo; «read» lascia le sole letture.
-    // Fail-open SOLO sull'errore di lettura della matrice: se il database non
-    // risponde si lascia passare (con log) — la sessione è comunque stata
-    // verificata sullo stesso database un attimo prima, quindi il fail-closed
-    // qui non comprerebbe sicurezza, solo un'API che va in 403 a raffica.
+    // FAIL-CLOSED sull'errore di lettura della matrice: se il database non risponde si ricade sul
+    // DEFAULT PER RUOLO (`permessoDefaultPerRuolo`), non si lascia passare. Fino al 09/10/2026 era
+    // fail-OPEN, ed era una scelta argomentata — la sessione è verificata sullo stesso database un
+    // attimo prima, quindi un errore di lettura non è un attacco. Ma l'effetto collaterale era che
+    // **l'error-path era più permissivo del percorso normale**: con la matrice irraggiungibile, chi
+    // non ha righe otteneva l'accesso pieno che il default per ruolo gli nega, cioè il rilievo di
+    // sicurezza chiuso il 27/09 tornava vivo ogni volta che la lettura falliva. Il prezzo accettato
+    // (deciso col titolare, voce 5) è che un guasto possa negare un accesso legittimo: si sbaglia dal
+    // lato giusto, perché una porta chiusa per errore si vede e si riapre, una porta aperta per
+    // errore non si vede.
     if (
       req.method !== 'OPTIONS' &&
       rottaEsistente &&
@@ -566,8 +572,13 @@ export function buildServer(app: AppPort): FastifyInstance {
           // Nessuna riga sulla matrice → default per ruolo, non più accesso pieno.
           livello = (permesso?.livello as LivelloPermesso | undefined) ?? permessoDefaultPerRuolo(ruolo, modulo);
         } catch (err) {
-          // Fail-open sull'errore di lettura: `livello` resta undefined e si lascia passare (con log).
-          console.error('Verifica permesso modulo fallita:', err instanceof Error ? err.message : err);
+          // Fail-closed: si ricade sul default per ruolo invece di lasciar passare (voce 5, 09/10/2026).
+          // Il log resta, e dice che il livello applicato è un *ripiego*, non una riga della matrice.
+          livello = permessoDefaultPerRuolo(ruolo, modulo);
+          console.error(
+            `Verifica permesso modulo fallita su '${modulo}': applico il default per ruolo '${livello}'.`,
+            err instanceof Error ? err.message : err,
+          );
         }
         if (livello === 'denied' || (livello === 'read' && req.method !== 'GET' && req.method !== 'HEAD')) {
           return reply.code(403).send({
