@@ -165,8 +165,8 @@ Railway e sul VPS non si preme quel pulsante.
 
 ### Cose da fare
 
-Aperte al 02/10/2026, in ordine di quanto farebbero male. La prima non è un miglioramento: senza,
-il backup che c'è non è un backup.
+Aperte al 02/10/2026, riviste al 09/10/2026, in ordine di quanto farebbero male. La prima non è un
+miglioramento: senza, il backup che c'è non è un backup.
 
 - [ ] **La chiave del backup, su carta, in cassaforte.** `BACKUP_ENCRYPTION_KEY` sta **dentro** il
       `.env`, che viene cifrato **con sé stessa**. Finché il server vive il restore funziona; se il
@@ -185,11 +185,28 @@ il backup che c'è non è un backup.
 - [ ] **La copia off-site.** Oggi i backup stanno sullo **stesso disco** del database — su quella
       macchina c'è un solo filesystem, quindi «un'area diversa» può essere solo una directory diversa.
       Proteggono dagli errori applicativi, **non** dalla morte del disco o del server.
-      **Come si chiude:** `rclone` sul VPS + `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, verso uno spazio
-      cloud che il titolare **già paga** — ⚠️ da dire **quale** (Drive, OneDrive o Dropbox). Attenzione
-      al modo, non al fine: con Google Drive rclone va riautenticato periodicamente, e **se scade in
-      silenzio la copia smette senza che nessuno se ne accorga**. Va quindi aggiunto anche un controllo
-      sulla **freschezza della copia off-site**, o si sostituisce un buco con un buco più silenzioso.
+      **Il provider è deciso dal 09/10/2026: Dropbox** — spazio cloud che il titolare **già paga**,
+      non Backblaze. **Come si chiude:** `rclone` sul VPS + `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`,
+      con il remote Dropbox (`rclone config` → tipo `dropbox`). Attenzione al modo, non al fine:
+      l'autenticazione rclone **scade**, e **se scade in silenzio la copia smette senza che nessuno se
+      ne accorga**. Va quindi aggiunto anche un controllo sulla **freschezza della copia off-site**, o
+      si sostituisce un buco con un buco più silenzioso. Nota: fra i tre candidati Dropbox è quello
+      che regge meglio l'uso non presidiato — il token dura a lungo e rclone ha un remote «ufficiale»
+      — ma la scadenza non è mai zero, quindi il controllo di freschezza resta obbligatorio comunque.
+
+      **Verificato il 09/10/2026 (spike sulla documentazione rclone/Dropbox):**
+      - **Il VPS non ha un browser**, quindi `rclone config` interattivo non è la strada. Il percorso
+        documentato è `rclone authorize dropbox` **su una macchina con browser**, che stampa il token
+        da incollare. `rclone authorize` è descritto come «*used to authorize a remote or headless
+        rclone from a machine with a browser*».
+      - **Non serve registrare un'app Dropbox nostra**: `rclone config` per Dropbox dice
+        «app_key / app_secret — leave blank normally» e usa la sua app. Nessun `client_id` da
+        custodire, nessun redirect URI da dichiarare.
+      - La credenziale da custodire è il **token rclone in JSON**: contiene il **refresh token** e
+        rclone rinnova da sé l'access token di breve durata. Si passa al comando con `--config`
+        (flag globale) oppure con `RCLONE_CONFIG` / `RCLONE_DROPBOX_TOKEN`.
+      - Il **dominio non serve**, in nessuna delle due forme (vedi la riga **8-bis** di
+        `PIANO_DI_MIGLIORAMENTO.md` §1bis: vale anche per il form nel superadmin).
 
 - [ ] **`healthchecks.io`, o un cane da guardia fuori dal VPS.** I sette controlli girano **sul VPS**:
       se il VPS muore del tutto, il monitor muore con lui e non avvisa nessuno — l'unico segnale che
@@ -264,8 +281,9 @@ non portano a niente — la forma del caso «20 documenti, 8 senza il loro file�
 
 **⚠️ Il buco che resta.** I backup stanno **sullo stesso disco** del database: su questa macchina
 c'è un solo filesystem (`/dev/vda1`). Proteggono dagli errori applicativi, **non** dalla morte del
-disco o del server. L'unica copia che sopravvive al server è quella off-site, da configurare
-(`rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE`).
+disco o del server. L'unica copia che sopravvive al server è quella off-site, **non ancora attiva**:
+provider deciso il 09/10/2026 (**Dropbox**, spazio già pagato), da configurare con `rclone` +
+`BLUMAN_BACKUP_RCLONE_REMOTE` (vedi la voce nella lista qui sopra).
 
 **⚠️ La chiave.** `BACKUP_ENCRYPTION_KEY` sta **dentro** il `.env` che viene cifrato con sé stessa.
 Finché il server è vivo il restore funziona; se il server muore, senza una copia della chiave

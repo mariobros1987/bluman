@@ -3,6 +3,11 @@
 _Redatto il 19/09/2026. Motivo dichiarato: lentezza nel caricamento di progetti e clienti; si vuole più velocità di lettura del database._
 _Aggiornato il 20/09/2026 con le misure di rete di produzione (§0-bis) e le specifiche VPS (§4-bis)._
 _Aggiornato il 30/09/2026 con le decisioni effettivamente prese e il VPS reale — §3-bis._
+_Aggiornato il 09/10/2026: **il VPS è in esercizio** e il deploy è stato verificato **sul server** —
+`git rev-parse HEAD` = `87a77482` in `/opt/bluman`, sha256 di `nginx/bluman_app.inc` identico fra
+repository e container, container `api`/`nginx` ricreati dopo il commit, `migrate` e `rls` usciti con
+0, ultima migrazione applicata `20261005120000_comunicazione_microvoce`. Resta aperto il **cut-over
+del dominio** (DNS + TLS, voce 10) e la **copia off-site**, ora decisa (Dropbox) ma non ancora attiva._
 
 > **Questo documento è una guida operativa passo-passo.** Ogni fase ha un obiettivo, i comandi, e come verificare che sia andata a buon fine. Le fasi vanno fatte **in ordine**. Non saltare la Fase 0.
 
@@ -318,7 +323,7 @@ VPS lo renderebbe un rollback inutile, perché condividerebbe il guasto che si s
 ## 8. Dopo il cut-over — quello che prima faceva Supabase e ora fai tu
 
 - [x] **Backup automatici** — **fatto il 01/10/2026** (cron `17 3 * * *`, UTC). Copre database, documenti (`bluman_uploads`) e `.env`, cifrati AES-256, in `/var/backups/bluman` (fuori da `/opt/bluman` e fuori dai volumi Docker). Restore-test eseguito: conteggi identici alla produzione su 10 tabelle, 27 documenti su 27 presenti nell'archivio, `.env` riapribile e identico.
-  - [ ] **Resta la copia off-site** (`rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE`): finché non c'è, i backup stanno sullo **stesso disco** del database — un solo filesystem su quella macchina — quindi proteggono dagli errori applicativi ma non dalla perdita del server.
+  - [ ] **Resta la copia off-site** (`rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE`): finché non c'è, i backup stanno sullo **stesso disco** del database — un solo filesystem su quella macchina — quindi proteggono dagli errori applicativi ma non dalla perdita del server. **Provider deciso il 09/10/2026: Dropbox** (spazio già pagato, non Backblaze); restano da configurare il remote `rclone` e il **controllo di freschezza**, perché l'autenticazione può scadere in silenzio e la copia smetterebbe senza avvisare.
   - [ ] **Custodia di `BACKUP_ENCRYPTION_KEY` fuori dal server** (gestore di password): sta dentro il `.env` che cifra con sé stessa, quindi da sola non sopravvive al server.
 - [ ] **Monitoraggio**: spazio disco, connessioni attive, slow query log.
 - [ ] **Aggiornamenti di sicurezza** di PostgreSQL e OS.
@@ -340,7 +345,7 @@ Supabase resta **intatto e funzionante** durante tutta la migrazione. Rollback =
 - [ ] Test di isolamento passato con due studi diversi (§5.6, §7.6).
 - [ ] `DIRECT_URL` punta a Postgres diretto, non al pooler (§6.1).
 - [ ] Major version PostgreSQL uguale a Supabase (§4).
-- [x] Backup automatico configurato **e** restore testato (§8) — locale; la copia off-site resta aperta.
+- [x] Backup automatico configurato **e** restore testato (§8) — locale; la copia off-site resta aperta, con il provider ora deciso (**Dropbox**, 09/10/2026).
 - [ ] Documenti scaricabili dopo lo switch (§6.3, §7.5).
 
 ---

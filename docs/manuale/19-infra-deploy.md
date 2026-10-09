@@ -1,14 +1,21 @@
 # 19 · Infrastruttura & Deploy
 
 ## 👤 Cosa fa e come si usa
-BluMan è distribuito in due metà:
+BluMan gira su **tre** destinazioni, e lo script le aggiorna **tutte e tre** in un colpo solo:
+- **VPS Register.it** — lo stack «tutto su un server» (`docker-compose.prod.yml`): è la
+  **produzione di destinazione**, quella su cui si prova e su cui punterà il dominio quando il
+  cut-over sarà chiuso (TLS e DNS: voce aperta 10);
 - **Backend** (Fastify) su **Railway**;
 - **Frontend** (React/Vite) su **Vercel**.
 
 Il deploy si fa con **`scripts/distribuisci.sh`** (regola 9): verifica (typecheck backend+frontend,
-lint, build, `vitest run`), controlla l'autore Git richiesto da Vercel, poi push → Vercel e
-`railway up` → Railway. Dopo il deploy verifica health, **che ogni pagina della SPA torni HTML**
-(non il JSON dell'API) e la sonda rotta (401, non 404).
+lint, build, `vitest run`), controlla l'autore Git richiesto da Vercel, poi push → Vercel,
+`railway up` → Railway e — **per default** — l'aggiornamento del VPS (codice, frontend, database,
+backend, nginx). Dopo il deploy verifica health, **che ogni pagina della SPA torni HTML** (non il
+JSON dell'API) e la sonda rotta (401, non 404). Distribuire **senza** il VPS richiede `--no-vps`,
+ed è una scelta esplicita: se il VPS non risponde lo script **si ferma**, perché due ambienti con
+codice diverso sono esattamente il guasto che questo script esiste per evitare. Railway e Vercel
+restano accesi come **rollback** finché il cut-over del dominio non è dichiarato chiuso.
 
 ⚠️ **Un `git push` da solo non pubblica il frontend**: il deploy che Vercel crea dal webhook GitHub
 resta `BLOCKED` (build a `0ms`, nessun log) e non arriva mai Ready. A pubblicare la SPA è **solo** il
@@ -41,8 +48,11 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   volumi Docker (`docker compose down -v` non lo tocca). Restore-test eseguito e superato.
   **Resta un buco dichiarato**: i backup stanno sullo **stesso disco** del database (un solo
   filesystem su quella macchina), quindi proteggono dagli errori applicativi ma **non** dalla morte
-  del disco o del server — per quello serve la copia off-site, ancora da configurare. Vedi
-  `docs/vps-primo-avvio.md` §7.
+  del disco o del server — per quello serve la copia off-site, **non ancora attiva**. Il provider è
+  deciso dal 09/10/2026 (**Dropbox**, spazio già pagato): restano da fare la configurazione di
+  `rclone` sul VPS e la variabile `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, **più un controllo di
+  freschezza** — l'autenticazione rclone può scadere in silenzio e la copia smette senza avvisare.
+  Vedi `docs/vps-primo-avvio.md` §7.
 - **Sorveglianza VPS**: dal 01/10/2026 `scripts/monitor-vps.sh` gira ogni **10 minuti** dal cron di
   `bluman` e avvisa su **Telegram** (bot dedicato `@Avvisibluman_bot`, non quello degli studi;
   configurato e **verificato end-to-end il 02/10/2026**). Sette controlli:
@@ -55,7 +65,8 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   il compose inietta dentro il container dell'API. Vedi `docs/vps-primo-avvio.md` §7.
 
 ## 🔗 Collegamenti
-- Tutti i moduli: il deploy porta in produzione backend (Railway) e frontend (Vercel) insieme.
+- Tutti i moduli: un solo `distribuisci.sh` porta avanti le **tre** destinazioni insieme — VPS (per
+  default), backend Railway e frontend Vercel — così nessuna resta indietro con codice diverso.
 
 ## ⚠️ Stati limite & errori
 - Autore ultimo commit ≠ identità Vercel → lo script si ferma (correzione manuale, niente amend auto).
