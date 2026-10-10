@@ -12,12 +12,13 @@
 
 | | |
 |---|---|
-| Ultimo commit | `755ba47f` — *docs(recap): la distribuzione di `41a9276c` è verificata, e i test frontend non sono nello script*, su `origin/main` |
+| Ultimo commit **di codice** | `9d59fc93` — *feat(backup): la copia off-site si configura dall'app, e qualcuno se ne accorge se smette*, su `origin/main` e **distribuito**. Sopra sta un commit di **sole docs**, che non tocca il VPS: il codice che gira sul server resta quello |
 | Branch | `main`, **allineato a `origin/main`** |
-| Working tree | **Sporco, di proposito:** la **voce 8-bis** è implementata e **verificata** (backend 1638 passati / 129 file, frontend 192 / 22, `tsc` e build verdi, grafo aggiornato) ma **non ancora committata** — in attesa dell'ok del titolare |
-| VPS | ✅ **Allineato a `41a9276c`** il 09/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle») |
-| Prossimo passo | **Committare e distribuire la 8-bis**, poi la **18** (secondo studio reale). Prima della distribuzione restano i **prerequisiti che richiedono root sul VPS**: `rclone`, le due cartelle con i loro permessi, la destinazione nel `.env` |
+| Working tree | **Pulito.** La **voce 8-bis** è implementata, committata e **in produzione** dal 10/10/2026 |
+| VPS | ✅ **Allineato a `9d59fc93`** il 10/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle»). In più, i **tre prerequisiti root sono fatti**: `rclone` v1.60.1 installato, le due cartelle create, la destinazione nel `.env` |
+| Prossimo passo | **Il token rclone** (`rclone authorize dropbox` su una macchina con browser → incollato nel form del pannello, **non in chat**), poi la **prova a mano** — anche storta. Dopo: la **voce 18** (secondo studio reale) |
 | ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
+| ⚠️ Fragilità nota | La suite backend può far fallire **uno o due test con `UNKNOWN: unknown error, read`** (I/O del runner su Windows, sotto la concorrenza dei 129 file) — ed essendo il passo 1 di `distribuisci.sh` **bloccante**, quel flake **aborta il deploy prima di qualunque push**. Il 10/10/2026 è successo su `src/calendario.test.ts`, che **non fa I/O**: da solo passa 56/56, tre volte su tre. Davanti a quell'errore: **rilanciare prima di indagare**, e non lanciare due `vitest` insieme. Vedi §«Il flake della suite backend» |
 
 ---
 
@@ -275,43 +276,53 @@ allineato, bundle nuovo realmente servito dalla porta 80 e nessun errore da ness
 
 ```
 main ... origin/main      (allineato, nessun commit da pushare)
-
-── codice ──
- M docker-compose.prod.yml           ← VOCE 8-bis: i due montaggi (cartelle, non file singoli)
- M scripts/backup-vps.sh             ← VOCE 8-bis: `--config`, il controllo del remote, `backup.json`
- M scripts/monitor-vps.sh            ← VOCE 8-bis: l'ottavo controllo, `copia-remota`
- M src/routes/tenant.ts              ← VOCE 8-bis: `GET/PUT/DELETE /admin/backup` + `GET /tenant/backup`
- M frontend/src/api/client.ts        ← VOCE 8-bis: riesporta `api/backup.ts`
- M frontend/src/pages/SuperAdminPage.tsx        ← VOCE 8-bis: le due schede «Studi» | «Backup off-site»
- M frontend/src/components/settings/TabManutenzione.tsx ← VOCE 8-bis: il riquadro del titolare
-?? src/services/backupOffSite.ts                    (nuovo — la logica pura)
-?? src/backupOffSite.test.ts                        (nuovo — 29 test, 1 POSIX-only)
-?? src/backupRotte.test.ts                          (nuovo — 23 test, 1 POSIX-only)
-?? frontend/src/api/backup.ts                       (nuovo)
-?? frontend/src/utils/backupStato.ts                (nuovo)
-?? frontend/src/utils/backupStato.test.ts           (nuovo — 23 test)
-?? frontend/src/components/admin/PannelloBackupOffSite.tsx  (nuovo)
-?? frontend/src/components/admin/PannelloBackupOffSite.test.tsx (nuovo — 12 test)
-?? frontend/src/components/settings/TabManutenzione.test.tsx    (nuovo — 5 test)
-
-── documenti ──
- M .agents/AGENTS.md                 ← la riga sull'infrastruttura del backup + la sorveglianza
- M .env.prod.example                 ← `BLUMAN_BACKUP_RCLONE_REMOTE` e le due cartelle
- M PIANO_DI_MIGLIORAMENTO.md         ← la voce 8-bis chiusa, con le tre decisioni del 10/10
- M PIANO_MIGRAZIONE_VPS.md           ← la copia off-site: il codice c'è, non è attiva sul server
- M RECAP_SESSIONE_TERMINALE.md       ← questo file
- M docs/manuale/17-rbac.md           ← cosa *non* passa dalla matrice
- M docs/manuale/19-infra-deploy.md   ← backup e sorveglianza: otto controlli
- M docs/vps-primo-avvio.md           ← §7: i passi che richiedono root, e il caso storto
+                          (niente da elencare: l'albero è PULITO)
 ```
 
-Ultimo commit: `755ba47f` — *docs(recap): la distribuzione di `41a9276c` è verificata, e i test
-frontend non sono nello script* (09/10/2026).
+Ultimo commit **di codice**: `9d59fc93` — *feat(backup): la copia off-site si configura dall'app, e
+qualcuno se ne accorge se smette* (**10/10/2026**), su `origin/main` e **distribuito**. Sopra c'è un
+commit di **sole docs** (questo): cambio l'aggettivo da «ultimo» a «ultimo **di codice**» perché è
+esattamente il modo in cui una riga come questa diventa falsa da sola — e «allineato» vale per il
+codice sul server, non per l'HEAD del branch.
 
-> Le modifiche **non sono ancora committate** — in attesa dell'ok del titolare. Sono **tutte la
-> voce 8-bis**: sette file di codice modificati e nove nuovi (fra sorgenti e test), più otto
-> documenti. Le voci **4, 5, 6 e 9(c)** sono invece già in produzione dal 09/10 (`41a9276c`).
-> Il piano della voce non entra nel repository: vive fuori, in `~/.claude/plans/`.
+> **Il commit della voce 8-bis** (24 file, +3039/−104) non è più nel working tree: è in
+> produzione su Vercel, Railway e VPS. Conteneva sette file di codice modificati e nove nuovi (fra
+> sorgenti e test), più otto documenti. Il **piano** della voce non entra nel repository: vive
+> fuori, in `~/.claude/plans/`. Le voci **4, 5, 6 e 9(c)** erano già in produzione dal 09/10
+> (`41a9276c`).
+
+### 🚀 La distribuzione della 8-bis — 10/10/2026
+
+`./scripts/distribuisci.sh` con `SSH_AUTH_SOCK` agganciato all'agente: **`EXIT=0`** e
+`🎉 Distribuzione Completata con Successo!` — push su GitHub, Vercel `Ready`, `railway up`,
+VPS allineato a `9d59fc93` con i container ricreati, `migrate` + `rls` applicati, nginx
+ricaricato, e tutte le sonde verdi.
+
+**Prima della distribuzione, i tre prerequisiti che richiedono root** (fatti il 10/10/2026, via
+SSH con l'agente già carico):
+
+| Passo | Esito |
+|---|---|
+| `rclone` | **v1.60.1** dai repository Ubuntu 24.04 (`apt`, non il `curl \| bash`: così si aggiorna con la sicurezza di sistema) |
+| Le due cartelle | `config` **0750** uid 1000, `stato` **0755** — create con `install -d`, **prima** del `compose up` |
+| La destinazione | `BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup` in `/opt/bluman/.env` (riga 17). Verificato col diff: **`10a11,17`**, pura aggiunta, zero righe toccate, modo `600` invariato |
+
+**La verifica che il deploy non copre**, perché le sue sonde sono generiche: i due montaggi e le
+rotte nuove, controllati a mano sul VPS.
+
+| Controllo | Esito |
+|---|---|
+| Montaggi sul container `api` | `config` → `/app/backup-config` **rw=true**, `stato` → `/app/backup-stato` **rw=false** |
+| La variabile nel container | `dropbox:bluman-backup` |
+| L'API scrive in `config` | **Sì** — gira come `uid=1000(node)` |
+| L'API scrive in `stato` | **`Read-only file system`** — è il flag `:ro`, non i permessi, a imporlo |
+| Le rotte nuove | `/api/admin/backup` e `/api/tenant/backup` → **401** (esistono), non 404 |
+
+**Un fatto che sembra un errore e non lo è:** sull'host `bluman` **è** l'uid 1000
+(`uid=1000(bluman)`), lo stesso del `node` del container. Per questo `config` appare come
+`bluman:bluman 0750` ed è esattamente `1000:bluman 0750`, e per questo `stato` **non** è protetta
+dai permessi POSIX ma dal montaggio `:ro`. Un test che chieda «uid 1000 può scrivere in `stato`?»
+risponde di sì e non dimostra niente.
 
 ---
 
@@ -360,8 +371,9 @@ cosa **manca**. Qui la sintesi.
 | **L'ottavo controllo del monitor** | `scripts/monitor-vps.sh` guadagna `copia-remota` in `CHIAVI`, cadenza **24 h**, soglia `BLUMAN_MONITOR_COPIA_MAX_ORE` (default **30**). Interroga il **remoto** con `rclone lsl` e prende il file più recente: oltre soglia → `fail` con avviso **Telegram** e voce nel riepilogo delle **08:00 UTC**; non configurata → `unknown` (un controllo che accusa l'assenza di una cosa mai chiesta insegna a ignorare il monitor); rclone assente o **autenticazione scaduta** → `unknown`, **mai** `ok`. Scrive il suo verdetto in `stato/verifica.json`. |
 | **Due file di stato, non uno** | `backup.json` = cosa il backup **crede** di aver fatto (lo scrive `backup-vps.sh`); `verifica.json` = cosa il monitor ha **constatato** interrogando Dropbox. Sono due fatti distinti, ed è proprio la distinzione che serve quando l'autenticazione scade: il primo resta verde, il secondo no. Separarli evita anche due scrittori sullo stesso file. Il montaggio è di **cartelle, non di file singoli** — la lezione di nginx del 09/10. |
 | **Regola del modulo** | Ciò che non si è potuto leggere vale `sconosciuto`, **mai** `ok`: file assente, illeggibile o malformato non è un backup riuscito, è un'informazione che manca. |
-| **Presidi** | **Suite intere, rilanciate il 10/10/2026 sul codice finale**: backend `npx vitest run` → **1638 passati, 2 saltati, 129 file**, `EXIT=0` (365 s); frontend `npx vitest run` → **192 passati, 22 file** (37 s); `tsc --noEmit` pulito in radice, `npm run typecheck` (`tsc -b --force`) pulito nel frontend, `npm run build` verde (895 ms), `bash -n` verde su `backup-vps.sh` e `monitor-vps.sh`, grafo aggiornato (**5229 nodi, 12387 archi, 305 comunità**). I **92 test nuovi** sono: `src/backupOffSite.test.ts` (29, di cui 1 sui bit di modo — POSIX-only), `src/backupRotte.test.ts` (23, di cui 1 idem), `frontend/src/utils/backupStato.test.ts` (23), `frontend/src/components/admin/PannelloBackupOffSite.test.tsx` (12), `frontend/src/components/settings/TabManutenzione.test.tsx` (5). Il pannello presidia le tre promesse: il token non si rilegge **nemmeno se il server lo restituisse**, un backend che non vede la cartella lo dice e non fa credere di aver salvato, il campo si svuota anche sul fallimento. L'elenco dei file toccati è nello §«Stato del repository Git». |
-| **Restano i passi che richiedono root** | (1) `rclone authorize dropbox` su una macchina **con browser** e incollare il token **nel form, non in chat**; (2) installare `rclone` sul VPS; (3) `BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup` nel `.env` (la *destinazione* non è un segreto) — attenzione al **nome esatto** della variabile; (4) creare `/var/lib/bluman-backup/{config,stato}` con proprietari e permessi documentati **prima** del primo `docker compose up`. Poi la prova a mano: `bash ./scripts/backup-vps.sh`, `rclone lsl` per vedere i tre artefatti sul remoto, `bash ./scripts/monitor-vps.sh` e l'ottavo controllo `ok`. **Provare anche il caso storto**: rinominare `rclone.conf` e verificare che il controllo degradi a `unknown` senza rompere il backup. |
+| **Presidi** | **Suite intere, rilanciate il 10/10/2026 sul codice finale, e poi confermate dal passo 1 della distribuzione** (che le riesegue da capo: **129 file passati su 129**). Backend `npx vitest run` → **1638 passati, 2 saltati, 129 file**, `EXIT=0` (365 s); frontend `npx vitest run` → **192 passati, 22 file**; `tsc --noEmit` pulito in radice, `npm run typecheck` (`tsc -b --force`) pulito nel frontend, `npm run build` verde, `bash -n` verde su `backup-vps.sh` e `monitor-vps.sh`, grafo aggiornato (**~5230 nodi, ~12390 archi, ~309 comunità** — il rilevamento delle comunità non è deterministico, quindi il conteggio varia di qualche unità a ogni giro, e due run dello stesso codice hanno dato 5229/12387/305 e 5231/12389/309). I **92 test nuovi** sono: `src/backupOffSite.test.ts` (29, di cui 1 sui bit di modo — POSIX-only), `src/backupRotte.test.ts` (23, di cui 1 idem), `frontend/src/utils/backupStato.test.ts` (23), `frontend/src/components/admin/PannelloBackupOffSite.test.tsx` (12), `frontend/src/components/settings/TabManutenzione.test.tsx` (5). Il pannello presidia le tre promesse: il token non si rilegge **nemmeno se il server lo restituisse**, un backend che non vede la cartella lo dice e non fa credere di aver salvato, il campo si svuota anche sul fallimento. |
+| **Distribuzione** | ✅ **Commit `9d59fc93`, distribuito il 10/10/2026** con `./scripts/distribuisci.sh` — `EXIT=0`: push su GitHub, Vercel, `railway up`, VPS allineato al commit con container ricreati, `migrate` + `rls` applicati, nginx ricaricato, tutte le sonde verdi. Dettagli e verifica dei montaggi in §«La distribuzione della 8-bis». |
+| **Cosa resta** | Il **token**: `rclone authorize dropbox` su una macchina **con browser**, e il JSON incollato **nel form del pannello, non in chat**. Poi la **prova a mano** — `bash ./scripts/backup-vps.sh`, `rclone lsl` per vedere i tre artefatti sul remoto, `bash ./scripts/monitor-vps.sh` con l'ottavo controllo `ok` — e **il caso storto**: rinominare `rclone.conf` e verificare che il controllo degradi a `unknown` **senza** rompere il backup. I tre passi che richiedevano root sono **fatti**; l'unico documento da custodire resta `BACKUP_ENCRYPTION_KEY`, come già era. |
 
 ### ℹ️ I 2 secondi per query nei test — una scelta, non un difetto (chiarito il 09/10/2026)
 
@@ -403,6 +415,42 @@ Se un giorno i ~6 minuti di suite daranno fastidio, la domanda vera è un'altra 
 (es. un database usa-e-getta per le suite che oggi non ne hanno uno) — **non** è un seguito della
 voce 5.
 
+### ⚠️ Il flake della suite backend — e perché aborta un deploy (10/10/2026)
+
+**Non è una voce aperta e non è una regressione.** Va scritto perché il 10/10/2026 ha quasi fatto
+attribuire a un commit un guasto che non esisteva.
+
+La suite backend può far fallire **uno o due test** con l'errore:
+
+```
+→ UNKNOWN: unknown error, read
+```
+
+Osservato su `src/calendario.test.ts`, test *un evento senza progetto non entra nello scadenzario
+di un progetto*, dopo **41 ms**. Quel test **non fa I/O**: scrive uno stato in memoria e chiama
+`server.inject` su un'app in-memory (`src/calendario.test.ts:549-557`). L'errore non può quindi
+nascere dalla sua logica — nasce dal **runner di vitest mentre legge un file** (modulo, source map,
+cache). `vitest.config.ts` **non configura né pool né worker né retry**, quindi vitest usa i
+default: un worker per CPU su **129 file**, e su Windows quella concorrenza è la condizione che
+produce l'errore.
+
+**Perché conta più di quanto sembri:** `distribuisci.sh` ha `set -euo pipefail` (riga 40) e chiama
+la suite alla riga 106, **prima** di qualunque push o deploy. Il flake quindi **aborta il deploy al
+passo 1** — senza aver toccato niente (verificabile: `git log origin/main -1` resta indietro).
+Il 10/10/2026 è successo alla prima esecuzione, e la seconda è passata **129 file su 129**.
+
+**Cosa fare, in quest'ordine:**
+
+1. **Rilanciare prima di indagare.** Su un errore di I/O la prima ipotesi è l'ambiente, non il codice.
+2. **Eseguire il file da solo**, **2-3 volte** — una volta sola non distingue un caso isolato da un
+   guasto intermittente. Il 10/10/2026: `src/calendario.test.ts` → **56/56, tre volte su tre**.
+3. **Non lanciare due `vitest` in parallelo** per «recuperare tempo»: aggiunge proprio la pressione
+   di I/O che causa l'errore. Vale anche per il resto del lavoro pesante su file.
+
+**La cura, se un giorno desse noia** (non presa ora, perché è una modifica al cancello di deploy e
+va decisa, non improvvisata): `retry` in `vitest.config.ts`, o `--pool=forks` / un tetto ai worker.
+Va provata **misurando**, non per intuito — è la stessa lezione dei ~2 s per query qui sopra.
+
 
 ### Da affrontare per prime (scelte il 09-10/10/2026)
 
@@ -416,9 +464,11 @@ Le voci 4, 5, 6, 8, 8-bis e 9(c) sono **chiuse** (tabelle sopra). Restano:
    supportato, `token_access_type=offline` restituisce il refresh token, e rclone usa la sua app.
    La forma realizzata è «il superadmin incolla il token rclone», e il segreto sta in un **file sul
    VPS**. Vedi §«Voci 8 e 8-bis» e la riga 8-bis di `PIANO_DI_MIGLIORAMENTO.md` §1bis.
-3. **Attivare davvero la copia off-site su Dropbox** — è **solo lavoro sul server**, non codice:
-   i quattro passi che richiedono root sono in fondo a §«Voci 8 e 8-bis». Fino a che non sono
-   fatti, il pannello mostra «copia off-site non configurata» e il monitor dice `unknown`: è il
+3. **Attivare davvero la copia off-site su Dropbox** — **resta il token e la prova**, il resto è
+   fatto. I tre passi che richiedevano root (`rclone`, le due cartelle, la destinazione nel `.env`)
+   sono **eseguiti il 10/10/2026**. Manca `rclone authorize dropbox` su una macchina con browser e
+   l'incollo del JSON **nel form del pannello**, poi la prova a mano **e il caso storto**. Fino ad
+   allora il pannello mostra «copia off-site non configurata» e il monitor dice `unknown`: è il
    comportamento giusto, non un difetto.
 4. **Nient'altro.** I ~2 s per query nei test **non** sono una voce da fare: sono la scelta
    deliberata del 19/08/2026 (§«I 2 secondi per query nei test»), e la voce 5 non li ha introdotti
@@ -429,7 +479,7 @@ Le voci 4, 5, 6, 8, 8-bis e 9(c) sono **chiuse** (tabelle sopra). Restano:
 | Voce | Cosa manca |
 |---|---|
 | **TLS sul VPS** | Quando il DNS punterà al server (`docs/vps-primo-avvio.md` §6) |
-| **Copia off-site su Dropbox (voce 8-bis)** | Il codice c'è; manca il **lavoro sul server**, che richiede root: installare `rclone`, creare `/var/lib/bluman-backup/{config,stato}` con i proprietari documentati, `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, e **incollare il token nel form** (non in chat) dopo `rclone authorize dropbox` su una macchina con browser. Vedi §«Voci 8 e 8-bis» |
+| **Copia off-site su Dropbox (voce 8-bis)** | **Quasi finita.** Il codice è in produzione e i tre passi root sono fatti; manca solo il **token** — `rclone authorize dropbox` su una macchina con browser, e il JSON incollato **nel form del pannello** (non in chat) — più la prova a mano. Vedi §«Voci 8 e 8-bis» |
 | **Telegram sul VPS** | Secondo bot da BotFather; il bot di produzione si sposta **solo** al cut-over |
 | **Custodia di `BACKUP_ENCRYPTION_KEY`** | La chiave sta dentro il `.env` che viene cifrato con sé stessa: se il server muore senza una copia **fuori dal server**, i backup non si aprono più. Va **verificata** riscrivendo la chiave dal foglio e aprendo un backup vero |
 | **CI come cancello di deploy** | Meno urgente: `distribuisci.sh` valida (typecheck BE/FE, lint, build, suite intera) **prima** di pushare, ed è bloccante |
@@ -469,15 +519,16 @@ Le voci 4, 5, 6, 8, 8-bis e 9(c) sono **chiuse** (tabelle sopra). Restano:
    per ruolo invece di lasciar passare (§«Voci 4 e 5»).
 4. ~~**Voce 6 + 9(c)**~~ ✅ **Fatte il 09/10/2026** — l'avviso «non instradabile» porta alla pratica o
    all'anagrafica, e la campanella ha il filtro «senza fascicolo» (§«Voci 6 e 9(c)»).
-5. ~~**Voce 8 + 8-bis**~~ ✅ **Fatte il 10/10/2026** — la credenziale rclone si incolla dal pannello
-   del super admin e vive in un **file sul VPS** (non nel database: il DB *è* ciò che viene spedito
-   su Dropbox); il titolare vede la freschezza in Impostazioni → Manutenzione; il monitor ha
-   l'**ottavo controllo** `copia-remota` con avviso Telegram (§«Voci 8 e 8-bis»). **Non ancora
-   committata**: manca l'ok del titolare, e prima della distribuzione vanno fatti i quattro passi
-   che richiedono root sul VPS.
-6. **Voce 18** — il secondo studio reale (resta la domanda: quanti e chi li crea).
-7. **Attivare il backup off-site su Dropbox** — ripetuto qui perché è l'unica cosa che resta sulla
-   copia off-site: il codice c'è, il server no.
+5. ~~**Voce 8 + 8-bis**~~ ✅ **Fatte il 10/10/2026 e distribuite** — la credenziale rclone si incolla
+   dal pannello del super admin e vive in un **file sul VPS** (non nel database: il DB *è* ciò che
+   viene spedito su Dropbox); il titolare vede la freschezza in Impostazioni → Manutenzione; il
+   monitor ha l'**ottavo controllo** `copia-remota` con avviso Telegram (§«Voci 8 e 8-bis»).
+   Commit **`9d59fc93`**, `distribuisci.sh` a `EXIT=0`, **e i tre passi root già eseguiti sul VPS**:
+   `rclone` v1.60.1, le due cartelle, la destinazione nel `.env`.
+6. **Il token rclone** — `rclone authorize dropbox` su una macchina **con browser** e il JSON
+   incollato **nel form del pannello** (**non in chat**). Poi la prova a mano e **il caso storto**.
+   È l'unica cosa che manca perché la copia off-site sia viva.
+7. **Voce 18** — il secondo studio reale (resta la domanda: quanti e chi li crea).
 
 Nient'altro in coda. In particolare i **~2 s per query nei test** e la suite a ~6 minuti **non** sono
 una voce aperta: sono la scelta deliberata del 19/08/2026 descritta in §«I 2 secondi per query nei

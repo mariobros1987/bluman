@@ -189,24 +189,28 @@ miglioramento: senza, il backup che c'è non è un backup.
       **Il provider è deciso dal 09/10/2026: Dropbox** — spazio cloud che il titolare **già paga**,
       non Backblaze.
 
-      **Il codice c'è dal 10/10/2026 (voce 8-bis):** `scripts/backup-vps.sh` copia i tre artefatti
-      con `rclone --config`, il **monitor ha l'ottavo controllo** (`copia-remota`), e la credenziale
-      si incolla dal pannello **Impostazioni → Super admin → Backup off-site** invece che a mano sul
-      server. Il segreto vive in `/var/lib/bluman-backup/config/rclone.conf`, **non** in una tabella
-      e **non** nel `.env`: il database *è* ciò che viene spedito su Dropbox, e il `.env` *è* una
-      delle tre cose che lo script archivia — metterci la chiave della copia significa spedirla
-      insieme alla cassaforte.
+      **Il codice è in produzione dal 10/10/2026 (voce 8-bis, commit `9d59fc93`):**
+      `scripts/backup-vps.sh` copia i tre artefatti con `rclone --config`, il **monitor ha l'ottavo
+      controllo** (`copia-remota`), e la credenziale si incolla dal pannello
+      **Impostazioni → Super admin → Backup off-site** invece che a mano sul server. Il segreto vive
+      in `/var/lib/bluman-backup/config/rclone.conf`, **non** in una tabella e **non** nel `.env`:
+      il database *è* ciò che viene spedito su Dropbox, e il `.env` *è* una delle tre cose che lo
+      script archivia — metterci la chiave della copia significa spedirla insieme alla cassaforte.
 
-      **Cosa resta da fare, e richiede root** (i primi tre passi si fanno una volta sola, **prima**
-      del `docker compose up`, perché il compose monta le due cartelle):
+      **I tre passi che richiedevano root sono fatti il 10/10/2026.** Restano qui come registro, e
+      perché vanno rifatti identici su una macchina nuova — con l'ordine che conta: **prima** le
+      cartelle, **poi** il `docker compose up`, altrimenti Docker le crea lui di `root` e l'API
+      riceve EACCES.
 
       ```bash
-      # 1. rclone (serve root: `distribuisci.sh` non lo installa)
-      curl https://rclone.org/install.sh | sudo bash     # oppure: apt install rclone
+      # 1. rclone (serve root: `distribuisci.sh` non lo installa). Il 10/10/2026 è stato preso dai
+      #    repository Ubuntu (`apt`), non dal `curl | bash`: così si aggiorna con la sicurezza di
+      #    sistema. Versione installata: v1.60.1.
+      curl https://rclone.org/install.sh | sudo bash     # oppure, preferibile: apt install rclone
 
-      # 2. le due cartelle. `1000` è l'utente `node` del container dell'API: la cartella del
-      #    segreto dev'essere SUA, o l'API non può scriverci. Lo stato lo scrive il cron di
-      #    `bluman` in sola scrittura, l'API lo legge e basta.
+      # 2. le due cartelle. `1000` è l'utente `node` del container dell'API — e sull'host `bluman`
+      #    **è** l'uid 1000, quindi `-o 1000 -g bluman` e `-o bluman -g bluman` sono lo stesso
+      #    proprietario: per questo `ls -l` le mostra entrambe come `bluman:bluman`.
       sudo install -d -o 1000 -g bluman -m 0750 /var/lib/bluman-backup/config
       sudo install -d -o bluman -g bluman -m 0755 /var/lib/bluman-backup/stato
 
@@ -214,6 +218,12 @@ miglioramento: senza, il backup che c'è non è un backup.
       #    ⚠️ il nome esatto della variabile:
       #    BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup
       ```
+
+      **Attenzione a un test che sembra ovvio e non dimostra niente.** Poiché `bluman` è l'uid 1000,
+      anche `stato` risulta scrivibile da uid 1000 — e va bene: la sola lettura dell'API **non** è
+      imposta dai permessi POSIX ma dal **flag `:ro` del montaggio**. La prova che vale è
+      `docker exec bluman_api touch /app/backup-stato/x`, che deve rispondere
+      `Read-only file system`; un `test -w` sull'host risponde di sì e non prova nulla.
 
       4. **Il token.** Il VPS non ha un browser, quindi `rclone authorize dropbox` va eseguito su una
          macchina **con browser** e il JSON che stampa va incollato **nel form del pannello**, non in

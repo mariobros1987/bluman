@@ -49,13 +49,16 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   **Resta un buco dichiarato**: i backup stanno sullo **stesso disco** del database (un solo
   filesystem su quella macchina), quindi proteggono dagli errori applicativi ma **non** dalla morte
   del disco o del server. Per quello serve la **copia off-site**, che dal 10/10/2026 è
-  **implementata** (voce 8-bis) e **non ancora attiva su questo server**. Il provider è deciso dal
-  09/10/2026 (**Dropbox**, spazio già pagato): `scripts/backup-vps.sh` copia i tre artefatti con
-  `rclone --config`, e la **credenziale si incolla dal pannello** del super admin (*Backup off-site*)
-  invece che a mano sul server. Il segreto vive in `/var/lib/bluman-backup/config/rclone.conf`,
-  **non** nel database e **non** nel `.env` — il database *è* ciò che viene spedito su Dropbox e il
-  `.env` *è* una delle tre cose che lo script archivia. Restano i passi che richiedono root
-  (`rclone`, le due cartelle, `BLUMAN_BACKUP_RCLONE_REMOTE`): `docs/vps-primo-avvio.md` §7.
+  **in produzione** (voce 8-bis, commit `9d59fc93`) e **aspetta solo la credenziale** — il token non
+  è ancora stato incollato, quindi la copia non è ancora viva: `scripts/backup-vps.sh` dice
+  «credenziale assente» e prosegue. Il provider è deciso dal 09/10/2026 (**Dropbox**, spazio già
+  pagato): lo script copia i tre artefatti con `rclone --config`, e la **credenziale si incolla dal
+  pannello** del super admin (*Backup off-site*) invece che a mano sul server. Il segreto vive in
+  `/var/lib/bluman-backup/config/rclone.conf`, **non** nel database e **non** nel `.env` — il
+  database *è* ciò che viene spedito su Dropbox e il `.env` *è* una delle tre cose che lo script
+  archivia. I **tre passi che richiedevano root** sono fatti il 10/10/2026 (`rclone` v1.60.1 dai
+  repository Ubuntu, le due cartelle, `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`); la tabella dei
+  montaggi e la prova del caso storto stanno in `docs/vps-primo-avvio.md` §7.
 - **Sorveglianza VPS**: dal 01/10/2026 `scripts/monitor-vps.sh` gira ogni **10 minuti** dal cron di
   `bluman` e avvisa su **Telegram** (bot dedicato `@Avvisibluman_bot`, non quello degli studi;
   configurato e **verificato end-to-end il 02/10/2026**). **Otto** controlli:
