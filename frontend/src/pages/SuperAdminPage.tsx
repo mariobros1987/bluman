@@ -4,6 +4,7 @@ import { setActiveTenantId } from '../utils/tenant';
 import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi, resetPasswordTenantApi } from '../api/client';
 import { useToast } from '../components/ui/ToastProvider';
 import { confirm } from '../components/ui/ConfirmProvider';
+import { PannelloBackupOffSite } from '../components/admin/PannelloBackupOffSite';
 
 interface TenantStudio {
   id: string;
@@ -35,6 +36,13 @@ const DEFAULT_TENANTS: TenantStudio[] = [];
 
 export function SuperAdminPage() {
   const toast = useToast();
+  /**
+   * Due schede e non due pagine: il pannello del super admin fa due mestieri distinti — gli
+   * studi della piattaforma e l'infrastruttura che li tiene in piedi — e mescolarli in una
+   * schermata sola era il motivo per cui la copia di sicurezza non si trovava da nessuna parte.
+   * La scheda vive qui e non dentro i componenti: così la barra resta una riga sola.
+   */
+  const [sezione, setSezione] = useState<'studi' | 'backup'>('studi');
   const [tenants, setTenants] = useState<TenantStudio[]>(() => {
     const saved = localStorage.getItem('bluman_all_tenants_admin');
     return saved ? JSON.parse(saved) : DEFAULT_TENANTS;
@@ -323,6 +331,38 @@ export function SuperAdminPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Barra delle schede: «Studi» è la schermata storica, «Backup off-site» è la voce 8-bis. */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {([
+          { chiave: 'studi' as const, etichetta: '🏢 Studi & Licenze' },
+          { chiave: 'backup' as const, etichetta: '💾 Backup off-site' },
+        ]).map(({ chiave, etichetta }) => {
+          const attiva = sezione === chiave;
+          return (
+            <button
+              key={chiave}
+              type="button"
+              onClick={() => setSezione(chiave)}
+              style={{
+                background: attiva ? 'var(--indigo)' : 'var(--card)',
+                color: attiva ? '#fff' : 'var(--muted)',
+                border: `1px solid ${attiva ? 'var(--indigo)' : 'var(--border)'}`,
+                borderRadius: 10, padding: '8px 16px', fontSize: 12.5,
+                fontWeight: attiva ? 700 : 600, cursor: 'pointer',
+              }}
+            >
+              {etichetta}
+            </button>
+          );
+        })}
+      </div>
+
+      {sezione === 'backup' ? (
+        <PannelloBackupOffSite />
+      ) : (
+        // Il frammento tiene la schermata degli studi intatta: spostare 500 righe di JSX per
+        // aggiungere una scheda avrebbe reso il diff illeggibile proprio dove serve leggerlo.
+        <>
       {/* Header Super Admin */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
@@ -906,6 +946,8 @@ export function SuperAdminPage() {
             </div>
           </form>
         </div>
+      )}
+        </>
       )}
     </div>
   );

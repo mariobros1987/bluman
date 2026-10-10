@@ -11,6 +11,8 @@ export * from './fatturazione';
 export * from './portale';
 export * from './firma';
 export * from './tenant';
+// §voce 8-bis — copia off-site del backup: credenziale (super admin) e freschezza (titolare).
+export * from './backup';
 export * from './notifiche';
 export * from './report';
 export * from './paginazione';

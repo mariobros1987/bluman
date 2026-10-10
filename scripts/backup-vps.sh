@@ -32,6 +32,13 @@
 #    una copia della chiave **fuori dal server** (gestore di password) i backup off-site
 #    cifrati non si aprono più.
 #
+# ⚠️ LA CREDENZIALE DELLA COPIA OFF-SITE NON STA NEL .env, e non è un dettaglio: il .env è una
+#    delle tre cose che questo script archivia e spedisce su Dropbox, quindi una credenziale
+#    scritta lì viaggerebbe insieme alla cassaforte che apre. Sta in un file a parte,
+#    `$DIR_CONFIG_BACKUP/rclone.conf`, che scrive l'API dal pannello del super admin (voce
+#    8-bis, 10/10/2026), con permessi 0640 di `1000:bluman`. La **destinazione** invece è
+#    configurazione e resta nel .env: non è un segreto e da sola non autentica niente.
+#
 # ⚠️ Un backup mai ripristinato NON è un backup: testa il restore (vedi in fondo) prima di
 #    fidarti. Il test copre tutte e tre le parti, non solo il database.
 #
@@ -47,6 +54,53 @@ DEST="${BLUMAN_BACKUP_DIR:-/var/backups/bluman}"
 RETENZIONE="${BLUMAN_BACKUP_KEEP:-14}"   # quanti backup tenere (per ogni tipo di artefatto)
 TS="$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$DEST"
+
+# Le due cartelle della copia off-site (voce 8-bis). `config/` la scrive l'API, `stato/` la
+# scrive questo script e la legge l'API: sono montate nei container come CARTELLE e non come
+# file singoli, così una sostituzione via `rename` si vede subito (lezione nginx del 09/10).
+DIR_CONFIG_BACKUP="${BLUMAN_BACKUP_CONFIG_DIR:-/var/lib/bluman-backup/config}"
+CONFIG_RCLONE="$DIR_CONFIG_BACKUP/rclone.conf"
+DIR_STATO_BACKUP="${BLUMAN_BACKUP_STATO_DIR:-/var/lib/bluman-backup/stato}"
+
+# ── STATO PER L'APPLICAZIONE ─────────────────────────────────────────
+# L'esito si deposita in un file che l'API legge e mostra nel pannello: senza, un backup
+# fallito alle 03:17 resta invisibile fino al giorno del restore. Il trap su EXIT copre il caso
+# peggiore — lo script che muore a metà (dump vuoto, volume assente) — perché scriva comunque
+# l'esito invece di lasciare in vista il successo della notte prima.
+STATO_SCRITTO=0
+ESITO_LOCALE="fallito"
+ESITO_LOCALE_DETTAGLIO="il backup si è interrotto prima di concludersi"
+COPIA_OFFSITE="saltata"
+COPIA_DETTAGLIO="il backup non è arrivato al passo della copia"
+FILE_DB=""
+BYTE_DB="null"
+
+# Toglie virgolette, barre e a capo dal testo libero: il file dev'essere JSON valido anche se
+# un dettaglio li contiene, e il dettaglio non deve poter rompere il file che l'app legge.
+solo_testo_sicuro() { printf '%s' "${1:-}" | tr -d '"\\' | tr '\n\r\t' '   '; }
+valore_json() { if [ -n "${1:-}" ]; then printf '"%s"' "$(solo_testo_sicuro "$1")"; else printf 'null'; fi; }
+
+scrivi_stato_backup() {
+  [ "$STATO_SCRITTO" -eq 1 ] && return 0
+  [ -d "$DIR_STATO_BACKUP" ] || return 0
+  # File temporaneo + rinomina: l'API può leggere questo file in qualunque momento, e un
+  # mezzo JSON verrebbe interpretato come «sconosciuto» — cioè un falso allarme.
+  if {
+    printf '{\n'
+    printf '  "esito": "%s",\n' "$ESITO_LOCALE"
+    printf '  "quando": "%s",\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf '  "file": %s,\n' "$(valore_json "$FILE_DB")"
+    printf '  "byte": %s,\n' "$BYTE_DB"
+    printf '  "copiaOffSite": "%s",\n' "$COPIA_OFFSITE"
+    printf '  "dettaglio": "%s"\n' "$(solo_testo_sicuro "$ESITO_LOCALE_DETTAGLIO")"
+    printf '}\n'
+  } > "$DIR_STATO_BACKUP/backup.json.tmp" 2>/dev/null; then
+    mv -f "$DIR_STATO_BACKUP/backup.json.tmp" "$DIR_STATO_BACKUP/backup.json" 2>/dev/null \
+      && STATO_SCRITTO=1
+  fi
+  return 0
+}
+trap 'codice=$?; scrivi_stato_backup || true; exit $codice' EXIT
 
 # Le credenziali DB dal .env accanto al compose (owner: può leggere tutto per il dump).
 set -a; . ./.env; set +a
@@ -66,6 +120,9 @@ echo "[$(date -Is)] Dump di ${POSTGRES_DB}…"
 $COMPOSE exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom > "$FILE" </dev/null
 [ -s "$FILE" ] || { echo "ERRORE: dump vuoto"; rm -f "$FILE"; exit 1; }
 ARTEFATTI+=("$FILE")
+# Il nome e la dimensione del dump si fissano qui (dopo la cifratura il file non cifrato non
+# esiste più): sono i due numeri che finiscono nello stato letto dall'applicazione.
+FILE_DB="$(basename "$FILE")"
 
 # ── 2. DOCUMENTI (volume uploads) ────────────────────────────────────
 # Il nome del volume non si indovina: il progetto compose lo prefissa. Si legge dal container
@@ -121,15 +178,56 @@ fi
 # ── 5. COPIA OFF-SITE ────────────────────────────────────────────────
 # È l'unica copia che sopravvive alla perdita del server: senza, tutti i backup stanno
 # sullo stesso disco del database e spariscono con lui.
-if [ -n "${BLUMAN_BACKUP_RCLONE_REMOTE:-}" ] && command -v rclone >/dev/null 2>&1; then
-  for f in "${ARTEFATTI[@]}"; do
-    [ "$CIFRATO" -eq 1 ] && f="${f}.enc"
-    rclone copy "$f" "$BLUMAN_BACKUP_RCLONE_REMOTE"
-  done
-  echo "[$(date -Is)] Copiati off-site su $BLUMAN_BACKUP_RCLONE_REMOTE"
-else
+#
+# La *destinazione* (`dropbox:bluman-backup`) si legge dal .env; la *credenziale* sta in
+# `$CONFIG_RCLONE`, che scrive l'API dal pannello del super admin. Le due cose mancano in modo
+# diverso e vanno dette in modo diverso: una destinazione senza credenziale non è «non
+# configurato», è una copia che **non parte** — e il verso giusto in cui sbagliare è rumoroso.
+BYTE_DB="$(stat -c %s "$DEST/bluman_${TS}.dump.enc" 2>/dev/null \
+  || stat -c %s "$DEST/bluman_${TS}.dump" 2>/dev/null || printf 'null')"
+
+if [ -z "${BLUMAN_BACKUP_RCLONE_REMOTE:-}" ]; then
   echo "ℹ️  Nessuna copia off-site (imposta BLUMAN_BACKUP_RCLONE_REMOTE e installa rclone)."
   echo "    ⚠️  Finché non c'è, i backup stanno sullo STESSO disco del database."
+  COPIA_DETTAGLIO="nessuna destinazione configurata (BLUMAN_BACKUP_RCLONE_REMOTE)"
+elif ! command -v rclone >/dev/null 2>&1; then
+  COPIA_OFFSITE="fallita"
+  COPIA_DETTAGLIO="destinazione impostata ma rclone non è installato sul server"
+  echo "⚠️  BLUMAN_BACKUP_RCLONE_REMOTE è impostata ma rclone NON è installato: la copia non è partita." >&2
+elif [ ! -s "$CONFIG_RCLONE" ]; then
+  COPIA_OFFSITE="fallita"
+  COPIA_DETTAGLIO="credenziale assente: $CONFIG_RCLONE non esiste (va salvata dal pannello del super admin)"
+  echo "⚠️  Destinazione impostata ma la credenziale non c'è: nessuna copia off-site." >&2
+  echo "    Salva il token rclone dal pannello «Backup off-site» e riprova." >&2
+else
+  # Il nome del remote è la parte prima dei due punti (`dropbox:bluman-backup` → `dropbox`).
+  NOME_REMOTE="${BLUMAN_BACKUP_RCLONE_REMOTE%%:*}"
+  if ! grep -q "^\[${NOME_REMOTE}\]" "$CONFIG_RCLONE"; then
+    # Senza questo controllo rclone fallirebbe con un errore che parla d'altro («didn't find
+    # section in config»), cioè del file sbagliato invece che della destinazione sbagliata.
+    COPIA_OFFSITE="fallita"
+    COPIA_DETTAGLIO="la credenziale non definisce il remote '${NOME_REMOTE}'"
+    echo "⚠️  La credenziale in $CONFIG_RCLONE non definisce il remote '${NOME_REMOTE}': copia non partita." >&2
+  else
+    FALLITI=0
+    for f in "${ARTEFATTI[@]}"; do
+      if [ "$CIFRATO" -eq 1 ]; then f="${f}.enc"; fi
+      if rclone --config "$CONFIG_RCLONE" copy "$f" "$BLUMAN_BACKUP_RCLONE_REMOTE" </dev/null; then
+        echo "[$(date -Is)] Copiato off-site: $(basename "$f")"
+      else
+        FALLITI=$((FALLITI + 1))
+        echo "⚠️  Copia off-site FALLITA per $(basename "$f")" >&2
+      fi
+    done
+    if [ "$FALLITI" -eq 0 ]; then
+      COPIA_OFFSITE="ok"
+      COPIA_DETTAGLIO="$(( ${#ARTEFATTI[@]} )) artefatti copiati su $BLUMAN_BACKUP_RCLONE_REMOTE"
+      echo "[$(date -Is)] Copiati off-site su $BLUMAN_BACKUP_RCLONE_REMOTE"
+    else
+      COPIA_OFFSITE="fallita"
+      COPIA_DETTAGLIO="${FALLITI} su ${#ARTEFATTI[@]} artefatti non copiati"
+    fi
+  fi
 fi
 
 # ── 6. ROTAZIONE ─────────────────────────────────────────────────────
@@ -143,6 +241,18 @@ done
 echo "[$(date -Is)] Fatto. Conservati: $(ls -1 "$DEST"/bluman_*.dump* 2>/dev/null | wc -l) database, \
 $(ls -1 "$DEST"/bluman_*_uploads.tar.gz* 2>/dev/null | wc -l) documenti, \
 $(ls -1 "$DEST"/bluman_*_env.tar.gz* 2>/dev/null | wc -l) segreti."
+
+# ── 7. STATO PER L'APPLICAZIONE ──────────────────────────────────────
+# Due fatti distinti, due campi distinti: `esito` dice se il backup locale è riuscito,
+# `copiaOffSite` se è uscito da questa macchina. Fonderli nasconderebbe proprio il caso che
+# questa voce esiste per rendere visibile — il backup che si dichiara riuscito e non è mai
+# arrivato su Dropbox.
+ESITO_LOCALE="ok"
+ESITO_LOCALE_DETTAGLIO="database, documenti e segreti archiviati, cifrati e ruotati"
+if [ "$COPIA_OFFSITE" != "ok" ]; then
+  ESITO_LOCALE_DETTAGLIO="$ESITO_LOCALE_DETTAGLIO; copia off-site: $COPIA_DETTAGLIO"
+fi
+scrivi_stato_backup
 
 # ── RESTORE-TEST (da eseguire A MANO, periodicamente, su un DB usa-e-getta) ──
 # Non basta l'exit code: un dump che si apre ma è vuoto passa ogni controllo superficiale.

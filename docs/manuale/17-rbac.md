@@ -24,6 +24,16 @@ Regola **chi può fare cosa**. Due meccanismi:
   irraggiungibile, chi non aveva righe otteneva l'accesso pieno che il default gli nega. Il prezzo
   accettato è che un guasto possa negare un accesso legittimo: si sbaglia dal lato che si vede (una
   porta chiusa per errore si nota e si riapre; una aperta per errore no).
+- **Cosa *non* passa dalla matrice.** Le rotte `/admin/*` (pannello di piattaforma) e `/tenant/*`
+  (impostazioni dello studio) sono **deliberatamente fuori** da `ROTTE_MODULO`
+  (`src/util/rbacModuli.ts`): la matrice governa i moduli di **dominio** (clients, invoices,
+  comunicazioni…), non l'amministrazione, che è protetta da **guardie di ruolo**
+  (`soloSuperAdmin` per `/admin/*`; `advisor`/`super_admin` per `/tenant/*`). La conseguenza
+  pratica è che una funzione nuova riservata al titolare **non richiede una voce nella matrice**: le
+  basta la guardia di ruolo già esistente. È il caso della **freschezza del backup off-site**
+  (`GET /tenant/backup`, 10/10/2026): il riquadro in *Impostazioni → Manutenzione* la vede
+  l'`advisor`, e gli altri ruoli ricevono 403 — che l'interfaccia interpreta come «non ti
+  riguarda», non come un guasto (un 500, quello sì, si dice).
 - **super_admin** ha `tenant_id` **NULL** (invariante RLS): un super_admin con tenant valorizzato
   diventa un utente ordinario di quello studio.
 - **2FA/TOTP** disponibile; il marcatore `pre_totp` non vale come sessione (niente bypass 2FA).
@@ -40,7 +50,11 @@ Regola **chi può fare cosa**. Due meccanismi:
   riattivazione, che è riservata agli stessi due ruoli.
 
 ## 🔗 Collegamenti
-- **Impostazioni** (§16): la matrice e il team.
+- **Impostazioni** (§16): la matrice e il team. La scheda **Manutenzione** mostra all'`advisor` la
+  freschezza della copia di sicurezza (rotta `/tenant/backup`, guardia di ruolo, **non** matrice).
+- **Super admin** (pagina piattaforma, **non** un modulo): la scheda **Backup off-site** è dietro
+  `soloSuperAdmin` e **non** compare agli altri ruoli; la credenziale che vi si incolla non è mai
+  rileggibile. Il campo del token è *write-only* per costruzione, non per convenzione: vedi §19.
 - **Tutti i moduli**: comunicazioni (invio **e** lettura della casella), documenti, library, clients,
   invoices… passano dalla matrice.
 - **Comunicazioni**: la matrice governa l'intero modulo — invio, casella in arrivo, fascicolo del

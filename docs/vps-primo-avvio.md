@@ -149,8 +149,9 @@ Railway e sul VPS non si preme quel pulsante.
 
 ## 7. Dopo il cut-over
 - [x] **Backup in cron** (01/10/2026) — vedi «Il backup» qui sotto. Restore-test eseguito.
-- [x] **Sorveglianza in cron** (01/10/2026) — vedi «La sorveglianza» qui sotto: sette controlli con
-      avvisi su Telegram, e il controllo che il backup non sia morto in silenzio.
+- [x] **Sorveglianza in cron** (01/10/2026, ottavo controllo il 10/10/2026) — vedi «La sorveglianza»
+      qui sotto: otto controlli con avvisi su Telegram, e il controllo che il backup non sia morto in
+      silenzio.
 - [x] **Rotazione delle password** (`bluman_app` e proprietario) — 02/10/2026, vedi «La rotazione
       delle password» qui sotto.
 - [x] **`pg_stat_statements`** — 02/10/2026. Rende visibili le query lente, che prima erano
@@ -186,13 +187,63 @@ miglioramento: senza, il backup che c'è non è un backup.
       macchina c'è un solo filesystem, quindi «un'area diversa» può essere solo una directory diversa.
       Proteggono dagli errori applicativi, **non** dalla morte del disco o del server.
       **Il provider è deciso dal 09/10/2026: Dropbox** — spazio cloud che il titolare **già paga**,
-      non Backblaze. **Come si chiude:** `rclone` sul VPS + `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`,
-      con il remote Dropbox (`rclone config` → tipo `dropbox`). Attenzione al modo, non al fine:
-      l'autenticazione rclone **scade**, e **se scade in silenzio la copia smette senza che nessuno se
-      ne accorga**. Va quindi aggiunto anche un controllo sulla **freschezza della copia off-site**, o
-      si sostituisce un buco con un buco più silenzioso. Nota: fra i tre candidati Dropbox è quello
-      che regge meglio l'uso non presidiato — il token dura a lungo e rclone ha un remote «ufficiale»
-      — ma la scadenza non è mai zero, quindi il controllo di freschezza resta obbligatorio comunque.
+      non Backblaze.
+
+      **Il codice c'è dal 10/10/2026 (voce 8-bis):** `scripts/backup-vps.sh` copia i tre artefatti
+      con `rclone --config`, il **monitor ha l'ottavo controllo** (`copia-remota`), e la credenziale
+      si incolla dal pannello **Impostazioni → Super admin → Backup off-site** invece che a mano sul
+      server. Il segreto vive in `/var/lib/bluman-backup/config/rclone.conf`, **non** in una tabella
+      e **non** nel `.env`: il database *è* ciò che viene spedito su Dropbox, e il `.env` *è* una
+      delle tre cose che lo script archivia — metterci la chiave della copia significa spedirla
+      insieme alla cassaforte.
+
+      **Cosa resta da fare, e richiede root** (i primi tre passi si fanno una volta sola, **prima**
+      del `docker compose up`, perché il compose monta le due cartelle):
+
+      ```bash
+      # 1. rclone (serve root: `distribuisci.sh` non lo installa)
+      curl https://rclone.org/install.sh | sudo bash     # oppure: apt install rclone
+
+      # 2. le due cartelle. `1000` è l'utente `node` del container dell'API: la cartella del
+      #    segreto dev'essere SUA, o l'API non può scriverci. Lo stato lo scrive il cron di
+      #    `bluman` in sola scrittura, l'API lo legge e basta.
+      sudo install -d -o 1000 -g bluman -m 0750 /var/lib/bluman-backup/config
+      sudo install -d -o bluman -g bluman -m 0755 /var/lib/bluman-backup/stato
+
+      # 3. la destinazione (non è un segreto) nel .env dell'app
+      #    ⚠️ il nome esatto della variabile:
+      #    BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup
+      ```
+
+      4. **Il token.** Il VPS non ha un browser, quindi `rclone authorize dropbox` va eseguito su una
+         macchina **con browser** e il JSON che stampa va incollato **nel form del pannello**, non in
+         chat e non in un file. Il token contiene il **refresh token**, che è ciò che permette a
+         rclone di rinnovare da sé l'access token di breve durata: **senza, la copia funzionerebbe
+         poche ore e poi smetterebbe senza avvisare**, ed è il motivo per cui il form lo pretende.
+
+      **La prova, a mano, una volta** — e va fatta **anche storta**, perché è la storta quella che
+      conta:
+
+      ```bash
+      ssh bluman@136.144.234.118 'cd /opt/bluman && bash ./scripts/backup-vps.sh'
+      ssh bluman@136.144.234.118 \
+        'rclone --config /var/lib/bluman-backup/config/rclone.conf lsl dropbox:bluman-backup'
+      # i tre artefatti devono comparire sul remoto; poi:
+      ssh bluman@136.144.234.118 'cd /opt/bluman && bash ./scripts/monitor-vps.sh'
+      # l'ottavo controllo, `copia-remota`, deve dire ok.
+
+      # Il caso storto: rinominare la credenziale e guardare cosa succede.
+      sudo mv /var/lib/bluman-backup/config/rclone.conf /tmp/rclone.conf.bak
+      # atteso: `copia-remota` degrada a `unknown` (NON a `ok`), e backup-vps.sh NON si rompe:
+      # dice «credenziale assente» e prosegue. Poi rimetti il file a posto.
+      sudo mv /tmp/rclone.conf.bak /var/lib/bluman-backup/config/rclone.conf
+      ```
+
+      **Perché il controllo di freschezza non è opzionale:** l'autenticazione rclone **scade**, e
+      **se scade in silenzio la copia smette senza che nessuno se ne accorga**. Senza l'ottavo
+      controllo si sostituirebbe un buco con un buco più silenzioso. Fra i tre candidati Dropbox è
+      quello che regge meglio l'uso non presidiato — il token dura a lungo e rclone ha un remote
+      «ufficiale» — ma la scadenza non è mai zero.
 
       **Verificato il 09/10/2026 (spike sulla documentazione rclone/Dropbox):**
       - **Il VPS non ha un browser**, quindi `rclone config` interattivo non è la strada. Il percorso
@@ -207,8 +258,14 @@ miglioramento: senza, il backup che c'è non è un backup.
         (flag globale) oppure con `RCLONE_CONFIG` / `RCLONE_DROPBOX_TOKEN`.
       - Il **dominio non serve**, in nessuna delle due forme (vedi la riga **8-bis** di
         `PIANO_DI_MIGLIORAMENTO.md` §1bis: vale anche per il form nel superadmin).
+      - **Perché il token va nel form e non a mano nel `rclone.conf`.** Il file si può sempre
+        scrivere via SSH, ma il pannello valida prima di scrivere (rifiuta un token senza
+        `refresh_token`, e rifiuta una config intera incollata al posto del token), e dichiara
+        **quale backend sta guardando**: Railway e il VPS hanno database diversi, e una credenziale
+        salvata dal backend sbagliato non arriverebbe mai al backup notturno. Da Railway la rotta
+        risponde **503**, non un 200 che non ha salvato niente.
 
-- [ ] **`healthchecks.io`, o un cane da guardia fuori dal VPS.** I sette controlli girano **sul VPS**:
+- [ ] **`healthchecks.io`, o un cane da guardia fuori dal VPS.** Gli otto controlli girano **sul VPS**:
       se il VPS muore del tutto, il monitor muore con lui e non avvisa nessuno — l'unico segnale che
       resta è il riepilogo delle 08:00 che **non arriva**, e «non arriva» è indistinguibile da «non
       c'era niente da dire» per chi non lo sta aspettando. È l'ultimo buco di una sorveglianza che si
@@ -281,9 +338,17 @@ non portano a niente — la forma del caso «20 documenti, 8 senza il loro file�
 
 **⚠️ Il buco che resta.** I backup stanno **sullo stesso disco** del database: su questa macchina
 c'è un solo filesystem (`/dev/vda1`). Proteggono dagli errori applicativi, **non** dalla morte del
-disco o del server. L'unica copia che sopravvive al server è quella off-site, **non ancora attiva**:
-provider deciso il 09/10/2026 (**Dropbox**, spazio già pagato), da configurare con `rclone` +
-`BLUMAN_BACKUP_RCLONE_REMOTE` (vedi la voce nella lista qui sopra).
+disco o del server. L'unica copia che sopravvive al server è quella **off-site**: provider deciso il
+09/10/2026 (**Dropbox**, spazio già pagato), copia e controllo **implementati il 10/10/2026** (voce
+8-bis) e **non ancora attivi su questo server** — mancano i passi che richiedono root, elencati nella
+voce «La copia off-site» qui sopra. Finché non sono fatti, la copia off-site **non esiste**: il
+pannello dice «non configurata» e l'ottavo controllo del monitor dice `unknown`, che è la verità.
+
+**Come si vede che è viva, dall'app.** Il **super admin** ha la scheda «Backup off-site» (dove
+incolla il token) e il **titolare dello studio** vede la freschezza in *Impostazioni → Manutenzione*:
+«Copia di sicurezza: ultima copia 6 ore fa», in rosso se è vecchia. Non è una comodità: se la
+credenziale scade di notte, chi se ne accorge per primo è chi usa il prodotto ogni giorno, non chi
+apre il pannello di piattaforma.
 
 **⚠️ La chiave.** `BACKUP_ENCRYPTION_KEY` sta **dentro** il `.env` che viene cifrato con sé stessa.
 Finché il server è vivo il restore funziona; se il server muore, senza una copia della chiave
@@ -302,7 +367,7 @@ bash ./scripts/monitor-vps.sh --riepilogo     # forza il riepilogo
 bash ./scripts/monitor-vps.sh --prova         # un messaggio di prova su Telegram
 ```
 
-**Sette controlli**, ogni 10 minuti dal cron di `bluman`:
+**Otto controlli**, ogni 10 minuti dal cron di `bluman`:
 
 | Controllo | Scatta quando | Cadenza |
 |---|---|---|
@@ -313,6 +378,20 @@ bash ./scripts/monitor-vps.sh --prova         # un messaggio di prova su Telegra
 | `health` | `/health` non risponde `200` **con `db:ok`** | ogni giro |
 | `apt` | ci sono aggiornamenti di **sicurezza** in attesa | 1×/giorno |
 | `postgres` | il digest di `postgres:17-alpine` è superato rispetto al registro | 1×/giorno |
+| `copia-remota` | la copia più recente **su Dropbox** ha più di **30 ore** (`BLUMAN_MONITOR_COPIA_MAX_ORE`) | 1×/giorno |
+
+**L'ottavo, `copia-remota` (dal 10/10/2026), è quello che guarda il posto giusto.** I primi sette
+guardano **questo** server; lui interroga **Dropbox** con `rclone lsl` e prende il file più recente:
+è l'unico che si accorge di un'autenticazione **scaduta**, perché il backup locale resta verde mentre
+la copia smette. Tre stati, e la distinzione conta:
+- copia più vecchia della soglia → `fail`, con avviso immediato e voce nel riepilogo delle 08:00;
+- **copia mai configurata** → `unknown`, **non** `fail`: accusare l'assenza di una cosa mai chiesta è
+  un falso allarme, ed è il modo in cui si insegna a ignorare il monitor;
+- rclone assente, credenziale illeggibile o **token scaduto** → `unknown`, **mai** `ok`.
+Scrive il suo verdetto in `/var/lib/bluman-backup/stato/verifica.json`, che è il file da cui l'app
+mostra la freschezza al titolare. Il backup scrive invece `backup.json` nella stessa cartella: sono
+due fatti distinti — cosa il backup **crede** di aver fatto e cosa il monitor ha **constatato** — ed
+è proprio la distinzione che serve quando l'autenticazione scade.
 
 **Avvisa solo sui cambiamenti.** Ogni controllo ha uno stato ricordato in
 `/var/lib/bluman-monitor`, e parte un messaggio solo sulla **transizione**: 🔴 quando peggiora, 🟢

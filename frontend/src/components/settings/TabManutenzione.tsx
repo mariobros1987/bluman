@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { chiaviDatiLocali, svuotaDatiLocali } from '../../utils/datiLocali';
+import { fetchStatoBackupTitolareApi } from '../../api/backup';
+import { sintesiCopia, type StatoCopia } from '../../utils/backupStato';
 import styles from '../../pages/Settings.module.css';
 
 interface TabManutenzioneProps {
@@ -8,6 +11,77 @@ interface TabManutenzioneProps {
   setChiaviRimosse: (v: string[] | null) => void;
   confermaSvuota: boolean;
   setConfermaSvuota: (v: boolean) => void;
+}
+
+/**
+ * Voce 8-bis — la freschezza della copia di sicurezza, per il titolare dello studio.
+ *
+ * **Perché qui e non in una scheda sua.** La barra delle impostazioni ne ha già otto e questo è
+ * una riga di testo in sola lettura: una scheda intera per una frase sposterebbe l'attenzione su
+ * una cosa che il titolare non può cambiare.
+ *
+ * **Perché si nasconde invece di spiegare.** Questa schermata la vede ogni ruolo, e la rotta
+ * risponde 403 a chi non è responsabile dello studio. Un riquadro che dicesse «non hai i
+ * permessi» sarebbe rumore su una pagina che parla d'altro — quindi quel caso non disegna nulla.
+ * Un guasto vero (rete, 500) invece si dice: è la differenza fra «non ti riguarda» e «non lo so»,
+ * e confonderle è il modo in cui un'informazione mancante passa per «tutto a posto» (regola 7).
+ */
+function RiquadroCopiaSicurezza() {
+  const [stato, setStato] = useState<StatoCopia | null>(null);
+  const [guasto, setGuasto] = useState<string | null>(null);
+  const [nascosto, setNascosto] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const s = await fetchStatoBackupTitolareApi();
+        if (vivo) setStato(s);
+      } catch (err: any) {
+        if (!vivo) return;
+        // 403 = questo ruolo non vede la freschezza, ed è previsto: niente riquadro.
+        if (err?.status === 403) setNascosto(true);
+        else setGuasto(err?.message || 'Stato della copia di sicurezza non disponibile');
+      }
+    })();
+    return () => { vivo = false; };
+  }, []);
+
+  if (nascosto) return null;
+
+  const sintesi = stato ? sintesiCopia(stato) : null;
+  const colore = sintesi?.livello === 'ok' ? 'var(--green)'
+    : sintesi?.livello === 'errore' ? 'var(--red)'
+    : sintesi?.livello === 'attenzione' ? 'var(--amber)'
+    : 'var(--muted)';
+  const icona = sintesi?.livello === 'ok' ? '✓'
+    : sintesi?.livello === 'errore' ? '🔴'
+    : sintesi?.livello === 'attenzione' ? '⚠️'
+    : '❔';
+
+  return (
+    <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600 }}>Copia di sicurezza</div>
+      {sintesi && (
+        <>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: colore, marginTop: 6 }}>
+            {icona} {sintesi.titolo}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.6 }}>
+            {sintesi.dettaglio}
+          </div>
+        </>
+      )}
+      {guasto && (
+        <div style={{ fontSize: 11.5, color: 'var(--pill-red-fg)', marginTop: 6, lineHeight: 1.6 }}>
+          🔴 {guasto}
+        </div>
+      )}
+      {!sintesi && !guasto && (
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Lettura dello stato…</div>
+      )}
+    </div>
+  );
 }
 
 // TAB 5: Manutenzione dei dati locali di questo browser
@@ -21,6 +95,7 @@ export function TabManutenzione({
 }: TabManutenzioneProps) {
   return (
         <div className={styles.sectionBox}>
+          <RiquadroCopiaSicurezza />
           <div style={{ fontSize: 14, fontWeight: 600 }}>Dati di lavoro salvati in questo browser</div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, lineHeight: 1.6 }}>
             Progetti, note, documenti e firme inseriti prima che la creazione passasse dal server sono

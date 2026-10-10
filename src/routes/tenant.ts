@@ -21,6 +21,17 @@ import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../
 import { moduloConcessoAlTenant } from '../util/moduliTenant.js';
 import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
 import { disattivaCollaboratore, riattivaCollaboratore, apriPeriodoIniziale } from '../services/periodiCollaborazione.js';
+import {
+  cartellaConfigurazione,
+  cartellaStato,
+  componiConfigRclone,
+  leggiConfigurazione,
+  leggiStato,
+  rimuoviTokenRclone,
+  scriviTokenRclone,
+  statoPerTitolare,
+  validaTokenRclone,
+} from '../services/backupOffSite.js';
 import { urlWebhookWhatsapp } from '../util/urlPubblica.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import {
@@ -1288,6 +1299,111 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     } catch (err: any) {
       return reply.code(500).send({ errore: err.message || 'Errore eliminazione tenant' });
     }
+  });
+
+  // ── COPIA OFF-SITE DEL BACKUP (voce 8-bis, 10/10/2026) ────────────────────────────────
+  //
+  // Il backup notturno del VPS copre database, documenti e `.env`, ma tutti e tre finiscono
+  // sullo **stesso disco del database**: su quella macchina c'è un filesystem solo. Il passo che
+  // li porta fuori esiste già in `scripts/backup-vps.sh`; quello che mancava è la credenziale, e
+  // la sorveglianza su di essa — perché l'access token di Dropbox scade in poche ore e rclone lo
+  // rinnova col refresh token, ma se l'autenticazione si rompe la copia smette **in silenzio**.
+  //
+  // Qui si gestiscono due cose sole: il file della credenziale (scritto dall'API, che è l'unica a
+  // poterlo fare senza SSH) e la lettura dei due file di stato che gli script depositano. Il
+  // **token non esce mai** da queste rotte — come `leadAdvisorPassword`, di cui si mostra solo
+  // l'esistenza e la data (regola 6). Si mostra la data di salvataggio, ricavata dal `mtime` del
+  // file: un terzo file di metadati sarebbe un'altra cosa da tenere allineata.
+
+  /** La configurazione della copia off-site, per il super admin. **Mai** il token. */
+  server.get('/admin/backup', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
+    const config = leggiConfigurazione();
+    const stato = leggiStato();
+    return reply.send({
+      // I due percorsi si mostrano perché su un altro backend (Railway) non esistono, e il modo
+      // in cui ci si accorge dello sbaglio è leggere dove si sta scrivendo (o non scrivendo).
+      cartellaConfigurazione: cartellaConfigurazione(),
+      cartellaStato: cartellaStato(),
+      configurazioneDisponibile: config.cartellaDisponibile,
+      statoDisponibile: stato.disponibile,
+      destinazione: config.destinazione,
+      configurato: config.configurato,
+      configuratoIl: config.configuratoIl,
+      backup: stato.backup,
+      verifica: stato.verifica,
+    });
+  });
+
+  /**
+   * Salva la credenziale rclone. Il corpo è `{ token }` col JSON di
+   * `rclone authorize dropbox` — non una configurazione intera: `validaTokenRclone` la rifiuta,
+   * perché una config senza credenziale verrebbe letta da rclone e non autenticherebbe niente.
+   *
+   * Se la cartella non c'è, la risposta è **503 e non 200**: su Railway (o su un VPS a cui manca
+   * il montaggio) il file finirebbe dentro il container, nessun backup lo leggerebbe, e
+   * l'interfaccia direbbe «configurato». È la stessa famiglia del guasto di `urlPubblica.ts`:
+   * una configurazione composta per il deployment sbagliato non produce un errore, produce un
+   * silenzio (regola 7).
+   */
+  server.put<{ Body?: { token?: string } }>('/admin/backup/token', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
+    const esito = validaTokenRclone(req.body?.token);
+    if (!esito.ok) return reply.code(400).send({ errore: esito.errore });
+    try {
+      scriviTokenRclone(componiConfigRclone(esito.token));
+    } catch (err: any) {
+      return reply.code(503).send({ errore: err.message || 'Salvataggio della credenziale non riuscito.' });
+    }
+    // Nel registro va l'atto, mai il contenuto: `dettagli` non contiene il token.
+    await recordAudit({
+      tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo,
+      azione: 'BACKUP_CREDENZIALE_SALVATA', entita: 'Copia off-site del backup',
+      dettagli: 'Credenziale rclone salvata dal super admin', ipAddress: req.ip,
+    }).catch(() => { /* l'audit non deve far fallire un salvataggio riuscito */ });
+    return reply.send({
+      ok: true,
+      configurato: true,
+      configuratoIl: leggiConfigurazione().configuratoIl,
+      messaggio:
+        'Credenziale salvata. La copia partirà col prossimo backup notturno; la verifica arriverà dal monitor entro un giorno.',
+    });
+  });
+
+  /** Disattiva la copia off-site. Rimuovere il file è l'unico interruttore: la *destinazione*
+   *  resta nel `.env`, perché non è un segreto e non autentica niente da sola. */
+  server.delete('/admin/backup/token', async (req, reply) => {
+    if (!soloSuperAdmin(req, reply)) return reply;
+    try {
+      const rimosso = rimuoviTokenRclone();
+      await recordAudit({
+        tenantId: req.tenantId, userId: req.userId, ruolo: req.ruolo,
+        azione: 'BACKUP_CREDENZIALE_RIMOSSA', entita: 'Copia off-site del backup',
+        dettagli: rimosso ? 'Credenziale rclone rimossa: copia off-site disattivata' : 'Nessuna credenziale da rimuovere',
+        ipAddress: req.ip,
+      }).catch(() => { /* idem */ });
+      return reply.send({ ok: true, configurato: false, rimosso });
+    } catch (err: any) {
+      return reply.code(500).send({ errore: err.message || 'Rimozione della credenziale non riuscita.' });
+    }
+  });
+
+  /**
+   * La freschezza della copia, per il **titolare** dello studio (decisione del 10/10/2026: il
+   * super admin configura, il titolare vede). Se il backup smette, chi se ne accorge per primo è
+   * chi usa il prodotto ogni giorno — non chi apre il pannello di piattaforma.
+   *
+   * Sta dietro un guard di **ruolo** e non dietro la matrice permessi, ed è voluto: la matrice
+   * governa le rotte di dominio (`clients`, `invoices`, `communications`…), mentre in
+   * `src/util/rbacModuli.ts` le rotte `tenant` e `admin` sono dichiarate fuori dalla mappa perché
+   * già protette dal ruolo. Aggiungerci un modulo significherebbe una casella in più da
+   * configurare per un'informazione che il titolare non può cambiare.
+   */
+  server.get('/tenant/backup', async (req, reply) => {
+    if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
+      return reply.code(403).send({ errore: 'Lo stato della copia di sicurezza è visibile al responsabile dello studio.' });
+    }
+    return reply.send(statoPerTitolare());
   });
 
   /**

@@ -37,8 +37,9 @@
 # Opzionali: BLUMAN_MONITOR_BACKUP_MAX_ORE (26), BLUMAN_MONITOR_DISCO_PCT (85),
 # BLUMAN_MONITOR_MEM_PCT (15), BLUMAN_MONITOR_SWAP_PCT (50),
 # BLUMAN_MONITOR_RIEPILOGO_ORA (8), BLUMAN_MONITOR_APT_MAX_ORE (168),
-# BLUMAN_MONITOR_STATO, BLUMAN_MONITOR_CONF, BLUMAN_BACKUP_DIR,
-# BLUMAN_MONITOR_HEALTH_URL.
+# BLUMAN_MONITOR_COPIA_MAX_ORE (30), BLUMAN_MONITOR_STATO, BLUMAN_MONITOR_CONF,
+# BLUMAN_BACKUP_DIR, BLUMAN_BACKUP_CONFIG_DIR, BLUMAN_BACKUP_STATO_DIR,
+# BLUMAN_BACKUP_RCLONE_REMOTE, BLUMAN_MONITOR_HEALTH_URL.
 #
 # ── USO ──────────────────────────────────────────────────────────────────────
 #   bash ./scripts/monitor-vps.sh                 # un giro completo
@@ -90,11 +91,24 @@ MAX_ORE_LISTE_APT="${BLUMAN_MONITOR_APT_MAX_ORE:-168}"
 HEALTH_URL="${BLUMAN_MONITOR_HEALTH_URL:-http://127.0.0.1/health}"
 DIR_BACKUP="${BLUMAN_BACKUP_DIR:-/var/backups/bluman}"
 
-CHIAVI=(backup disco memoria container health apt postgres)
+# ── COPIA OFF-SITE (voce 8-bis) ──────────────────────────────────────────────
+# La destinazione è nel .env dell'applicazione; la credenziale in un file a parte che scrive
+# l'API dal pannello. Il monitor non tocca il .env dell'app (vedi l'intestazione): la
+# destinazione gli arriva da /etc/bluman/monitor.env, oppure dall'ambiente.
+REMOTO_OFFSITE="${BLUMAN_BACKUP_RCLONE_REMOTE:-}"
+CONFIG_RCLONE="${BLUMAN_BACKUP_CONFIG_DIR:-/var/lib/bluman-backup/config}/rclone.conf"
+DIR_STATO_BACKUP="${BLUMAN_BACKUP_STATO_DIR:-/var/lib/bluman-backup/stato}"
+# Una copia al giorno e un controllo al giorno: la soglia sta sopra le 24 ore per non dare un
+# falso allarme sul giro che precede il backup notturno, e sotto le 48 per accorgersi della
+# prima notte saltata.
+MAX_ORE_COPIA="${BLUMAN_MONITOR_COPIA_MAX_ORE:-30}"
+
+CHIAVI=(backup disco memoria container health apt postgres copia-remota)
 declare -A ETICHETTE=(
   [backup]="Backup"          [disco]="Disco"        [memoria]="Memoria"
   [container]="Container"    [health]="API /health" [apt]="Aggiornamenti di sistema"
   [postgres]="Immagine PostgreSQL"
+  [copia-remota]="Copia off-site"
 )
 
 # ── UTILITÀ ──────────────────────────────────────────────────────────────────
@@ -114,20 +128,21 @@ elenco() { local IFS=$'\n'; printf '%s' "$*"; }
 # Nel frattempo vale l'ultimo stato letto, che resta visibile nel riepilogo.
 cadenza_di() {
   case "$1" in
-    apt|postgres) printf '24' ;;
+    apt|postgres|copia-remota) printf '24' ;;
     *)            printf '0' ;;
   esac
 }
 
 esegui_controllo() {
   case "$1" in
-    backup)    controlla_backup ;;
-    disco)     controlla_disco ;;
-    memoria)   controlla_memoria ;;
-    container) controlla_container ;;
-    health)    controlla_health ;;
-    apt)       controlla_apt ;;
-    postgres)  controlla_postgres ;;
+    backup)        controlla_backup ;;
+    disco)         controlla_disco ;;
+    memoria)       controlla_memoria ;;
+    container)     controlla_container ;;
+    health)        controlla_health ;;
+    apt)           controlla_apt ;;
+    postgres)      controlla_postgres ;;
+    copia-remota)  controlla_copia_remota ;;
   esac
 }
 
@@ -311,6 +326,111 @@ controlla_postgres() {
   else
     printf 'fail|immagine locale superata: "docker compose pull postgres" e riavvio'
   fi
+}
+
+# 8. COPIA OFF-SITE (una volta al giorno) — la copia che sopravvive alla morte del server.
+#    Il controllo 1 guarda i file LOCALI, e che il backup locale riesca non dice niente sul
+#    fatto che sia uscito da questa macchina. Il caso peggiore è proprio questo: l'access token
+#    di Dropbox dura poche ore, e quando rclone non riesce più a rinnovarlo la copia smette
+#    **senza che nulla in locale cambi** — il backup continua a dichiararsi riuscito.
+#
+#    I tre esiti non sono intercambiabili, e la differenza è il punto:
+#      · non configurata → `unknown`, non `fail`: accusare l'assenza di una cosa mai chiesta è
+#        un falso allarme, ed è il modo più rapido per insegnare a ignorare il monitor;
+#      · rclone assente, credenziale assente, autenticazione scaduta → `unknown`, **mai** `ok`:
+#        un comando che fallisce non deve poter produrre un «tutto bene» (la regola dell'indice
+#        apt vecchio, qui applicata al registro remoto);
+#      · copia assente o più vecchia della soglia → `fail`: l'unico caso che merita un avviso.
+controlla_copia_remota() {
+  local out codice ultimo_file riga data ora epoch eta
+
+  if [ -z "$REMOTO_OFFSITE" ]; then
+    scrivi_verifica unknown "" "" "nessuna destinazione off-site configurata: la copia resta sullo stesso disco del database"
+    printf 'unknown|non configurata (BLUMAN_BACKUP_RCLONE_REMOTE)'
+    return 0
+  fi
+  if ! command -v rclone >/dev/null 2>&1; then
+    scrivi_verifica unknown "" "" "rclone non installato sul server"
+    printf 'unknown|rclone non installato: %s non verificabile' "$REMOTO_OFFSITE"
+    return 0
+  fi
+  if [ ! -s "$CONFIG_RCLONE" ]; then
+    scrivi_verifica unknown "" "" "credenziale assente in $CONFIG_RCLONE"
+    printf 'unknown|credenziale rclone assente: la copia non può partire'
+    return 0
+  fi
+
+  # `lsl` elenca il contenuto con dimensione, data e nome. `--retries 1`: il cron gira ogni
+  # dieci minuti e non c'è tempo da spendere in ritentativi; se Dropbox non risponde si dice
+  # `unknown` e si riprova al giro dopo.
+  out="$(rclone --config "$CONFIG_RCLONE" lsl "$REMOTO_OFFSITE" --timeout 30s --contimeout 10s --retries 1 2>/dev/null)"
+  codice=$?
+  if [ "$codice" -ne 0 ]; then
+    # Il caso che questa voce esiste per intercettare: il token non si rinnova più.
+    scrivi_verifica unknown "" "" "rclone ha risposto con errore $codice (autenticazione scaduta o rete)"
+    printf 'unknown|rclone non ha risposto (codice %s): autenticazione scaduta o rete' "$codice"
+    return 0
+  fi
+
+  # I nomi portano il timestamp zero-paddato (`bluman_AAAAMMGG_HHMMSS…`), quindi l'ordine
+  # alfabetico è l'ordine cronologico e non serve nessun ordinamento per data.
+  ultimo_file="$(printf '%s\n' "$out" | awk 'NF>=4 {print $NF}' | sort | tail -1)"
+  if [ -z "$ultimo_file" ]; then
+    scrivi_verifica fail "" "" "la destinazione $REMOTO_OFFSITE non contiene nessun file"
+    printf 'fail|nessuna copia su %s' "$REMOTO_OFFSITE"
+    return 0
+  fi
+
+  riga="$(printf '%s\n' "$out" | awk -v f="$ultimo_file" '$NF==f {print; exit}')"
+  data="$(printf '%s' "$riga" | awk '{print $2}')"
+  # rclone stampa i decimi di secondo: `date -d` non li accetta, si tagliano.
+  ora="$(printf '%s' "$riga" | awk '{print $3}')"; ora="${ora%%.*}"
+  epoch="$(date -d "$data $ora" +%s 2>/dev/null)" || epoch=""
+  if [ -z "$epoch" ]; then
+    # Senza questo controllo una data illeggibile darebbe un'età di zero ore, cioè un `ok`
+    # falso: è il modo di sbagliare che questo monitor non si può permettere.
+    scrivi_verifica unknown "" "$ultimo_file" "data della copia non interpretabile: $data $ora"
+    printf 'unknown|data della copia non interpretabile (%s %s)' "$data" "$ora"
+    return 0
+  fi
+
+  eta=$(( ( $(date +%s) - epoch ) / 3600 ))
+  if [ "$eta" -gt "$MAX_ORE_COPIA" ]; then
+    scrivi_verifica fail "$eta" "$ultimo_file" "ultima copia $eta ore fa (soglia $MAX_ORE_COPIA)"
+    printf 'fail|ultima copia %s ore fa (soglia %s) — %s' "$eta" "$MAX_ORE_COPIA" "$ultimo_file"
+  else
+    scrivi_verifica ok "$eta" "$ultimo_file" "ultima copia $eta ore fa ($ultimo_file)"
+    printf 'ok|ultima copia %s ore fa (%s)' "$eta" "$ultimo_file"
+  fi
+}
+
+# Il verdetto di questo controllo in un file che l'applicazione legge (voce 8-bis): il monitor è
+# l'unico che interroga il remoto, quindi è l'unico che può dire se la copia esiste davvero.
+# Scrittura su file temporaneo + rinomina perché l'API può leggere in qualunque momento, e un
+# mezzo JSON verrebbe mostrato come «sconosciuto».
+#
+# I due aiutanti sono ripetuti da `backup-vps.sh` invece di stare in una libreria comune: i due
+# script girano da soli, da cron, con utenti diversi, e ognuno dev'essere leggibile e
+# distribuibile senza cercare un terzo file.
+solo_testo_sicuro() { printf '%s' "${1:-}" | tr -d '"\\' | tr '\n\r\t' '   '; }
+valore_json() { if [ -n "${1:-}" ]; then printf '"%s"' "$(solo_testo_sicuro "$1")"; else printf 'null'; fi; }
+
+scrivi_verifica() {
+  local stato="$1" ore="$2" file="$3" dettaglio="$4" ore_json="null"
+  [ -d "$DIR_STATO_BACKUP" ] || return 0
+  [ -n "$ore" ] && ore_json="$ore"
+  if {
+    printf '{\n'
+    printf '  "stato": "%s",\n' "$(solo_testo_sicuro "$stato")"
+    printf '  "quando": "%s",\n' "$(adesso)"
+    printf '  "ore": %s,\n' "$ore_json"
+    printf '  "file": %s,\n' "$(valore_json "$file")"
+    printf '  "dettaglio": "%s"\n' "$(solo_testo_sicuro "$dettaglio")"
+    printf '}\n'
+  } > "$DIR_STATO_BACKUP/verifica.json.tmp" 2>/dev/null; then
+    mv -f "$DIR_STATO_BACKUP/verifica.json.tmp" "$DIR_STATO_BACKUP/verifica.json" 2>/dev/null || true
+  fi
+  return 0
 }
 
 # ── STATO ────────────────────────────────────────────────────────────────────

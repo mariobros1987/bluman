@@ -1,6 +1,6 @@
 # 📑 Report & Passaggio Consegne — Sessione Terminale Claude
 
-> **Ultimo aggiornamento: 09/10/2026.** Il documento nasce come consegna della sessione del
+> **Ultimo aggiornamento: 10/10/2026.** Il documento nasce come consegna della sessione del
 > 22-23 settembre 2026 (oltre 26 ore, 79 interazioni, chiusa per saturazione della context
 > window: `API Error: 400 Context window is full`). Da allora è tenuto aggiornato come
 > **registro di cosa è stato fatto**, ricostruito dai commit e non dalla memoria.
@@ -8,15 +8,15 @@
 
 ---
 
-## 🧭 Dove siamo — 09/10/2026
+## 🧭 Dove siamo — 10/10/2026
 
 | | |
 |---|---|
-| Ultimo commit | `41a9276c` — 09/10/2026, **distribuito in produzione** (Vercel + Railway + VPS), `EXIT=0` |
+| Ultimo commit | `755ba47f` — *docs(recap): la distribuzione di `41a9276c` è verificata, e i test frontend non sono nello script*, su `origin/main` |
 | Branch | `main`, **allineato a `origin/main`** |
-| Working tree | **pulito.** Le voci **4, 5, 6 e 9(c)** sono fatte e in produzione |
+| Working tree | **Sporco, di proposito:** la **voce 8-bis** è implementata e **verificata** (backend 1638 passati / 129 file, frontend 192 / 22, `tsc` e build verdi, grafo aggiornato) ma **non ancora committata** — in attesa dell'ok del titolare |
 | VPS | ✅ **Allineato a `41a9276c`** il 09/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle») |
-| Prossimo passo | La **18** (secondo studio reale), e — in parallelo — la **voce 8**, sbloccata dallo spike dello 09/10 (non serve il dominio) |
+| Prossimo passo | **Committare e distribuire la 8-bis**, poi la **18** (secondo studio reale). Prima della distribuzione restano i **prerequisiti che richiedono root sul VPS**: `rclone`, le due cartelle con i loro permessi, la destinazione nel `.env` |
 | ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
 
 ---
@@ -275,35 +275,43 @@ allineato, bundle nuovo realmente servito dalla porta 80 e nessun errore da ness
 
 ```
 main ... origin/main      (allineato, nessun commit da pushare)
+
+── codice ──
+ M docker-compose.prod.yml           ← VOCE 8-bis: i due montaggi (cartelle, non file singoli)
+ M scripts/backup-vps.sh             ← VOCE 8-bis: `--config`, il controllo del remote, `backup.json`
+ M scripts/monitor-vps.sh            ← VOCE 8-bis: l'ottavo controllo, `copia-remota`
+ M src/routes/tenant.ts              ← VOCE 8-bis: `GET/PUT/DELETE /admin/backup` + `GET /tenant/backup`
+ M frontend/src/api/client.ts        ← VOCE 8-bis: riesporta `api/backup.ts`
+ M frontend/src/pages/SuperAdminPage.tsx        ← VOCE 8-bis: le due schede «Studi» | «Backup off-site»
+ M frontend/src/components/settings/TabManutenzione.tsx ← VOCE 8-bis: il riquadro del titolare
+?? src/services/backupOffSite.ts                    (nuovo — la logica pura)
+?? src/backupOffSite.test.ts                        (nuovo — 29 test, 1 POSIX-only)
+?? src/backupRotte.test.ts                          (nuovo — 23 test, 1 POSIX-only)
+?? frontend/src/api/backup.ts                       (nuovo)
+?? frontend/src/utils/backupStato.ts                (nuovo)
+?? frontend/src/utils/backupStato.test.ts           (nuovo — 23 test)
+?? frontend/src/components/admin/PannelloBackupOffSite.tsx  (nuovo)
+?? frontend/src/components/admin/PannelloBackupOffSite.test.tsx (nuovo — 12 test)
+?? frontend/src/components/settings/TabManutenzione.test.tsx    (nuovo — 5 test)
+
+── documenti ──
+ M .agents/AGENTS.md                 ← la riga sull'infrastruttura del backup + la sorveglianza
+ M .env.prod.example                 ← `BLUMAN_BACKUP_RCLONE_REMOTE` e le due cartelle
+ M PIANO_DI_MIGLIORAMENTO.md         ← la voce 8-bis chiusa, con le tre decisioni del 10/10
+ M PIANO_MIGRAZIONE_VPS.md           ← la copia off-site: il codice c'è, non è attiva sul server
  M RECAP_SESSIONE_TERMINALE.md       ← questo file
- M PIANO_DI_MIGLIORAMENTO.md         ← nota di verifica VPS + voce 8 (Dropbox) + voci 4 e 5 chiuse
- M PIANO_MIGRAZIONE_VPS.md           ← verifica on-server + copia off-site: provider deciso
- M .agents/AGENTS.md                 ← copia off-site: provider deciso
- M docs/vps-primo-avvio.md           ← copia off-site: provider deciso
- M docs/manuale/19-infra-deploy.md   ← le tre destinazioni di deploy (prima diceva due)
- M docs/manuale/README.md            ← indice: destinazione di produzione
- M docs/manuale/17-rbac.md           ← voci 4 e 5
- M docs/manuale/15-comunicazioni.md  ← voce 4
- M src/util/rbacModuli.ts            ← VOCE 4: la mappa copre la lettura, non solo l'invio
- M src/rbacModuli.test.ts            ← VOCE 4: i casi di confine nuovi
- M src/server.ts                     ← VOCE 5: il catch ricade sul default per ruolo
- M src/rbacServer.test.ts            ← VOCE 5: il test asseriva il contrario; + voce 4
- M src/routes/comunicazioni.ts       ← VOCE 4: il commento diceva «invio soltanto»
-?? frontend/src/utils/comunicazioniAccesso.ts       (nuovo)
-?? frontend/src/utils/comunicazioniAccesso.test.ts  (nuovo)
- M frontend/src/pages/ProjectDetail.tsx             ← la scheda non compare a chi è negata
- M frontend/src/components/PassaggioModal.tsx       ← la linguetta «Messaggi» idem
- M frontend/src/components/settings/OperatorDetailModal.tsx ← «Invio» → «Lettura e invio»
+ M docs/manuale/17-rbac.md           ← cosa *non* passa dalla matrice
+ M docs/manuale/19-infra-deploy.md   ← backup e sorveglianza: otto controlli
+ M docs/vps-primo-avvio.md           ← §7: i passi che richiedono root, e il caso storto
 ```
 
-Ultimo commit: `87a77482` — *fix(nginx): i file si montano come cartella, o il deploy mente
-sulla configurazione* (08/10/2026 19:32).
+Ultimo commit: `755ba47f` — *docs(recap): la distribuzione di `41a9276c` è verificata, e i test
+frontend non sono nello script* (09/10/2026).
 
-> Le modifiche **non sono ancora committate** — in attesa dell'ok del titolare. Nove file sono
-> **solo documentazione** (registrano la verifica del VPS del 09/10, la decisione su Dropbox e la
-> chiusura delle voci 4 e 5); gli altri otto più i due nuovi sono il **codice delle voci 4 e 5**,
-> con i test: `npx vitest run` → **1584 passati** (backend) e **139 + 5 nuovi passati** (frontend),
-> `tsc --noEmit` pulito su entrambi i lati.
+> Le modifiche **non sono ancora committate** — in attesa dell'ok del titolare. Sono **tutte la
+> voce 8-bis**: sette file di codice modificati e nove nuovi (fra sorgenti e test), più otto
+> documenti. Le voci **4, 5, 6 e 9(c)** sono invece già in produzione dal 09/10 (`41a9276c`).
+> Il piano della voce non entra nel repository: vive fuori, in `~/.claude/plans/`.
 
 ---
 
@@ -312,12 +320,12 @@ sulla configurazione* (08/10/2026 19:32).
 Le voci aperte vivono in **`PIANO_DI_MIGLIORAMENTO.md` §1bis**, che è il posto dove si scrive
 cosa **manca**. Qui la sintesi.
 
-### Deciso il 09/10/2026 col titolare
+### Deciso il 09-10/10/2026 col titolare
 
 | Voce | Decisione |
 |---|---|
-| **Backup off-site** (voce 8) | **Dropbox.** Il VPS ha un solo filesystem: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco. rclone + `BLUMAN_BACKUP_RCLONE_REMOTE`. ⚠️ Serve un **controllo di freschezza**: l'auth rclone può scadere in silenzio e la copia smette senza avvisare. |
-| **Dove vive la credenziale rclone** (voce 8-bis) | **Nel form del superadmin**, non a mano sul server. Comporta tabella di piattaforma + cifratura a riposo con chiave **fuori** dal `.env` + rotta `/admin/*` + file di stato + **controllo di freschezza** sulla copia remota. **✅ Spike fatto il 09/10/2026: il dominio NON serve.** Il code flow Dropbox funziona **senza `redirect_uri`** (il codice si legge su dropbox.com e si incolla), PKCE è supportato, `token_access_type=offline` dà il **refresh token**, e **rclone non richiede un'app nostra** (`app_key`/`app_secret` si lasciano vuoti: usa la sua). Quindi la forma più semplice è «il superadmin incolla il **token rclone** generato con `rclone authorize dropbox` su una macchina con browser» — niente app Dropbox di BluMan, niente redirect URI, niente dominio |
+| **Backup off-site** (voce 8) | **Dropbox.** Il VPS ha un solo filesystem: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco. rclone + `BLUMAN_BACKUP_RCLONE_REMOTE`. Il **controllo di freschezza** che serviva ora esiste: è l'**ottavo controllo** del monitor (`copia-remota`), con avviso Telegram e riepilogo alle 08:00 UTC. **✅ fatto il 10/10/2026** — vedi sotto. |
+| **Dove vive la credenziale rclone** (voce 8-bis) | **Nel form del superadmin**, non a mano sul server. La previsione iniziale («tabella di piattaforma + cifratura a riposo con chiave fuori dal `.env`») era **sbagliata** e il 10/10/2026 è stata sostituita: la credenziale vive in un **file sul VPS** (`/var/lib/bluman-backup/config/rclone.conf`, `0640 1000:bluman`), scritto dall'API che gira sul VPS. Il motivo è che **il database *è* ciò che viene scaricato e spedito su Dropbox**, e il `.env` **è** una delle tre cose che lo script archivia: metterci dentro la chiave significa spedirla insieme alla cassaforte. Costo accettato e dichiarato: il form funziona **solo** dal backend che vede la cartella (il VPS); su Railway risponde **503**, mai un 200 fantasma. **✅ Spike del 09/10/2026: il dominio NON serve** — il code flow Dropbox funziona **senza `redirect_uri`**, PKCE è supportato, `token_access_type=offline` dà il **refresh token**, e **rclone usa la sua app** (`app_key`/`app_secret` vuoti), quindi niente app Dropbox di BluMan. **✅ Implementata il 10/10/2026** — vedi sotto. |
 | **Lettura posta in ingresso** (voce 4) | **Governata come l'invio**: `communications = denied` non legge la posta in arrivo. **✅ fatta il 09/10/2026** — vedi sotto. |
 | **Errore di lettura matrice** (voce 5) | **Fail-closed sul default per ruolo**: si accetta che un guasto di lettura possa negare accessi legittimi, in cambio di non allargare mai i permessi per errore. **✅ fatta il 09/10/2026** — vedi sotto. |
 | **Messaggio senza pratiche aperte** (voci 6 e 9(c)) | **Campanella cliccabile + filtro «senza fascicolo»**: il link apre l'anagrafica del cliente. **Niente fascicolo generico** — il messaggio resta visibile finché non c'è una pratica, senza archivi finti. **✅ fatta il 09/10/2026** — vedi sotto. |
@@ -340,6 +348,20 @@ cosa **manca**. Qui la sintesi.
 | **9(c) — il filtro «senza fascicolo»** | Nuovo `frontend/src/utils/notificheFiltro.ts` (helper puri, verificabili senza montare il pannello) + i chip in `NotificationModal`. **Filtra sul tipo d'evento, non sul tipo visivo**: `messaggio_non_instradabile` e l'euristica KYC condividono `type: 'blocked'`, quindi un filtro su `type` mostrerebbe anche i KYC. Per questo `NotificationItem` porta ora anche `tipoEvento`, riempito in `mapNotificaBackend`. Il chip **compare solo se c'è almeno un avviso da isolare** (un filtro che porta al vuoto è peggio di un filtro assente), il badge «N nuove» conta **dentro il filtro** (altrimenti direbbe «3 nuove» mostrandone 1) e il vuoto ha una frase sua. |
 | **Presidi** | `npx vitest run` → **1588 passati** (backend, 127 file, +4 sul servizio: le quattro destinazioni), **152 passati** (frontend, 19 file, +8 su `notificheFiltro`), `tsc --noEmit` pulito su entrambi i lati, `npm run build` verde, grafo aggiornato (5143 nodi, 12161 archi). Documentazione allineata: `docs/manuale/15-comunicazioni.md`, `PIANO_DI_MIGLIORAMENTO.md` (voci 6 e 9(c)). |
 | **Distribuzione** | ✅ **Commit `41a9276c`, distribuito il 09/10/2026** con `./scripts/distribuisci.sh` — `EXIT=0`: push su GitHub, Vercel `Ready` via CLI, `railway up` con health verde e sonda rotta 401, VPS allineato al commit con container ricreati, `migrate` + `rls` applicati, nginx ricaricato e tutte le sonde verdi. **Nota per la prossima volta:** il passo 1 dello script esegue **solo** la suite backend — i test frontend vanno lanciati a parte, e l'hook di pre-commit gira `oxlint --fix` *dopo* l'ultima esecuzione, quindi conviene rilanciarli sul codice committato. |
+
+### ✅ Voci 8 e 8-bis — la copia off-site, la sua credenziale e chi se ne accorge (10/10/2026)
+
+| Voce | Cosa è cambiato |
+|---|---|
+| **Dove sta il segreto, e perché non nel database** | `frontend` → il super admin incolla il token; l'API lo valida (`src/services/backupOffSite.ts`) e scrive `/var/lib/bluman-backup/config/rclone.conf` (`0640`, `1000:bluman`) con scrittura **temporaneo + rinomina**, così rclone alle 03:17 non trova mai un file a metà. **Non** in una tabella e **non** nel `.env`: il database *è* ciò che viene scaricato e spedito su Dropbox, e il `.env` *è* una delle tre cose che lo script archivia — metterci la credenziale della copia significa spedire la chiave insieme alla cassaforte. Nessuna migrazione, nessuna eccezione RLS, nessuna seconda chiave di cifratura da custodire. |
+| **Il `refresh_token` è obbligatorio, e il rifiuto lo spiega** | `validaTokenRclone` respinge un token senza `refresh_token` **mentre l'operatore è ancora davanti al modulo**. L'access token di Dropbox dura poche ore, e senza refresh la copia funzionerebbe fino a sera e poi smetterebbe **senza avvisare**: è esattamente il guasto silenzioso da cui la voce esiste, quindi meglio un rifiuto ora che un verde falso domani. Rifiuta anche vuoto, JSON non valido, testo troppo lungo e una **config rclone intera incollata** (accettarla scriverebbe un file che rclone legge ma che non contiene nessuna credenziale). |
+| **Il pannello dice quale backend sta guardando** | Su Railway la cartella non esiste: `leggiConfigurazione` risponde `cartellaDisponibile: false`, la schermata lo **dichiara** col percorso e **disabilita il salvataggio**, e la rotta `PUT` risponde **503**, non un 200 fantasma. Railway e il VPS hanno **database diversi**: una credenziale salvata dal backend sbagliato non arriverebbe mai al backup notturno, e il modo in cui ci si accorge dello sbaglio è vedere una freschezza vecchia mentre il form dice «configurato». Il campo del token è **write-only**: si incolla, si salva, non si rilegge **mai** — e viene svuotato anche se il salvataggio fallisce, perché un token lasciato a schermo è un token in una schermata condivisa. |
+| **Il titolare vede la freschezza** | Un riquadro in sola lettura in cima a **Impostazioni → Manutenzione** (`TabManutenzione.tsx`): «Copia di sicurezza: ultima copia 6 ore fa», oppure in rosso «14 giorni fa ⚠». **Nessuna voce nuova nella matrice permessi**: le rotte `/tenant/*` e `/admin/*` stanno *fuori* da `ROTTE_MODULO` (`src/util/rbacModuli.ts:17-19`) e sono protette da un guard di **ruolo** — la matrice governa le rotte di *dominio*. Il riquadro distingue **403 da guasto**: 403 = questo ruolo non vede la freschezza, e allora non compare niente (nessuna spiegazione da leggere su una schermata che parla dei dati locali del browser); un guasto vero invece si dice. |
+| **L'ottavo controllo del monitor** | `scripts/monitor-vps.sh` guadagna `copia-remota` in `CHIAVI`, cadenza **24 h**, soglia `BLUMAN_MONITOR_COPIA_MAX_ORE` (default **30**). Interroga il **remoto** con `rclone lsl` e prende il file più recente: oltre soglia → `fail` con avviso **Telegram** e voce nel riepilogo delle **08:00 UTC**; non configurata → `unknown` (un controllo che accusa l'assenza di una cosa mai chiesta insegna a ignorare il monitor); rclone assente o **autenticazione scaduta** → `unknown`, **mai** `ok`. Scrive il suo verdetto in `stato/verifica.json`. |
+| **Due file di stato, non uno** | `backup.json` = cosa il backup **crede** di aver fatto (lo scrive `backup-vps.sh`); `verifica.json` = cosa il monitor ha **constatato** interrogando Dropbox. Sono due fatti distinti, ed è proprio la distinzione che serve quando l'autenticazione scade: il primo resta verde, il secondo no. Separarli evita anche due scrittori sullo stesso file. Il montaggio è di **cartelle, non di file singoli** — la lezione di nginx del 09/10. |
+| **Regola del modulo** | Ciò che non si è potuto leggere vale `sconosciuto`, **mai** `ok`: file assente, illeggibile o malformato non è un backup riuscito, è un'informazione che manca. |
+| **Presidi** | **Suite intere, rilanciate il 10/10/2026 sul codice finale**: backend `npx vitest run` → **1638 passati, 2 saltati, 129 file**, `EXIT=0` (365 s); frontend `npx vitest run` → **192 passati, 22 file** (37 s); `tsc --noEmit` pulito in radice, `npm run typecheck` (`tsc -b --force`) pulito nel frontend, `npm run build` verde (895 ms), `bash -n` verde su `backup-vps.sh` e `monitor-vps.sh`, grafo aggiornato (**5229 nodi, 12387 archi, 305 comunità**). I **92 test nuovi** sono: `src/backupOffSite.test.ts` (29, di cui 1 sui bit di modo — POSIX-only), `src/backupRotte.test.ts` (23, di cui 1 idem), `frontend/src/utils/backupStato.test.ts` (23), `frontend/src/components/admin/PannelloBackupOffSite.test.tsx` (12), `frontend/src/components/settings/TabManutenzione.test.tsx` (5). Il pannello presidia le tre promesse: il token non si rilegge **nemmeno se il server lo restituisse**, un backend che non vede la cartella lo dice e non fa credere di aver salvato, il campo si svuota anche sul fallimento. L'elenco dei file toccati è nello §«Stato del repository Git». |
+| **Restano i passi che richiedono root** | (1) `rclone authorize dropbox` su una macchina **con browser** e incollare il token **nel form, non in chat**; (2) installare `rclone` sul VPS; (3) `BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup` nel `.env` (la *destinazione* non è un segreto) — attenzione al **nome esatto** della variabile; (4) creare `/var/lib/bluman-backup/{config,stato}` con proprietari e permessi documentati **prima** del primo `docker compose up`. Poi la prova a mano: `bash ./scripts/backup-vps.sh`, `rclone lsl` per vedere i tre artefatti sul remoto, `bash ./scripts/monitor-vps.sh` e l'ottavo controllo `ok`. **Provare anche il caso storto**: rinominare `rclone.conf` e verificare che il controllo degradi a `unknown` senza rompere il backup. |
 
 ### ℹ️ I 2 secondi per query nei test — una scelta, non un difetto (chiarito il 09/10/2026)
 
@@ -382,20 +404,23 @@ Se un giorno i ~6 minuti di suite daranno fastidio, la domanda vera è un'altra 
 voce 5.
 
 
-### Da affrontare per prime (scelte il 09/10/2026)
+### Da affrontare per prime (scelte il 09-10/10/2026)
 
-Le voci 4, 5, 6 e 9(c) sono **chiuse** (tabelle sopra). Restano:
+Le voci 4, 5, 6, 8, 8-bis e 9(c) sono **chiuse** (tabelle sopra). Restano:
 
 1. **Secondo studio reale** (voce 18) — è la prova end-to-end che manca ed è **sbloccata**: la
    voce 7 (tenant dinamico) è risolta. **Resta la sola domanda aperta: quanti studi e chi li crea.**
    È il presupposto di `PIANO_MULTITENANT.md`, che resta una **decisione** prima di essere codice.
-2. ~~**Spike OAuth Dropbox** (voce 8-bis, ~15 minuti)~~ ✅ **Fatto il 09/10/2026: il dominio non
-   serve.** Il code flow Dropbox accetta l'assenza di `redirect_uri` (il codice si legge su
-   dropbox.com e si incolla nell'app), PKCE è supportato, `token_access_type=offline` restituisce il
-   refresh token, e rclone non richiede un'app Dropbox nostra. La voce 8-bis si può fare subito,
-   nella forma «il superadmin incolla il token rclone». Vedi la riga 8-bis di
-   `PIANO_DI_MIGLIORAMENTO.md` §1bis.
-3. **Nient'altro.** I ~2 s per query nei test **non** sono una voce da fare: sono la scelta
+2. ~~**Spike OAuth Dropbox** (voce 8-bis)~~ ✅ **Fatto il 09/10/2026 e implementato il 10/10/2026:
+   il dominio non serve.** Il code flow Dropbox accetta l'assenza di `redirect_uri`, PKCE è
+   supportato, `token_access_type=offline` restituisce il refresh token, e rclone usa la sua app.
+   La forma realizzata è «il superadmin incolla il token rclone», e il segreto sta in un **file sul
+   VPS**. Vedi §«Voci 8 e 8-bis» e la riga 8-bis di `PIANO_DI_MIGLIORAMENTO.md` §1bis.
+3. **Attivare davvero la copia off-site su Dropbox** — è **solo lavoro sul server**, non codice:
+   i quattro passi che richiedono root sono in fondo a §«Voci 8 e 8-bis». Fino a che non sono
+   fatti, il pannello mostra «copia off-site non configurata» e il monitor dice `unknown`: è il
+   comportamento giusto, non un difetto.
+4. **Nient'altro.** I ~2 s per query nei test **non** sono una voce da fare: sono la scelta
    deliberata del 19/08/2026 (§«I 2 secondi per query nei test»), e la voce 5 non li ha introdotti
    né allungati. Un'eventuale revisione dei tempi della suite è un discorso a sé, da aprire da capo.
 
@@ -404,6 +429,7 @@ Le voci 4, 5, 6 e 9(c) sono **chiuse** (tabelle sopra). Restano:
 | Voce | Cosa manca |
 |---|---|
 | **TLS sul VPS** | Quando il DNS punterà al server (`docs/vps-primo-avvio.md` §6) |
+| **Copia off-site su Dropbox (voce 8-bis)** | Il codice c'è; manca il **lavoro sul server**, che richiede root: installare `rclone`, creare `/var/lib/bluman-backup/{config,stato}` con i proprietari documentati, `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, e **incollare il token nel form** (non in chat) dopo `rclone authorize dropbox` su una macchina con browser. Vedi §«Voci 8 e 8-bis» |
 | **Telegram sul VPS** | Secondo bot da BotFather; il bot di produzione si sposta **solo** al cut-over |
 | **Custodia di `BACKUP_ENCRYPTION_KEY`** | La chiave sta dentro il `.env` che viene cifrato con sé stessa: se il server muore senza una copia **fuori dal server**, i backup non si aprono più. Va **verificata** riscrivendo la chiave dal foglio e aprendo un backup vero |
 | **CI come cancello di deploy** | Meno urgente: `distribuisci.sh` valida (typecheck BE/FE, lint, build, suite intera) **prima** di pushare, ed è bloccante |
@@ -443,11 +469,15 @@ Le voci 4, 5, 6 e 9(c) sono **chiuse** (tabelle sopra). Restano:
    per ruolo invece di lasciar passare (§«Voci 4 e 5»).
 4. ~~**Voce 6 + 9(c)**~~ ✅ **Fatte il 09/10/2026** — l'avviso «non instradabile» porta alla pratica o
    all'anagrafica, e la campanella ha il filtro «senza fascicolo» (§«Voci 6 e 9(c)»).
-5. **Voce 18** — il secondo studio reale (resta la domanda: quanti e chi li crea).
-6. **Voce 8-bis** — ✅ **sbloccata il 09/10/2026** (il dominio non serve): form del superadmin in cui
-   si incolla il token rclone. Resta da implementare: tabella di piattaforma, cifratura a riposo con
-   chiave **fuori** dal `.env`, rotta `/admin/*`, file di stato, controllo di freschezza.
-7. **Attivare il backup off-site su Dropbox** con il controllo di freschezza.
+5. ~~**Voce 8 + 8-bis**~~ ✅ **Fatte il 10/10/2026** — la credenziale rclone si incolla dal pannello
+   del super admin e vive in un **file sul VPS** (non nel database: il DB *è* ciò che viene spedito
+   su Dropbox); il titolare vede la freschezza in Impostazioni → Manutenzione; il monitor ha
+   l'**ottavo controllo** `copia-remota` con avviso Telegram (§«Voci 8 e 8-bis»). **Non ancora
+   committata**: manca l'ok del titolare, e prima della distribuzione vanno fatti i quattro passi
+   che richiedono root sul VPS.
+6. **Voce 18** — il secondo studio reale (resta la domanda: quanti e chi li crea).
+7. **Attivare il backup off-site su Dropbox** — ripetuto qui perché è l'unica cosa che resta sulla
+   copia off-site: il codice c'è, il server no.
 
 Nient'altro in coda. In particolare i **~2 s per query nei test** e la suite a ~6 minuti **non** sono
 una voce aperta: sono la scelta deliberata del 19/08/2026 descritta in §«I 2 secondi per query nei

@@ -48,21 +48,26 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   volumi Docker (`docker compose down -v` non lo tocca). Restore-test eseguito e superato.
   **Resta un buco dichiarato**: i backup stanno sullo **stesso disco** del database (un solo
   filesystem su quella macchina), quindi proteggono dagli errori applicativi ma **non** dalla morte
-  del disco o del server — per quello serve la copia off-site, **non ancora attiva**. Il provider è
-  deciso dal 09/10/2026 (**Dropbox**, spazio già pagato): restano da fare la configurazione di
-  `rclone` sul VPS e la variabile `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, **più un controllo di
-  freschezza** — l'autenticazione rclone può scadere in silenzio e la copia smette senza avvisare.
-  Vedi `docs/vps-primo-avvio.md` §7.
+  del disco o del server. Per quello serve la **copia off-site**, che dal 10/10/2026 è
+  **implementata** (voce 8-bis) e **non ancora attiva su questo server**. Il provider è deciso dal
+  09/10/2026 (**Dropbox**, spazio già pagato): `scripts/backup-vps.sh` copia i tre artefatti con
+  `rclone --config`, e la **credenziale si incolla dal pannello** del super admin (*Backup off-site*)
+  invece che a mano sul server. Il segreto vive in `/var/lib/bluman-backup/config/rclone.conf`,
+  **non** nel database e **non** nel `.env` — il database *è* ciò che viene spedito su Dropbox e il
+  `.env` *è* una delle tre cose che lo script archivia. Restano i passi che richiedono root
+  (`rclone`, le due cartelle, `BLUMAN_BACKUP_RCLONE_REMOTE`): `docs/vps-primo-avvio.md` §7.
 - **Sorveglianza VPS**: dal 01/10/2026 `scripts/monitor-vps.sh` gira ogni **10 minuti** dal cron di
   `bluman` e avvisa su **Telegram** (bot dedicato `@Avvisibluman_bot`, non quello degli studi;
-  configurato e **verificato end-to-end il 02/10/2026**). Sette controlli:
-  freschezza del backup, disco, memoria, container, `/health`, aggiornamenti di sicurezza `apt` e
-  digest dell'immagine `postgres`. **Avvisa solo sulle transizioni** (🔴 guasto, 🟢 rientro), più un
-  **riepilogo giornaliero** alle 08:00 UTC che arriva anche quando va tutto bene — è ciò che
-  distingue «nessun guasto» da «il monitor è morto». Dove un dato può ingannare risponde `unknown`
-  invece di `ok`: un indice `apt` vecchio conta zero aggiornamenti di sicurezza perché *non sa* che
-  esistono. Token e chat id in `/etc/bluman/monitor.env` (`600`), **non** nel `.env` dell'app, che
-  il compose inietta dentro il container dell'API. Vedi `docs/vps-primo-avvio.md` §7.
+  configurato e **verificato end-to-end il 02/10/2026**). **Otto** controlli:
+  freschezza del backup, disco, memoria, container, `/health`, aggiornamenti di sicurezza `apt`,
+  digest dell'immagine `postgres`, e dal 10/10/2026 la **copia off-site** (`copia-remota`: interroga
+  Dropbox, e degrada a `unknown` — mai `ok` — se rclone manca o il token è scaduto). **Avvisa solo
+  sulle transizioni** (🔴 guasto, 🟢 rientro), più un **riepilogo giornaliero** alle 08:00 UTC che
+  arriva anche quando va tutto bene — è ciò che distingue «nessun guasto» da «il monitor è morto».
+  Dove un dato può ingannare risponde `unknown` invece di `ok`: un indice `apt` vecchio conta zero
+  aggiornamenti di sicurezza perché *non sa* che esistono. Token e chat id in
+  `/etc/bluman/monitor.env` (`600`), **non** nel `.env` dell'app, che il compose inietta dentro il
+  container dell'API. Vedi `docs/vps-primo-avvio.md` §7.
 
 ## 🔗 Collegamenti
 - Tutti i moduli: un solo `distribuisci.sh` porta avanti le **tre** destinazioni insieme — VPS (per
@@ -85,6 +90,12 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   (`prisma migrate deploy`) → `rls` (crea `bluman_app` senza bypassrls + policy) → `api` (gira come
   `bluman_app`, con `env_file: .env` per i secret runtime) → `nginx` (SPA + proxy API) + `certbot`
   (TLS Let's Encrypt, rinnovo automatico). Secret in `.env.prod.example`. Backup: `scripts/backup-vps.sh`.
+  Dal 10/10/2026 il servizio `api` monta anche **due cartelle** di `/var/lib/bluman-backup`:
+  `config/` in **scrittura** (la credenziale rclone che si incolla dal pannello) e `stato/` in **sola
+  lettura** (le prove scritte dagli script: `backup.json`, `verifica.json`). Cartelle e non file
+  singoli — è la lezione di nginx del 09/10: un bind mount di un file lega l'inode, e chi riscrive con
+  `temp` + `rename` cambia inode. La cartella di stato è **read-only** di proposito: l'app scrive un
+  file solo (il segreto) e non può riscrivere l'evidenza.
   Il flusso migrate→rls→api è stato **verificato in dry-run locale** (RLS su 70 tabelle, isolamento ok).
 - **Aggiornare il VPS sono cinque passi**, non quattro: codice, frontend, database, backend e
   **ricarica di nginx**. L'ultimo è invisibile e si paga caro: nginx risolve il nome `api` una volta

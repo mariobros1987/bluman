@@ -177,6 +177,21 @@ services:
     command: ["sh", "-c", "npx tsx src/index.ts"]
     volumes:
       - bluman_uploads:/app/uploads
+      # ── La copia off-site del backup (voce 8-bis, 10/10/2026) ───────────────────────────
+      # Due CARTELLE e non due file, per la lezione di nginx del 09/10: un bind mount di un
+      # file singolo lega l'inode, e chi riscrive con `temp` + `rename` cambia inode — il
+      # container continuerebbe a servire il file vecchio senza un errore da nessuna parte.
+      # Qui entrambi gli scrittori (l'API per la credenziale, i due script per lo stato)
+      # sostituiscono il file per rinomina.
+      #
+      # `config/` è in scrittura: è l'unica cosa che l'API scrive, ed è la credenziale rclone
+      # che il super admin salva dal pannello. Sull'host dev'essere di proprietà di `1000`
+      # (l'utente `node` del container, vedi Dockerfile) e del gruppo `bluman`, con permessi
+      # 0750: se la crea Docker al primo `up`, nasce di root e l'API riceve EACCES.
+      # `stato/` è in SOLA LETTURA: lo scrivono i due script dal cron, l'API lo legge e basta.
+      # I due file di stato sono **evidenza**, non qualcosa che l'applicazione possa aggiustare.
+      - /var/lib/bluman-backup/config:/app/backup-config
+      - /var/lib/bluman-backup/stato:/app/backup-stato:ro
     networks:
       - bluman_internal
       - bluman_web

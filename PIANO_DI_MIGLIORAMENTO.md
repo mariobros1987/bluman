@@ -51,7 +51,7 @@
 
 ---
 
-## 1bis. Lavori aperti — scaletta al 03/10/2026, voci 4 e 5 chiuse il 09/10/2026, registro dal 17/09/2026
+## 1bis. Lavori aperti — scaletta al 03/10/2026, voci 4 e 5 chiuse il 09/10/2026, voce 8-bis (e l'applicazione della 8) chiusa il 10/10/2026, registro dal 17/09/2026
 
 > Questa sezione è il posto dove si scrive cosa **manca**, perché il grafo (`graphify-out/`) è
 > generato e non può ospitarlo. Va tenuta corta e cancellata man mano che le voci si chiudono.
@@ -82,8 +82,10 @@
 > reale**, ora sbloccato dalla voce 7). (b) Il provider della copia off-site (**voce 8**): **Dropbox**.
 > (c) Il **VPS è verificato allineato** al 09/10/2026 — vedi la nota di verifica nella sezione qui
 > sotto (nessuna voce nuova, nessuna voce chiusa in questa sede: sono decisioni d'ordine).
-> **Restano da fare, in quest'ordine**: la **18**, e — in parallelo — la **8**, che parte da uno
-> spike OAuth di ~15 minuti (vedi la riga 8-bis).
+> **Restano da fare, in quest'ordine**: la **18**, e — in parallelo — la **8**, la cui parte di
+> applicazione (la **8-bis**) è **✅ fatta il 10/10/2026**: vedi la riga 8-bis. Della 8 restano i
+> passi che richiedono **root sul server** (installare `rclone`, la variabile nel `.env`, le due
+> cartelle con i proprietari giusti) e il token da incollare nel form.
 > **Le tre voci fatte il 09/10/2026 sono distribuite in produzione** (Vercel + Railway + VPS, commit
 > `413a2e42`), non solo scritte: vedi `RECAP_SESSIONE_TERMINALE.md`.
 >
@@ -101,7 +103,7 @@
 >   archivi finti.
 > - **Voce 8 — dove vive la credenziale rclone**: scelto il **form nel superadmin** (le credenziali
 >   Dropbox si inseriscono dall'app, non a mano sul server). Comporta un lavoro che la voce 8 non
->   prevedeva — vedi la voce 8-bis qui sotto.
+>   prevedeva — vedi la voce 8-bis qui sotto, **✅ chiusa il 10/10/2026**.
 
 #### 🔴 Aperto — sicurezza (residuo dell'audit)
 
@@ -178,13 +180,33 @@
 | # | Cosa | Dove si chiude | Stato al 03/10/2026 |
 |---|------|----------------|---------------------|
 | 7 | **CI come cancello di deploy** — decisione già presa («sì») | dashboard Railway/Vercel («wait for CI») | Meno urgente di prima: `distribuisci.sh` valida (typecheck BE/FE, lint, build, suite intera) **prima** di pushare, ed è bloccante |
-| 8 | **Backup off-site** — il VPS ha **un solo filesystem**: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco | `rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE` | **✅ Il provider è deciso: Dropbox** (09/10/2026 — spazio cloud già pagato, non Backblaze). **Resta da fare**: configurare `rclone` sul VPS e `BLUMAN_BACKUP_RCLONE_REMOTE` nel `.env`, **più un controllo di freschezza** — l'autenticazione rclone può scadere in silenzio e la copia smette senza avvisare, quindi senza quel controllo si sostituisce un buco con un buco più silenzioso |
-| 8-bis | **Credenziali Dropbox dal superadmin** (conseguenza della voce 8, decisa il 09/10/2026): il token rclone si inserisce **dall'app**, non a mano sul server. Comporta una **tabella di piattaforma** nuova (`super_admin` ha `tenant_id` NULL, quindi non può stare in una riga tenant) + **cifratura a riposo** con una chiave che **non** stia dentro il `.env` (altrimenti il dump su Dropbox conterrebbe cifrato **e** chiave) + una rotta `/admin/*` riservata al super_admin + la scrittura di un **file di stato** che `backup-vps.sh` aggiorna e la UI legge, **più un controllo di freschezza** sulla copia remota (l'auth rclone scade in silenzio: senza quel controllo si sostituirebbe un buco con un buco più silenzioso) | `src/routes/tenant.ts` (`/admin/*`), `prisma/schema.prisma`, `frontend/src/pages/SuperAdminPage.tsx`, `scripts/backup-vps.sh` | **✅ Spike fatto il 09/10/2026 — il dominio NON serve, e non serve nemmeno un'app Dropbox nostra.** Le quattro cose verificate sulla documentazione: **(1)** il code flow Dropbox funziona **senza `redirect_uri`**: «*The redirect_uri is optional with the code flow — if unspecified, the authorization code is displayed on dropbox.com for the user to copy and paste to your app*». Il callback HTTPS ospitato è una comodità, non un requisito. **(2)** PKCE è supportato ed è la raccomandazione per i client che non possono custodire un `client_secret`. **(3)** con `token_access_type=offline` sull'URL di autorizzazione lo scambio su `/oauth2/token` restituisce un **refresh token**: è la credenziale lunga che serve a un cron notturno, perché l'access token scade. **(4)** **rclone non ha bisogno di un'app nostra**: `rclone config` per Dropbox dice «app_key/app_secret — leave blank normally» e usa **la sua** app registrata; sulla macchina senza browser il percorso documentato è `rclone authorize dropbox` altrove e **incollare il token**. La credenziale che deve vivere sul VPS è quindi il **token rclone in JSON** (contiene il refresh token; rclone rinnova da sé l'access token) e si può passare con `--config` (flag globale) o `RCLONE_CONFIG`/`RCLONE_DROPBOX_TOKEN`. **Conseguenza: la voce si sblocca con la sola forma «il superadmin incolla il token rclone nel form»** (generato con `rclone authorize dropbox` su una macchina con browser): niente app Dropbox di BluMan, niente redirect URI, niente dominio. Il pulsante «Collega Dropbox» diventa un campo «incolla qui il token», che è anche più onesto su cosa sta succedendo. Il flusso OAuth con pulsante e callback resta fattibile **in un secondo momento**, senza dominio, con lo stesso trucco del codice incollato a mano — non è un prerequisito |
+| 8 | **Backup off-site** — il VPS ha **un solo filesystem**: un backup in un'altra directory protegge dagli errori applicativi, non dalla morte del disco | `rclone` + `BLUMAN_BACKUP_RCLONE_REMOTE` | **✅ Provider deciso (Dropbox, 09/10/2026 — spazio già pagato, non Backblaze) e applicazione fatta (10/10/2026)**. `scripts/backup-vps.sh` copia ogni artefatto sul remote e deposita il proprio esito in `backup.json`; `scripts/monitor-vps.sh` ha l'**ottavo controllo** (`copia-remota`) che interroga Dropbox con `rclone lsl` e degrada a `unknown` — mai a `ok` — se non può leggere, con avviso Telegram nel riepilogo delle 08:00 UTC. **Restano i passi sul server, che richiedono root e non si fanno da qui**: installare `rclone`, impostare `BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup` nel `.env`, creare `/var/lib/bluman-backup/{config,stato}` con i proprietari documentati (vedi `docs/vps-primo-avvio.md` §7) **prima** del primo `docker compose up`, e salvare la credenziale dal pannello (voce 8-bis) |
+| 8-bis | **Credenziali Dropbox dal superadmin** (conseguenza della voce 8, decisa il 09/10/2026): il token rclone si inserisce **dall'app**, non a mano sul server, e la copia ha un **controllo di freschezza** sulla copia remota (l'auth rclone scade in silenzio: senza quel controllo si sostituirebbe un buco con un buco più silenzioso) — **✅ fatta il 10/10/2026** | `src/services/backupOffSite.ts`, `src/routes/tenant.ts` (`/admin/backup*`, `/tenant/backup`), `frontend/src/components/admin/PannelloBackupOffSite.tsx`, `frontend/src/components/settings/TabManutenzione.tsx`, `frontend/src/utils/backupStato.ts`, `scripts/backup-vps.sh`, `scripts/monitor-vps.sh`, `docker-compose.prod.yml` | **✅ Chiusa il 10/10/2026, ma NON come questa riga prevedeva: niente tabella nuova, niente cifratura a riposo, niente `prisma/schema.prisma`.** La riga diceva «comporta una tabella di piattaforma nuova + cifratura con una chiave fuori dal `.env`»; la decisione presa col titolare il 10/10/2026 è l'opposto, e per una ragione che si vede solo guardando cosa fa il backup: **il database *è* ciò che viene scaricato e spedito su Dropbox, e il `.env` *è* una delle tre cose che lo script archivia e spedisce insieme a esso.** Mettere la credenziale della copia in una tabella significherebbe spedire la chiave dentro la cassaforte che apre; metterla nel `.env` significherebbe spedirla insieme alla cassaforte. Vive invece in un **file dedicato** sul server (`/var/lib/bluman-backup/config/rclone.conf`, 0640 di `1000:bluman`), fuori da entrambi, che l'API scrive e `rclone` legge con `--config`. Conseguenza accettata e **dichiarata nella schermata**: il form funziona **solo** dal backend che monta quella cartella — cioè il VPS — e su Railway la rotta risponde `disponibile: false` e il salvataggio risponde **503, non 200** (regola 7: una configurazione composta per il deployment sbagliato non produce un errore, produce un silenzio). Le altre due decisioni: **il super admin configura, il titolare vede la freschezza** (se il backup smette, se ne accorge per primo chi usa il prodotto ogni giorno) e **l'ottavo controllo nel monitor**, incluso nel riepilogo. **Correzione a una cosa che avevo scritto ponendo la domanda**: la freschezza per il titolare **non** richiede una voce nella matrice permessi — `tenant`/`admin` sono deliberatamente fuori da `ROTTE_MODULO` (`src/util/rbacModuli.ts:17-19`) e protette da guard di **ruolo**, quindi la rotta sta dietro lo stesso guard già esistente. **Presidi**: `src/backupOffSite.test.ts` (token senza `refresh_token` → rifiuto; config intera incollata → rifiuto; file assente/malformato → `sconosciuto`, **mai** `ok`), `src/backupRotte.test.ts` (401/403 per ruolo, la risposta non contiene **mai** il token, 0640 sul file, cartella assente → 503, l'audit registra l'atto e non il contenuto), `frontend/src/utils/backupStato.test.ts` (i confini della freschezza), `PannelloBackupOffSite.test.tsx` (il campo non si precompila nemmeno se il server restituisse un token), `TabManutenzione.test.tsx` (403 → nessun riquadro, guasto → lo dice). **Restano i passi sul server, che richiedono root**: installare `rclone`, `BLUMAN_BACKUP_RCLONE_REMOTE=dropbox:bluman-backup` nel `.env`, le due cartelle con i proprietari giusti **prima** del primo `docker compose up` (`docs/vps-primo-avvio.md` §7), e `rclone authorize dropbox` su una macchina con browser per il token da incollare **nel form** (è una credenziale: non in chat, non in un file `.md`) |
 | 9 | **Custodia di `BACKUP_ENCRYPTION_KEY`** — la chiave sta dentro il `.env` che viene cifrato con sé stessa: se il server muore, senza una copia **fuori dal server** i backup non si aprono più | foglio a mano in cassaforte (data + nome della variabile) | Decisione presa; va **verificata** riscrivendo la chiave dal foglio e aprendo un backup vero |
 | 10 | **TLS sul VPS** | `docs/vps-primo-avvio.md` §6 | Quando il DNS punterà al server |
 | 11 | **Telegram sul VPS** — `TELEGRAM_WEBHOOK_SECRET` è assente dal container, e Telegram ammette **un solo webhook per bot** (occupato da Railway). Oggi il 400 sul VPS **protegge la produzione**: se passasse, il webhook si sposterebbe via da Railway in silenzio | secondo bot da BotFather; `docs/vps-primo-avvio.md` §6 | Al cut-over. Il bot di produzione si sposta **solo** allora, e mai su entrambi insieme |
 | 12 | **Il `telefono` dello studio è il Test Number di Meta** (`+1 555-181-9633`), non un numero che squilla. Ogni documento che stampa il recapito dello studio stampa quel numero | riga `tenant` di Bluecode | Voce 14, misurata il 17/09 — **da riconfermare** |
 | 13 | **La ricezione WhatsApp non è mai stata dimostrata con un cliente vero** (il numero è il Test Number) | la prova in un minuto: scrivere al numero e guardare i log | Voce 11 di questa sezione — la prova non è stata rifatta dal 17/09 |
+
+> **Lo spike Dropbox del 09/10/2026 — le quattro cose verificate, conservate perché serviranno.**
+> La voce 8-bis si è chiusa senza un'app Dropbox nostra e senza dominio, e la ragione sta in
+> queste quattro verifiche fatte sulla documentazione ufficiale. Le trascrivo qui perché la
+> cella della tabella che le conteneva è stata riscritta, e perché sono il punto di partenza il
+> giorno in cui si vorrà il pulsante «Collega Dropbox» invece del token incollato:
+> **(1)** il code flow Dropbox funziona **senza `redirect_uri`** — «*The redirect_uri is optional
+> with the code flow — if unspecified, the authorization code is displayed on dropbox.com for the
+> user to copy and paste to your app*»: il callback HTTPS ospitato è una comodità, non un
+> requisito. **(2)** PKCE è supportato ed è la raccomandazione per i client che non possono
+> custodire un `client_secret`. **(3)** con `token_access_type=offline` sull'URL di autorizzazione
+> lo scambio su `/oauth2/token` restituisce un **refresh token**, che è la credenziale lunga che
+> serve a un cron notturno (l'access token scade in poche ore). **(4)** **rclone non ha bisogno di
+> un'app nostra**: `rclone config` per Dropbox dice «app_key/app_secret — leave blank normally» e
+> usa **la sua** app registrata; sulla macchina senza browser il percorso documentato è
+> `rclone authorize dropbox` altrove e **incollare il token**. Da qui la forma scelta: la
+> credenziale è il **token rclone in JSON** (contiene il refresh token, rclone rinnova da sé
+> l'access token), passato a rclone con `--config`. Il pulsante OAuth con callback resta
+> fattibile in un secondo momento senza dominio, con lo stesso trucco del codice incollato a
+> mano — non è un prerequisito.
 
 #### ⏸ Bloccate su una scelta o su un fornitore esterno
 
