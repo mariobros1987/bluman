@@ -18,7 +18,7 @@
 | VPS | ✅ **Allineato a `9d59fc93`** il 10/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle»). In più, i **tre prerequisiti root sono fatti**: `rclone` v1.60.1 installato, le due cartelle create, la destinazione nel `.env` |
 | Prossimo passo | **Il token rclone** (`rclone authorize dropbox` su una macchina con browser → incollato nel form del pannello, **non in chat**), poi la **prova a mano** — anche storta. Dopo: la **voce 18** (secondo studio reale) |
 | ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
-| ⚠️ Fragilità nota | La suite backend può far fallire **uno o due test con `UNKNOWN: unknown error, read`** (I/O del runner su Windows, sotto la concorrenza dei 129 file) — ed essendo il passo 1 di `distribuisci.sh` **bloccante**, quel flake **aborta il deploy prima di qualunque push**. Il 10/10/2026 è successo su `src/calendario.test.ts`, che **non fa I/O**: da solo passa 56/56, tre volte su tre. Davanti a quell'errore: **rilanciare prima di indagare**, e non lanciare due `vitest` insieme. Vedi §«Il flake della suite backend» |
+| ⚠️ Fragilità nota | La suite backend può far fallire **uno o due test con `UNKNOWN: unknown error, read`** (I/O del runner su Windows, sotto la concorrenza dei 129 file) — ed essendo il passo 1 di `distribuisci.sh` **bloccante**, quel flake **aborta il deploy prima di qualunque push**. Il 10/10/2026 è successo su `src/calendario.test.ts`, che **non fa I/O**: da solo passa 56/56, tre volte su tre. **Curato il 10/10/2026** in `vitest.config.ts` (`maxWorkers: 4`, `retry: 2`): **non rallenta la suite** — 334/336 s a 4 worker contro **337,6 s** con gli 8 di default. ⚠️ Il meccanismo **non è stato dimostrato** — a 16 worker il guasto non si è riprodotto (due giri, 129/129 verdi). Davanti a quell'errore: **rilanciare prima di indagare**, e non lanciare due `vitest` insieme. Vedi §«Il flake della suite backend» |
 
 ---
 
@@ -430,9 +430,11 @@ Osservato su `src/calendario.test.ts`, test *un evento senza progetto non entra 
 di un progetto*, dopo **41 ms**. Quel test **non fa I/O**: scrive uno stato in memoria e chiama
 `server.inject` su un'app in-memory (`src/calendario.test.ts:549-557`). L'errore non può quindi
 nascere dalla sua logica — nasce dal **runner di vitest mentre legge un file** (modulo, source map,
-cache). `vitest.config.ts` **non configura né pool né worker né retry**, quindi vitest usa i
-default: un worker per CPU su **129 file**, e su Windows quella concorrenza è la condizione che
-produce l'errore.
+cache). Al momento del guasto `vitest.config.ts` **non configurava né pool né worker né retry**,
+quindi valevano i default — e i default sono più aggressivi di quanto sembri: il pool è **`threads`**
+(`pool ??= "threads"` in vitest 2.1.9), i worker sono `availableParallelism()`, cioè **8 su questa
+macchina**. Otto thread **dentro lo stesso processo** che rileggono gli stessi 129 file: su Windows
+è la condizione che produce l'errore.
 
 **Perché conta più di quanto sembri:** `distribuisci.sh` ha `set -euo pipefail` (riga 40) e chiama
 la suite alla riga 106, **prima** di qualunque push o deploy. Il flake quindi **aborta il deploy al
@@ -447,9 +449,39 @@ Il 10/10/2026 è successo alla prima esecuzione, e la seconda è passata **129 f
 3. **Non lanciare due `vitest` in parallelo** per «recuperare tempo»: aggiunge proprio la pressione
    di I/O che causa l'errore. Vale anche per il resto del lavoro pesante su file.
 
-**La cura, se un giorno desse noia** (non presa ora, perché è una modifica al cancello di deploy e
-va decisa, non improvvisata): `retry` in `vitest.config.ts`, o `--pool=forks` / un tetto ai worker.
-Va provata **misurando**, non per intuito — è la stessa lezione dei ~2 s per query qui sopra.
+**La cura — decisa e applicata il 10/10/2026** (in `vitest.config.ts`: `maxWorkers: 4`,
+`minWorkers: 1`, `retry: 2`). Le due parti non sono la stessa cosa, e va tenuto distinto:
+
+- **`retry` è assicurazione, non riparazione.** Un test davvero rotto fallisce anche al secondo e al
+  terzo giro, quindi non nasconde una regressione; copre il guasto transitorio. È l'unica delle due
+  che **non ha bisogno di una causa dimostrata**.
+- **il tetto ai worker toglie la condizione** in cui la corsa nascerebbe.
+
+⚠️ **Il meccanismo non è stato dimostrato.** Il 10/10/2026 ho provato a **indurre** il guasto
+raddoppiando la concorrenza (`--maxWorkers=16` su 8 CPU, `retry` a zero), due giri completi:
+**129/129 verdi entrambi, zero `UNKNOWN`**. Quindi la corsa fra thread che rileggono gli stessi file
+resta **la spiegazione più probabile, non una causa provata** — e chi legge questa sezione non deve
+trattarla come tale.
+
+**Il costo misurato del tetto è nullo, e la previsione era sbagliata.** Avevo scritto che il passo 1
+si sarebbe allungato; il dato dice il contrario:
+
+| | 16 worker | **8 (default)** | 4 worker |
+|---|---|---|---|
+| Durata di parete | 339 s / 349 s | **337,6 s** | **334 s / 336 s** |
+| `collect` (lettura moduli) | 211 s / 371 s | **127 s** | **86 s / 95 s** |
+
+Con 8 worker otto thread rileggevano e ritrasformavano **gli stessi** moduli: era lavoro duplicato,
+non parallelismo. La durata di parete fra 8 e 4 è dentro il rumore (337,6 s contro 334-336 s), ma il
+`collect` scende da 127 s a 86-95 s: il lavoro di lettura duplicato cresce coi worker, solo che non
+era sul percorso critico. Due giri di verifica con la configurazione nuova: **129/129 verdi, 1638
+passati | 2 saltati**, **zero `flaky` e zero `retry`** — l'assicurazione non è servita.
+
+**Cosa questi numeri non dicono:** che il flake è morto. Due giri verdi non lo dimostrano, esattamente
+come due giri a 16 worker non l'hanno riprodotto. Si può sostenere solo questo, ed è più stretto: *la
+condizione in cui nasceva è più stretta, e l'assicurazione c'è*. Se il flake uscisse di nuovo, la
+mossa resta quella dell'elenco qui sopra — e se il passo 1 si allungasse troppo, si **alza il tetto ai
+worker**, non si toglie il `retry`.
 
 
 ### Da affrontare per prime (scelte il 09-10/10/2026)

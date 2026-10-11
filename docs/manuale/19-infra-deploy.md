@@ -83,6 +83,14 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
 - **Deploy CLI Vercel non riuscito** → lo script **esce** (exit 1): il frontend non è stato pubblicato,
   e il deploy del webhook GitHub non lo sostituisce (resta `BLOCKED`, non viene costruito). Il
   messaggio dice il rimedio: `npx vercel --prod --scope fanta-ia`.
+- **Passo 1 interrotto da `UNKNOWN: unknown error, read`** → **non è una regressione**, ed è il modo
+  in cui questo errore fa perdere più tempo: è il runner di vitest che fallisce una lettura di file
+  su Windows sotto concorrenza, e viene attribuito a un test che non tocca il disco. Lo script esce
+  **prima** di qualunque push (verificabile: `git log origin/main -1` resta indietro). La mossa è
+  **rilanciare prima di indagare**, ed eseguire il file da solo 2-3 volte. Dal 10/10/2026
+  `vitest.config.ts` ha `maxWorkers: 4` e `retry: 2`: il tetto ai worker toglie la condizione (e,
+  misurato, **accorcia** la suite — i worker di default rileggevano gli stessi moduli), il `retry`
+  è l'assicurazione. ⚠️ Il meccanismo non è dimostrato: a 16 worker il guasto non si è riprodotto.
 
 ## 🔧 Nota tecnica
 - `scripts/distribuisci.sh` (+ `--solo-push` / `--solo-api`); IaC `.railway/railway.ts`; migrazioni
