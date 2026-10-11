@@ -3,6 +3,7 @@ import { fmt } from '../../utils';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
+import { sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../../utils/tenant';
 import type { CanaleOtp, CanaleFirma, RichiestaAddendum } from '../../api/client';
 import type { ModuloProposta, BersaglioFirma } from './types';
@@ -95,7 +96,11 @@ export function TabProposta({
   // §39 — l'HTML del mandato può portare l'intestazione e il piede propri dello studio, marcati
   // dentro il documento al momento del salvataggio: qui si rimettono al loro posto sul foglio.
   // Un mandato salvato prima di §39 non li ha: torna tutto come corpo, come si vedeva prima.
-  const partiProposta = scomponiDocumento(getResolvedEngagementHtml());
+  // Sanitizzato come la vista gemella del fascicolo (`DocumentiTab.tsx`): questo HTML finisce in
+  // `dangerouslySetInnerHTML` nel portale cliente, dove il token di sessione vive in localStorage.
+  // L'engagement interpola dati di tenant/cliente (nome progetto, ragione sociale digitata dal
+  // cliente) senza escape: senza l'allowlist, un markup attivo in quei campi si eseguirebbe qui.
+  const partiProposta = scomponiDocumento(sanitizzaHtmlDocumento(getResolvedEngagementHtml()));
 
   /**
    * Il bersaglio della firma del mandato: ambito, titolo **e il progetto**.

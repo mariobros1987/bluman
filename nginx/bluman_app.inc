@@ -11,6 +11,19 @@ add_header X-Content-Type-Options "nosniff" always;
 add_header X-Frame-Options "DENY" always;
 add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
+# Content-Security-Policy: la seconda barriera che mancava. Un XSS che superasse il
+# sanitizzatore del frontend (`src/util/htmlSanitizer.ts`) non potrebbe comunque caricare
+# script esterni né eseguire gestori inline (`onerror=…`), perché `script-src` NON ammette
+# `'unsafe-inline'`. L'unico script inline legittimo è il no-flash del tema in `index.html`:
+# è ammesso per **hash** (`sha256-…`), non per `'unsafe-inline'`, così resta l'unico inline
+# che gira. Se quel blocco cambia, l'hash non combacia più e lo script viene bloccato: la SPA
+# si carica lo stesso (il bundle è esterno, da `'self'`), al più ricompare un lampo di tema.
+# `style-src` ammette `'unsafe-inline'` perché i documenti sanitizzati e i componenti React
+# usano attributi `style=""`; bloccare lo stile ha un valore molto minore che bloccare lo script.
+# A livello `server` (qui), non dentro un `location`: così l'eredità vale anche per il frontend —
+# e `location /` usa `expires`, non `add_header`, proprio per non azzerare queste intestazioni.
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-psNg4gU6ub7YDYL4ZczDA7onArG8TN+R3V/rl4a18Lc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://bluman-api-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+
 # ─────────────────────────────────────────────────────────────────────
 # API Fastify — tutto sotto `/api`, e il prefisso si toglie strada facendo.
 #

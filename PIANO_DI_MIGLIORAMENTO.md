@@ -216,7 +216,7 @@
 | 15 | **KYC K8b completo (XML goAML)** — la fase-1 (dossier STR + registrazione del riferimento) è deployata | L'**XSD della FIAU** (la spec §10 esclude l'integrazione diretta in prima fase) |
 | 16 | **KYC K5 — screening** (PEP/sanzioni/mezzi di informazione) | Un **provider**. Il ciclo K0–K9 per il resto è completo e deployato |
 | 17 | **Email maltese della GDPR** — l'unico residuo Gibilterra è `advisor@bluegib.com`; l'utente ha scelto «allinea Malta» | **L'indirizzo dal titolare**. Non inventarlo. Poi il **consulente AML maltese** da configurare e i parametri `[da verificare]` da confermare |
-| 18 | **Secondo studio reale** — la voce 7 (tenant dinamico) è risolta, quindi è **sbloccato**: è anche la prova end-to-end che manca (creare un secondo studio in produzione) e il presupposto di `PIANO_MULTITENANT.md`, che resta una **decisione** (quanti studi, chi li crea) prima di scrivere codice |
+| 18 | **Secondo studio reale** — la voce 7 (tenant dinamico) è risolta, quindi è **sbloccato**. **Decisione presa l'11/10/2026: li crea il super admin** (gli studi oltre al primo), e il meccanismo **esiste già** — `/admin/tenants` (`POST` crea, riservata a `soloSuperAdmin`) col form in `SuperAdminPage.tsx`, e il blocco RLS alla creazione del responsabile è **chiuso** (la `user.create` gira in `contestoTenant.run` del nuovo tenant, `tenant.ts:1104-1128`). **Non resta codice**: resta l'**atto in produzione** — crearlo dal pannello con i dati reali dello studio (ragione sociale, giurisdizione, P.IVA, nome/email del responsabile), che è una scrittura verso l'esterno (password temporanea + email di benvenuto), quindi la fa il titolare, non un deploy |
 
 #### 🧹 Debito tecnico e igiene del repository
 

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { fmt } from '../utils';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
+import { escapeHtmlTesto } from '../../../src/util/htmlSanitizer';
 import { getStudioInfoForTenant } from '../utils/tenant';
 import { useToast } from '../components/ui/ToastProvider';
 import {
@@ -377,15 +378,15 @@ export function ClientPortal() {
           <tbody>
             ${moduliProposti.map(m => `
               <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${m.nome}</td>
-                <td style="padding: 8px 12px; color: #475569;">${m.cat}</td>
-                <td style="padding: 8px 12px; text-align: center; color: #475569;">${m.ore}h</td>
-                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #1e1b4b;">${fmt(m.prezzo)}</td>
+                <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${escapeHtmlTesto(m.nome)}</td>
+                <td style="padding: 8px 12px; color: #475569;">${escapeHtmlTesto(m.cat)}</td>
+                <td style="padding: 8px 12px; text-align: center; color: #475569;">${escapeHtmlTesto(m.ore)}h</td>
+                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #1e1b4b;">${escapeHtmlTesto(fmt(m.prezzo))}</td>
               </tr>
             `).join('')}
             <tr style="background: #f8fafc; font-weight: 800;">
               <td colspan="3" style="padding: 10px 12px; text-align: right; color: #1e1b4b;">TOTALE COMPLESSIVO MANDATO:</td>
-              <td style="padding: 10px 12px; text-align: right; color: #4338ca; font-size: 11pt;">${fmt(totalValue)}</td>
+                <td style="padding: 10px 12px; text-align: right; color: #4338ca; font-size: 11pt;">${escapeHtmlTesto(fmt(totalValue))}</td>
             </tr>
           </tbody>
         </table>
