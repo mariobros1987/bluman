@@ -12,11 +12,12 @@
 
 | | |
 |---|---|
-| Ultimo commit **di codice** | `9d59fc93` — *feat(backup): la copia off-site si configura dall'app, e qualcuno se ne accorge se smette*, su `origin/main` e **distribuito**. Sopra sta un commit di **sole docs**, che non tocca il VPS: il codice che gira sul server resta quello |
+| Ultimo commit **di codice** | `21398893` — *fix(sicurezza): chiudo l'XSS del portale e aggiungo la CSP mancante al frontend*, su `origin/main` e **distribuito** l'11/10/2026. Prima di lui: `1f36c679` (cura del flake, `maxWorkers: 4` + `retry: 2`) e `9d59fc93` (voce 8-bis). Il commit di sole docs non tocca il VPS |
 | Branch | `main`, **allineato a `origin/main`** |
-| Working tree | **Pulito.** La **voce 8-bis** è implementata, committata e **in produzione** dal 10/10/2026 |
-| VPS | ✅ **Allineato a `9d59fc93`** il 10/10/2026 — container ricreati, nginx ricaricato, tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle»). In più, i **tre prerequisiti root sono fatti**: `rclone` v1.60.1 installato, le due cartelle create, la destinazione nel `.env` |
-| Prossimo passo | **Il token rclone** (`rclone authorize dropbox` su una macchina con browser → incollato nel form del pannello, **non in chat**), poi la **prova a mano** — anche storta. Dopo: la **voce 18** (secondo studio reale) |
+| Working tree | **Pulito.** Voce 8-bis in produzione dal 10/10; cura del flake e correzioni di sicurezza dall'11/10 |
+| VPS | ✅ **Allineato a `21398893`** l'11/10/2026 — container ricreati, nginx ricaricato (la **CSP del frontend** valida da `nginx -t` ed esce davvero dalla porta 80, con i tre header di sicurezza intatti), tutte le sonde verdi (health, frontend 200, radice non cacheabile, SPA in HTML, sonda rotta 401, `checkRls` «RLS attivo su tutte le tabelle»). I **tre prerequisiti root** della 8-bis restano fatti |
+| Prossimo passo | **Il token rclone** (`rclone authorize dropbox` su una macchina con browser → incollato nel form del pannello, **non in chat**), poi la **prova a mano** — anche storta. Dopo: la **voce 18** (secondo studio reale, deciso: lo crea il super admin dal pannello) |
+| 🔒 Audit sicurezza 11/10 | `AUDIT_2026-10-11/` (sei capitoli): **0 Alta** (il buco Alta storico del RBAC è confermato chiuso), **3 Media** — due risolti e distribuiti (XSS del portale cliente, CSP del frontend), il terzo è difesa in profondità senza mass-assignment reale (passata `zod` da fare) — e **11 Bassa**, per lo più legati al cut-over TLS/dominio o a scelte d'architettura |
 | ℹ️ Non è una voce aperta | I **~2 s per query** nei test (`vitest.config.ts`, dal 19/08/2026) e la suite backend a ~6 minuti sono **una scelta deliberata**, non un difetto e **non** un effetto della voce 5. Vedi §«I 2 secondi per query nei test» |
 | ⚠️ Fragilità nota | La suite backend può far fallire **uno o due test con `UNKNOWN: unknown error, read`** (I/O del runner su Windows, sotto la concorrenza dei 129 file) — ed essendo il passo 1 di `distribuisci.sh` **bloccante**, quel flake **aborta il deploy prima di qualunque push**. Il 10/10/2026 è successo su `src/calendario.test.ts`, che **non fa I/O**: da solo passa 56/56, tre volte su tre. **Curato il 10/10/2026** in `vitest.config.ts` (`maxWorkers: 4`, `retry: 2`): **non rallenta la suite** — 334/336 s a 4 worker contro **337,6 s** con gli 8 di default. ⚠️ Il meccanismo **non è stato dimostrato** — a 16 worker il guasto non si è riprodotto (due giri, 129/129 verdi). Davanti a quell'errore: **rilanciare prima di indagare**, e non lanciare due `vitest` insieme. Vedi §«Il flake della suite backend» |
 
@@ -279,11 +280,11 @@ main ... origin/main      (allineato, nessun commit da pushare)
                           (niente da elencare: l'albero è PULITO)
 ```
 
-Ultimo commit **di codice**: `9d59fc93` — *feat(backup): la copia off-site si configura dall'app, e
-qualcuno se ne accorge se smette* (**10/10/2026**), su `origin/main` e **distribuito**. Sopra c'è un
-commit di **sole docs** (questo): cambio l'aggettivo da «ultimo» a «ultimo **di codice**» perché è
-esattamente il modo in cui una riga come questa diventa falsa da sola — e «allineato» vale per il
-codice sul server, non per l'HEAD del branch.
+Ultimo commit **di codice**: `21398893` — *fix(sicurezza): chiudo l'XSS del portale e aggiungo la
+CSP mancante al frontend* (**11/10/2026**), su `origin/main` e **distribuito**. Sotto di lui, in
+ordine: `1f36c679` (cura del flake), `9d59fc93` (voce 8-bis). Dico «di codice» perché è il modo in
+cui una riga così diventa falsa da sola — e «allineato» vale per il codice sul server, non per
+l'HEAD del branch quando sopra c'è un commit di sole docs.
 
 > **Il commit della voce 8-bis** (24 file, +3039/−104) non è più nel working tree: è in
 > produzione su Vercel, Railway e VPS. Conteneva sette file di codice modificati e nove nuovi (fra
