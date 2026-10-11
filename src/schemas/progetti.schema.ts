@@ -21,3 +21,15 @@ export const ConsuntivaOreSchema = z.object({
 }).refine(data => data.ore !== undefined || data.oreAggiunte !== undefined, {
   message: 'Il campo ore (o oreAggiunte) è obbligatorio',
 });
+
+/**
+ * `POST /progetti/:id/comunicazioni`. L'handler valida già presenza di `canale`/`testo` e i ruoli
+ * per `microvoceProgettoId`: lo schema aggiunge i tetti di lunghezza che mancavano (il `testo` era
+ * illimitato). `.passthrough()` per i campi che l'handler legge a parte.
+ */
+export const NuovaComunicazioneSchema = z.object({
+  canale: z.string().max(50).optional().nullable(),
+  testo: z.string().max(20000).optional().nullable(),
+  microvoceProgettoId: z.string().max(100).optional().nullable(),
+}).passthrough();
+

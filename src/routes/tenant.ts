@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { RuoloUtente } from '@prisma/client';
 import { prisma, prismaAmministrativo, contestoTenant } from '../util/prismaClient.js';
+import { CreaTenantSchema, AggiornaTenantSchema, AuditLogSchema } from '../schemas/tenant.schema.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
@@ -1071,7 +1072,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    */
   server.post<{ Body: Record<string, any> }>('/admin/tenants', async (req, reply) => {
     if (!soloSuperAdmin(req, reply)) return reply;
-    const b = req.body || {};
+    const parse = CreaTenantSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati studio non validi' });
+    }
+    const b = parse.data as Record<string, any>;
     const emailResponsabile = (b.leadAdvisorEmail || b.email || '').trim().toLowerCase();
     try {
       const tenant = await prisma.tenant.create({
@@ -1147,7 +1152,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
   server.patch<{ Params: { id: string }; Body: Record<string, any> }>('/admin/tenants/:id', async (req, reply) => {
     if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
-    const b = req.body || {};
+    const parse = AggiornaTenantSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati studio non validi' });
+    }
+    const b = parse.data as Record<string, any>;
     try {
       const updated = await prisma.tenant.update({
         where: { id },
@@ -1685,7 +1694,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
   server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
     const tenantId = req.tenantId;
-    const body = (req.body || {}) as Record<string, any>;
+    const parse = AuditLogSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati audit non validi' });
+    }
+    const body = parse.data as Record<string, any>;
     // Chi ha fatto l'operazione lo dice il token, non il corpo della richiesta: qui c'erano
     // `body.userEmail || 'joe@…'` e `body.userNome || 'Joe Disabato'`, cioè il nome di una
     // persona reale attribuito a chiunque chiamasse la rotta senza indicarsi. In un registro
@@ -1713,8 +1726,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         },
       });
       return reply.code(201).send(log);
-    } catch {
-      return reply.code(201).send({ ok: true, ...body });
+    } catch (err: any) {
+      // Non si rimanda il body com'era (prima: `{ ok:true, ...body }`): un registro di audit che
+      // non si è scritto è un fallimento, non un «ok» con l'eco di ciò che il client ha mandato.
+      req.log.error({ tenantId, err: err instanceof Error ? err.message : err }, 'POST /audit-logs — errore scrittura');
+      return reply.code(500).send({ errore: 'Errore nella registrazione dell’evento di audit' });
     }
   });
 

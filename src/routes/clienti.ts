@@ -23,7 +23,7 @@ import {
   baseUrlApplicazione,
   recordAudit,
 } from '../util/serverHelpers.js';
-import { CreaClienteSchema } from '../schemas/clienti.schema.js';
+import { CreaClienteSchema, AggiornaClienteSchema } from '../schemas/clienti.schema.js';
 import { chatIdTelegram } from '../services/telegramService.js';
 import { clienteIdDalJwt, richiediRuolo } from '../util/authorization.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
@@ -319,6 +319,13 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       return reply.code(400).send({
         errore: 'La password può essere modificata solo tramite la procedura dedicata.',
       });
+    }
+
+    // Guardia di forma al bordo: tipi e lunghezze sui campi noti (vedi `AggiornaClienteSchema`).
+    // L'handler continua a leggere `b` grezzo per i campi referente — `.passthrough()` li conserva.
+    const parseAgg = AggiornaClienteSchema.safeParse(b);
+    if (!parseAgg.success) {
+      return reply.code(400).send({ errore: parseAgg.error.issues[0]?.message || 'Dati cliente non validi' });
     }
 
     const referentiObj = sanitizzaReferenti(b.referentiJson !== undefined

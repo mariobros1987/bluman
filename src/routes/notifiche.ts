@@ -13,6 +13,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../util/prismaClient.js';
+import { CreaNotificaSchema } from '../schemas/notifiche.schema.js';
 
 export async function registraRotteNotifiche(server: FastifyInstance): Promise<void> {
   // ─── NOTIFICHE (Blocco 3) ─────────────────────────────────────────
@@ -45,7 +46,11 @@ export async function registraRotteNotifiche(server: FastifyInstance): Promise<v
 
   server.post<{ Body: Record<string, any> }>('/notifiche', async (req, reply) => {
     const tenantId = req.tenantId as string;
-    const body = (req.body || {}) as Record<string, any>;
+    const parse = CreaNotificaSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati notifica non validi' });
+    }
+    const body = parse.data as Record<string, any>;
     // Nessuna scorciatoia tipo `destinatarioId || 'usr-01'`: una notifica senza
     // destinatario reale è solo rumore che nessuno leggerà mai.
     const destinatarioId = body.destinatarioId as string | undefined;

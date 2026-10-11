@@ -43,3 +43,12 @@ export const CreaClienteSchema = z.object({
   indirizzoAlloggio: z.string().max(255).optional().nullable(),
   referentiJson: z.any().optional(),
 }).passthrough();
+
+/**
+ * `PUT /clienti/:id`: aggiornamento. Stessi campi della creazione ma tutti opzionali — una modifica
+ * parziale non deve ridichiarare nome e tipo. `.partial()` conserva il `.passthrough()`, così i
+ * campi che l'handler legge dal corpo grezzo (capitale, pec, città…) continuano a passare. La
+ * `password` qui non c'entra: l'handler la rifiuta con un 400 dedicato prima di validare.
+ */
+export const AggiornaClienteSchema = CreaClienteSchema.partial();
+

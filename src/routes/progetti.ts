@@ -26,7 +26,7 @@ import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
-import { CreaProgettoSchema, ConsuntivaOreSchema } from '../schemas/progetti.schema.js';
+import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from '../util/statoComunicazione.js';
@@ -168,6 +168,12 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       }
     }
     const body = (req.body || {}) as Record<string, any>;
+    // Tetti di lunghezza al bordo (il `testo` era illimitato); i controlli di presenza e di ruolo
+    // restano sotto, invariati.
+    const parseComm = NuovaComunicazioneSchema.safeParse(body);
+    if (!parseComm.success) {
+      return reply.code(400).send({ errore: parseComm.error.issues[0]?.message || 'Dati comunicazione non validi' });
+    }
     const clienteId = req.ruolo === 'cliente' ? clienteDellaRichiesta(req) : null;
     const canale = typeof body.canale === 'string' ? body.canale.trim().slice(0, 50) : '';
     const testo = typeof body.testo === 'string' ? body.testo.trim() : '';
