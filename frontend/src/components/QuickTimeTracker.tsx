@@ -25,6 +25,9 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
 
   const loadAllProjects = async () => {
     const list: Progetto[] = [];
+    // Distingue «il database risponde e non ci sono progetti» da «il database non ha risposto».
+    // Solo il secondo caso è una buona ragione per mostrare i dati dimostrativi (vedi il punto 3).
+    let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId(user);
     const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
@@ -54,6 +57,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
     try {
       const remote = await fetchProgetti();
       if (remote && Array.isArray(remote)) {
+        apiDisponibile = true;
         const dalDb: Progetto[] = [];
         remote
           .filter((rp: any) => rp.tenantId === currentTenantId)
@@ -117,8 +121,17 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       }
     } catch {}
 
-    // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
-    if (list.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
+    // 3. Se e solo se è il tenant demo Bluecode Ltd, l'API non ha risposto e non c'è nulla né a
+    // database né in locale, carica i progetti di seed.
+    //
+    // La guardia `!apiDisponibile` è la stessa degli altri tre punti che leggono il seed
+    // (Projects, Dashboard, ClientsPage), e qui mancava: bastava il **database vuoto** per far
+    // comparire i due progetti dimostrativi. Il 12/10/2026 la produzione è il VPS e il suo
+    // database è stato azzerato — quindi il caso «vuoto» non è più teorico, e il ripiego ha
+    // cominciato a mostrare «Progetto Structuring Holding Malta» accanto ad «Avvia Time
+    // Tracker» come se fosse un progetto vero (regola 7: il frontend non inventa dati che il
+    // database non ha). Un database che risponde zero progetti è una risposta, non un guasto.
+    if (!apiDisponibile && list.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
       const seed = getTenantSeedData(currentTenantId);
       list.push(...seed.projects);
     }
