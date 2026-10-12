@@ -46,13 +46,18 @@ export const TENANT_STUDIOS: Record<string, StudioInfo> = {
     codiceFiscale: 'C71668', // Malta company registration number
     sedeLegale: 'Notabile Residence, Mdina Road, Attard ATD9036, Malta',
     sedeOperativa: 'Notabile Residence, Mdina Road, Attard ATD9036, Malta',
-    email: 'advisor@bluegib.com',
+    // §7 — `email` era `'advisor@bluegib.com'` e `leadAdvisor` era `'Lead Senior Advisor'`.
+    // Il primo è un indirizzo su un dominio che non è dello studio; il secondo è un **ruolo**
+    // messo nel campo di una **persona**, e finiva stampato come nome («Advisor Lead: Lead
+    // Senior Advisor») su proposte e documenti. Quando l'anagrafica non è ancora arrivata dal
+    // server, il campo resta vuoto: chi lo legge capisce che manca, non chi è.
+    email: '',
     telefono: '',
     iban: '',
     bic: '',
     bancaNome: '',
     codiceSdi: '',
-    leadAdvisor: 'Lead Senior Advisor',
+    leadAdvisor: '',
   },
   // Advisory Italia (…002) e Swiss Wealth (…003) erano anagrafiche mock: studi eliminati dal
   // DB il 20/09/2026. Rimosse da qui perché un tenant non in mappa ripiega già sulla lista
@@ -282,7 +287,14 @@ export function saveTenantInfoToStorage(tenantId: string, data: any) {
 }
 
 /**
- * Restituisce l'elenco di tutti gli studi/tenant disponibili per lo switch
+ * Restituisce l'elenco di tutti gli studi/tenant disponibili per lo switch.
+ *
+ * §7 — è una lettura sincrona di **ciò che il server ha detto l'ultima volta** (il registro admin
+ * lo scrive `SuperAdminPage` solo dopo una risposta vera): per l'elenco aggiornato c'è
+ * `fetchAdminTenantsApi`. Il ripiego, quando quel registro è vuoto, è lo **studio attivo** con il
+ * nome che ha davvero — prima qui c'era una riga scritta a mano, «Bluecode Advisory Malta Ltd»,
+ * che non è il nome di nessuno studio: la riga `tenant` dice «Bluecode LTD», e così il selettore
+ * mostrava un'entità inesistente.
  */
 export function getAllAvailableTenants(): { id: string; ragioneSociale: string; giurisdizione: string }[] {
   try {
@@ -299,12 +311,11 @@ export function getAllAvailableTenants(): { id: string; ragioneSociale: string; 
     }
   } catch {}
 
-  // Ripiego minimo quando il localStorage è vuoto: solo Bluecode, il tenant di default
-  // sempre presente. Prima c'erano anche Advisory Italia e Swiss Wealth (studi mock, poi
-  // eliminati dal DB): li si toglie perché non devono ricomparire nel selettore studi.
-  return [
-    { id: BLUECODE_TENANT_ID, ragioneSociale: 'Bluecode Advisory Malta Ltd', giurisdizione: 'Malta (UE)' },
-  ];
+  // Niente registro locale: l'unico studio di cui si sa qualcosa è quello attivo. Il nome può
+  // essere il segnaposto generico («Studio Professionale») se nemmeno l'anagrafica è arrivata —
+  // e un segnaposto dichiarato è meglio di un nome inventato che sembra vero.
+  const studio = getStudioInfoForTenant();
+  return [{ id: studio.id, ragioneSociale: studio.ragioneSociale, giurisdizione: studio.giurisdizione }];
 }
 
 /**

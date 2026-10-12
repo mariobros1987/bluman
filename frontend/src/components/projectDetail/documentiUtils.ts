@@ -31,9 +31,9 @@ export function documentoApiAVista(d: any, projectId: string): any {
   };
 }
 
-// Le rimozioni dei documenti che NON stanno su PostgreSQL: i modelli precompilati che
-// `defaultDocs` rigenera da PREBUILT_TEMPLATES a ogni mount e le voci del registro locale del
-// Vault. Senza ricordarle, il cestino non ha effetto: la lista si ricostruisce all'apertura
+// Le rimozioni dei documenti che NON stanno su PostgreSQL: le voci del registro locale del Vault
+// (i modelli precompilati che il vault fabbricava da solo non esistono più — vedi `DocumentiTab`).
+// Senza ricordare le rimozioni, il cestino non ha effetto: la lista si ricostruisce all'apertura
 // della scheda e il documento riappare. I documenti veri vivono nella tabella `documento` e li
 // cancella l'API: per quelli questo elenco non serve.
 export function chiaveDocumentiRimossi(projectId: string | number) {

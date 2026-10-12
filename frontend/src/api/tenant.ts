@@ -3,7 +3,9 @@ import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 import { cachedQuery, invalidateCache } from './cache';
 
-// DEFAULT_TEAM_USERS serve SOLO come fallback di seed per il Tenant Demo Bluecode (tenant-1) se il DB è offline
+// DEFAULT_TEAM_USERS è il seed del Tenant Demo Bluecode, e vale **solo** quando il server non
+// risponde affatto (rete giù, errore, risposta non riconoscibile). Non è la risposta a «questo
+// studio non ha ancora collaboratori»: quella è un elenco vuoto, e va mostrata vuota.
 export const DEFAULT_TEAM_USERS = [
   { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin', specializzazione: 'Lead Advisor & Strategia', tenantId: '00000000-0000-0000-0000-000000000001' },
   { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP', tenantId: '00000000-0000-0000-0000-000000000001' },
@@ -31,7 +33,13 @@ export async function fetchUtentiTenant(options?: { forceRefresh?: boolean }) {
         const res = await apiFetch(`${API_BASE}/tenant/utenti`, { headers: getAuthHeaders() });
         if (res.ok) {
           const dbUsers = await res.json();
-          if (Array.isArray(dbUsers) && dbUsers.length > 0) {
+          // §7 — qui c'era `&& dbUsers.length > 0`: un elenco **vuoto** dal database non veniva
+          // creduto e si scendeva al ripiego, che per il tenant Bluecode è `DEFAULT_TEAM_USERS`,
+          // cioè cinque persone che non esistono. Era la stessa guardia mancante di
+          // `QuickTimeTracker`: l'assenza di *righe* scambiata per assenza di *risposta*. Un
+          // database che risponde «nessun collaboratore» ha risposto, e va creduto — anche
+          // quando la risposta è zero. Il seed resta vivo solo se il server non ha risposto.
+          if (Array.isArray(dbUsers)) {
             // Aggiungi solo eventuali custom locali non già presenti nel DB
             const existingEmails = new Set(dbUsers.map((u: any) => (u.email || '').toLowerCase()));
             const fullList = [...dbUsers];
@@ -763,16 +771,19 @@ export async function triggerCronScadenzeApi() {
   return await res.json();
 }
 
+/**
+ * Elenco degli studi della piattaforma, per il super admin.
+ *
+ * §7 — qui c'era un ripiego silenzioso sulla copia in localStorage: se il server non rispondeva,
+ * la funzione restituiva la lista salvata e **chi la chiamava non poteva distinguerla da una
+ * risposta vera**. Con l'API giù, gli studi cancellati dal database restavano in elenco con i
+ * loro pulsanti di modifica ed eliminazione, come se esistessero ancora. Ora l'errore si
+ * propaga: chi legge decide cosa dire all'operatore (vedi `SuperAdminPage`).
+ */
 export async function fetchAdminTenantsApi() {
-  try {
-    const res = await apiFetch(`${API_BASE}/admin/tenants`, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error('Errore recupero tenants');
-    return await res.json();
-  } catch (err) {
-    console.warn('Recupero admin tenants fallback local:', err);
-    const local = localStorage.getItem('bluman_all_tenants_admin');
-    return local ? JSON.parse(local) : null;
-  }
+  const res = await apiFetch(`${API_BASE}/admin/tenants`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Elenco studi non disponibile'));
+  return await res.json();
 }
 
 export async function createAdminTenantApi(data: any) {

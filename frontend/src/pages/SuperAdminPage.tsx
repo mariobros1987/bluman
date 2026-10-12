@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { fmt } from '../utils';
 import { setActiveTenantId } from '../utils/tenant';
 import { fetchAdminTenantsApi, createAdminTenantApi, updateAdminTenantApi, deleteAdminTenantApi, resetPasswordTenantApi } from '../api/client';
@@ -32,7 +32,6 @@ interface TenantStudio {
 // default: prima qui c'erano tre studi mock (Bluecode HQ, Advisory Italia, Swiss Wealth)
 // che comparivano quando il localStorage era vuoto e "risorgevano" anche dopo averli
 // eliminati dal database. Ora la lista parte vuota e la popola solo il DB.
-const DEFAULT_TENANTS: TenantStudio[] = [];
 
 export function SuperAdminPage() {
   const toast = useToast();
@@ -43,18 +42,35 @@ export function SuperAdminPage() {
    * La scheda vive qui e non dentro i componenti: così la barra resta una riga sola.
    */
   const [sezione, setSezione] = useState<'studi' | 'backup'>('studi');
-  const [tenants, setTenants] = useState<TenantStudio[]>(() => {
-    const saved = localStorage.getItem('bluman_all_tenants_admin');
-    return saved ? JSON.parse(saved) : DEFAULT_TENANTS;
-  });
+  /**
+   * §7 — l'elenco degli studi è **solo** quello che risponde il server. Prima partiva dalla copia
+   * in localStorage e il server la sostituiva solo se rispondeva con qualcosa: con l'API giù, gli
+   * studi eliminati dal database ricomparivano in pagina con i loro pulsanti di modifica ed
+   * eliminazione, indistinguibili da quelli veri. La copia locale resta, ma come *ultima risposta
+   * ricevuta dal server* — e lo stato qui sotto dice se quella risposta c'è stata.
+   */
+  const [tenants, setTenants] = useState<TenantStudio[]>([]);
+  const [statoElenco, setStatoElenco] = useState<'caricamento' | 'ok' | 'errore'>('caricamento');
+  const [erroreElenco, setErroreElenco] = useState('');
 
-  useEffect(() => {
-    fetchAdminTenantsApi().then(dbTenants => {
-      if (dbTenants && Array.isArray(dbTenants) && dbTenants.length > 0) {
+  const caricaStudi = useCallback(() => {
+    setStatoElenco('caricamento');
+    fetchAdminTenantsApi()
+      .then((dbTenants) => {
+        if (!Array.isArray(dbTenants)) throw new Error('Risposta non riconosciuta dal server');
         setTenants(dbTenants);
-      }
-    });
+        setStatoElenco('ok');
+        setErroreElenco('');
+      })
+      .catch((err: any) => {
+        // Nessun ripiego silenzioso: la lista resta vuota e la pagina dice che non lo sa.
+        setTenants([]);
+        setErroreElenco(err?.message || 'il server non ha risposto');
+        setStatoElenco('errore');
+      });
   }, []);
+
+  useEffect(() => { caricaStudi(); }, [caricaStudi]);
 
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -80,10 +96,13 @@ export function SuperAdminPage() {
   const [formPiano, setFormPiano] = useState<'enterprise' | 'pro' | 'trial'>('enterprise');
   const [formDurataMesi, setFormDurataMesi] = useState<number>(12);
 
-  // Salva ogni variazione su localStorage
+  // La copia in localStorage è **l'ultima risposta ricevuta dal server**, non ciò che la pagina
+  // sta mostrando: si riscrive solo quando l'elenco è arrivato davvero. Così un errore di rete
+  // non cancella (né rimpiazza) quello che il database aveva detto l'ultima volta.
   useEffect(() => {
+    if (statoElenco !== 'ok') return;
     localStorage.setItem('bluman_all_tenants_admin', JSON.stringify(tenants));
-  }, [tenants]);
+  }, [tenants, statoElenco]);
 
   // Calcola giorni rimanenti alla scadenza
   const calculateDaysRemaining = (dataScadenzaStr: string): number => {
@@ -381,6 +400,27 @@ export function SuperAdminPage() {
           <span>+</span> Registra Nuovo Tenant Studio
         </button>
       </div>
+
+      {/* §7 — quando il server non risponde, questa pagina non mostra un elenco vecchio: dice che
+          non lo sa. Un totale che sembra un dato e invece è un ricordo è peggio di un totale a
+          zero spiegato. */}
+      {statoElenco !== 'ok' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', borderRadius: 12, padding: '12px 16px' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--pill-amber-fg)' }}>
+            {statoElenco === 'caricamento'
+              ? '⏳ Lettura degli studi dal server…'
+              : `⚠ Elenco studi non disponibile — ${erroreElenco}. Gli studi qui sotto sono a zero perché non è stato possibile leggerli dal database, non perché non ci siano.`}
+          </div>
+          {statoElenco === 'errore' && (
+            <button
+              onClick={caricaStudi}
+              style={{ background: 'var(--amber)', color: '#1f1300', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 11.5, fontWeight: 800, cursor: 'pointer' }}
+            >
+              ↻ Riprova
+            </button>
+          )}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>

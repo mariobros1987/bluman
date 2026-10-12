@@ -5,7 +5,7 @@ import { GlobalSearch } from './GlobalSearch';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { UserProfileModal } from '../UserProfileModal';
 import { MustChangePasswordModal } from '../MustChangePasswordModal';
-import { fetchNotificheApi, markNotificheReadApi, apriStreamNotifiche, type NotificaStreamEvent } from '../../api/client';
+import { fetchNotificheApi, markNotificheReadApi, apriStreamNotifiche, fetchAdminTenantsApi, type NotificaStreamEvent } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
 import { ThemeToggle } from './ThemeToggle';
 import { SelettorePeriodo } from './SelettorePeriodo';
@@ -93,6 +93,35 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
     setCurrentUser(user);
   }, [user]);
 
+  /**
+   * §7 — il selettore studi del super admin legge l'elenco dal server. La lista sincrona di
+   * `getAllAvailableTenants` resta come valore di partenza (l'ultima risposta nota, così la barra
+   * non parte vuota) e viene sostituita appena `/admin/tenants` risponde: prima quell'elenco era
+   * *solo* locale, e uno studio cancellato dal database restava selezionabile finché qualcuno non
+   * apriva il pannello di amministrazione.
+   */
+  const [studiPerSwitcher, setStudiPerSwitcher] = useState(() => getAllAvailableTenants());
+  useEffect(() => {
+    const ruolo = currentUser?.ruolo || currentUser?.role;
+    if (ruolo !== 'super_admin') return;
+    let attivo = true;
+    fetchAdminTenantsApi()
+      .then((lista) => {
+        if (!attivo || !Array.isArray(lista)) return;
+        setStudiPerSwitcher(lista.map((t: any) => ({
+          id: t.id,
+          ragioneSociale: t.ragioneSociale,
+          giurisdizione: t.giurisdizione || '',
+        })));
+      })
+      .catch(() => {
+        // Il server non ha risposto: resta l'ultima lista nota. Qui è un selettore, non la pagina
+        // di amministrazione — e svuotarlo non proteggerebbe da nulla, impedirebbe solo di passare
+        // a uno studio che esiste.
+      });
+    return () => { attivo = false; };
+  }, [currentUser]);
+
   useEffect(() => {
     const loadDbNotifs = async () => {
       const dbNotifs = await fetchNotificheApi();
@@ -175,7 +204,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             {/* Selettore Studio / Tenant Switcher — RISERVATO AL SUPER ADMIN */}
             {(() => {
               const currentTid = getCurrentTenantId(currentUser);
-              const allTenants = getAllAvailableTenants();
+              const allTenants = studiPerSwitcher;
               const isSuperAdmin = currentUser?.ruolo === 'super_admin' || currentUser?.role === 'super_admin';
               const currentTenantObj = allTenants.find(t => t.id === currentTid) || { id: currentTid, ragioneSociale: 'Studio Advisory' };
 

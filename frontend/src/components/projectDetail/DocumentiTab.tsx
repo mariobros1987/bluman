@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fmt } from '../../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../../utils/pdfGenerator';
 import { SimpleZipBuilder } from '../../utils/zipBuilder';
-import { PREBUILT_TEMPLATES, resolveDocumentTemplateHtml } from '../../utils/documentTemplates';
 // `scaricaDocumentoClient`/`scaricaDocumentoWordClient` erano usate in
 // handleDownloadDocumentPdf/Word senza essere importate: sul ramo `doc.dbDoc` — cioè
 // proprio i documenti archiviati a database — il click lanciava ReferenceError. Il
 // typecheck del frontend non lo vedeva perché girava su zero file (vedi tsconfig.json).
 import { listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, archiviaDocumentoApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../../api/client';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, BLUECODE_TENANT_ID, isAdminStudio } from '../../utils/tenant';
+import { getTenantStorageKey, getStudioInfoForTenant, isAdminStudio } from '../../utils/tenant';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
@@ -40,39 +38,13 @@ export function DocumentiTab({ project }: { project: Progetto }) {
 
   // Caricamento Documenti dal Vault Locale e Cloud (Sincronizzati 1-a-1 con i Modelli Word Studio)
   const [docList, setDocList] = useState<any[]>(() => {
-    const isBluecode = getCurrentTenantId() === BLUECODE_TENANT_ID;
-    const isDemoProj = String(project.id) === 'proj-001' || String(project.id) === 'proj-002' || String(project.id) === '1' || String(project.id) === '2';
-    const studio = getStudioInfoForTenant();
-    
-    const defaultDocs = (isBluecode && isDemoProj) ? PREBUILT_TEMPLATES.map(t => {
-      const isSigned = t.id === 'tmpl-engagement' || t.id === 'tmpl-nda';
-      const catLabel = t.categoria === 'engagement' ? 'Contratti' :
-                       t.categoria === 'nda' ? 'Contratti' :
-                       t.categoria === 'societario' ? 'Societario' :
-                       t.categoria === 'trust' ? 'Trust' :
-                       t.categoria === 'compliance' ? 'Compliance' :
-                       t.categoria === 'delega' ? 'Societario' : 'Contratti';
-      return {
-        id: `doc-${t.id}`,
-        templateId: t.id,
-        nome: `${t.titolo} — ${project.cl}.pdf`,
-        titolo: t.titolo,
-        cat: catLabel,
-        dimensione: '54 KB',
-        data: '15/08/2026',
-        dataCaricamento: '15/08/2026',
-        firmato: isSigned,
-        formato: 'pdf',
-        contenutoHtml: resolveDocumentTemplateHtml(t.contenutoHtml, {
-          cliente: { nome: project.cl, ragione_sociale: project.cl },
-          progetto: { titolo: project.n, importo_totale: fmt(project.val) },
-          studio: { ragioneSociale: studio.ragioneSociale, sedeLegale: studio.sedeLegale, piva: studio.piva },
-          isForPrintOrExport: false,
-          tagMode: 'plain',
-        }),
-      };
-    }) : [];
-
+    // §7 — qui il vault **fabbricava** i documenti. Per il tenant Bluecode, e per i progetti il cui
+    // id fosse `1`, `2`, `proj-001` o `proj-002`, costruiva a runtime tutti i modelli dello studio
+    // con data 15/08/2026, e due di essi — contratto di incarico e NDA — li marcava
+    // `firmato: true`, cioè «sottoscritti con Firma Elettronica Semplice (OTP verificata)»: due
+    // documenti firmati che nessuno aveva firmato. La condizione passava da `String(project.id)`,
+    // quindi non serviva nemmeno il tenant demo: bastava un id numerico. Ora il vault contiene solo
+    // quello che esiste — le righe del database (lette qui sotto) e i documenti salvati in locale.
     try {
       const storageKey = getTenantStorageKey(`bluman_project_documents_${project.id}`);
       const savedProjDocsStr = localStorage.getItem(storageKey);
@@ -83,18 +55,17 @@ export function DocumentiTab({ project }: { project: Progetto }) {
       const matchingGlobalDocs = allVault.filter((d: any) => String(d.progettoId) === String(project.id));
 
       const mergedMap = new Map<string, any>();
-      [...defaultDocs, ...savedProjDocs, ...matchingGlobalDocs].forEach(d => {
+      [...savedProjDocs, ...matchingGlobalDocs].forEach(d => {
         if (d && (d.id || d.nome)) {
           mergedMap.set(d.id || d.nome, d);
         }
       });
-      // I documenti già rimossi non tornano: `defaultDocs` e il registro globale li
-      // riproporrebbero comunque, ed è questo che rendeva la cancellazione solo apparente.
+      // I documenti già rimossi non tornano: il registro globale li riproporrebbe comunque,
+      // ed è questo che rendeva la cancellazione solo apparente.
       const rimossi = documentiRimossi(project.id);
       return Array.from(mergedMap.values()).filter(d => !rimossi.has(d.id));
     } catch {
-      const rimossi = documentiRimossi(project.id);
-      return defaultDocs.filter(d => !rimossi.has(d.id));
+      return [];
     }
   });
 

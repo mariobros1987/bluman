@@ -7,6 +7,7 @@ import {
   getCurrentTenantId,
   getTenantStorageKey,
   isAdminStudio,
+  getAllAvailableTenants,
   BLUECODE_TENANT_ID,
 } from './tenant';
 
@@ -63,5 +64,33 @@ describe('isAdminStudio — chi può sbloccare i documenti firmati (§WF-DOC)', 
   it('il collaboratore non lo è: non può sbloccare un atto firmato', () => {
     localStorage.setItem('bluman_user', JSON.stringify({ ruolo: 'collaboratore_interno' }));
     expect(isAdminStudio()).toBe(false);
+  });
+});
+
+describe('getAllAvailableTenants — nessuno studio inventato nel selettore', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('senza il registro admin mostra lo studio attivo, col nome che ha davvero', () => {
+    const elenco = getAllAvailableTenants();
+    expect(elenco).toHaveLength(1);
+    // Il nome scritto a mano che c'era prima: «Bluecode Advisory Malta Ltd». La riga `tenant`
+    // dello studio dice «Bluecode LTD», e il selettore mostrava un'entità che non esiste.
+    expect(elenco[0].ragioneSociale).not.toBe('Bluecode Advisory Malta Ltd');
+    expect(elenco[0].ragioneSociale).toBe('Bluecode LTD');
+  });
+
+  it('senza nemmeno l\'anagrafica mostra il segnaposto, non un nome di fantasia', () => {
+    localStorage.setItem('bluman_user', JSON.stringify({ ruolo: 'advisor', tenantId: TENANT_DUE }));
+    const elenco = getAllAvailableTenants();
+    expect(elenco[0].ragioneSociale).toBe('Studio Professionale');
+  });
+
+  it('col registro admin in storage vince il registro', () => {
+    localStorage.setItem('bluman_all_tenants_admin', JSON.stringify([
+      { id: TENANT_DUE, ragioneSociale: 'Secondo Studio S.r.l.', giurisdizione: 'Italia' },
+    ]));
+    expect(getAllAvailableTenants()).toEqual([
+      { id: TENANT_DUE, ragioneSociale: 'Secondo Studio S.r.l.', giurisdizione: 'Italia' },
+    ]);
   });
 });
