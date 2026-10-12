@@ -33,3 +33,7 @@ graphify-out/
 *.zip
 .claude/
 .vercel
+
+# Stato di Certbot, che esiste solo sul VPS (vedi `.dockerignore`): le due liste coincidono
+# perché governano lo stesso rischio, cioè far entrare nella build roba che non le serve.
+certbot/

@@ -41,3 +41,13 @@ graphify-out/
 .git
 .claude/
 .vercel
+
+# I certificati e lo stato di Certbot. Non servono a nessuna immagine: il servizio `certbot`
+# del compose li monta da fuori, e nginx legge i certificati dalla stessa cartella del host.
+# Vanno esclusi perché il contesto di build è la cartella del repository, e `certbot/conf/accounts`
+# è di root con permessi di sola lettura per il proprietario: la build si ferma con
+# «error from sender: open /opt/bluman/certbot/conf/accounts: permission denied», cioè un
+# errore che non nomina né il Dockerfile né una dipendenza. Successo il 12/10/2026, al primo
+# deploy dopo il rinnovo dei certificati.
+certbot/
+
