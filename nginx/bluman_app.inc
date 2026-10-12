@@ -20,9 +20,19 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 # si carica lo stesso (il bundle è esterno, da `'self'`), al più ricompare un lampo di tema.
 # `style-src` ammette `'unsafe-inline'` perché i documenti sanitizzati e i componenti React
 # usano attributi `style=""`; bloccare lo stile ha un valore molto minore che bloccare lo script.
+# `connect-src` è `'self'` e nient'altro: da quando il frontend è servito da questa stessa
+# origine e parla con l'API sotto `/api` (che nginx toglie prima di consegnarla a `api:3000`),
+# nessuna chiamata del browser esce da qui. Fino al 12/10/2026 questa direttiva ammetteva anche
+# `https://bluman-api-production.up.railway.app`: era il backend di quando il frontend stava su
+# Vercel, e sul VPS **non serviva a niente** — una riga di permesso in più che nessun codice
+# usava, cioè una porta aperta per abitudine. Toglierla non cambia il funzionamento della SPA,
+# ma cambia cosa può fare uno script iniettato: non può spedire da nessuna parte ciò che legge.
+# Chi in futuro aggiungesse una chiamata verso l'esterno (per esempio `VITE_SENTRY_DSN`, oggi non
+# configurato) deve tornare qui e ammettere **quel** solo ospite: se lo dimentica, la CSP blocca
+# l'invio e lo si vede in console — un guasto visibile, che è il modo giusto di sbagliare.
 # A livello `server` (qui), non dentro un `location`: così l'eredità vale anche per il frontend —
 # e `location /` usa `expires`, non `add_header`, proprio per non azzerare queste intestazioni.
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-psNg4gU6ub7YDYL4ZczDA7onArG8TN+R3V/rl4a18Lc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://bluman-api-production.up.railway.app; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'sha256-psNg4gU6ub7YDYL4ZczDA7onArG8TN+R3V/rl4a18Lc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
 
 # ─────────────────────────────────────────────────────────────────────
 # API Fastify — tutto sotto `/api`, e il prefisso si toglie strada facendo.
