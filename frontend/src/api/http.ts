@@ -1,8 +1,17 @@
 // API Client per integrare il React Frontend con il backend Fastify + Supabase DB
 import { getCurrentTenantId } from '../utils/tenant';
 
-/** Il backend dello studio: unico posto dove le rotte Fastify esistono davvero. */
+/**
+ * Il backend dell'**ambiente di prove**: Railway, col suo database. Non è un ripiego per la
+ * produzione, ed è la sola cosa che questa costante può essere — vedi `scegliBaseApi`.
+ */
 const API_BACKEND_RAILWAY = 'https://bluman-api-production.up.railway.app';
+
+/** Il prefisso con cui nginx consegna l'API sulla stessa origine della pagina (VPS). */
+const PREFISSO_API = '/api';
+
+/** L'ospite dell'ambiente di prove: solo da qui Railway è una risposta sensata. */
+const OSPITE_DI_PROVA = /(^|\.)vercel\.app$/i;
 
 /**
  * §36 — sul VPS il frontend è servito dalla **stessa origine** che espone le API (nginx monta la
@@ -36,36 +45,82 @@ const API_BACKEND_RAILWAY = 'https://bluman-api-production.up.railway.app';
  *    quello che non è `/api/send-email` o i due webhook su `/index.html`: la POST
  *    non raggiunge mai Railway e quello che torna non è una risposta dell'API.
  *
- * Contro la prima si taglia la barra; contro la seconda si rifiuta la base e si
- * torna a Railway, dicendolo in console — silenziare l'errore significherebbe far
+ * Contro la prima si taglia la barra; contro la seconda non si tiene quella base, e si
+ * scende al ripiego — dicendolo in console, perché silenziare l'errore significherebbe far
  * credere all'operatore che il salvataggio sia partito (regola 3).
  */
 function normalizzaBase(valore: string): string {
   return valore.trim().replace(/\/+$/, '');
 }
 
-const getApiBase = () => {
-  const dichiarata =
-    typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE : undefined;
+function ospiteDi(origine: string): string {
+  try {
+    return new URL(origine).hostname;
+  } catch {
+    // Un'origine che non si lascia leggere (ambiente senza `window`, stringa vuota) non è
+    // l'ambiente di prove: vale come «ospite sconosciuto» e non fa scattare il ramo Railway.
+    return '';
+  }
+}
+
+/**
+ * §37 — **quale backend, deciso qui, una volta sola.**
+ *
+ * Prima esisteva una sola strada di ripiego: Railway. Andava bene finché Railway *era* la
+ * produzione; dal 12/10/2026 la produzione è il VPS e Railway è l'ambiente di prove, e quella
+ * riga è diventata il guasto peggiore che questa applicazione possa fare: **una build del
+ * frontend che dimentichi `VITE_API_BASE=/api` parla col database di prova e ci scrive.** Non
+ * fallisce — il salvataggio riesce, l'interfaccia conferma, il dato non c'è in produzione. È la
+ * stessa famiglia del difetto di `urlPubblica.ts`: una configurazione composta per il deployment
+ * sbagliato non dà errore, mente.
+ *
+ * La regola che la sostituisce: **solo l'ambiente di prova può finire su Railway.** Ovunque
+ * altrove — il dominio del VPS, l'IP, un nome futuro — il ripiego è il prefisso relativo `/api`
+ * di questa stessa origine, che è dove l'API sta davvero quando il frontend è servito dal VPS.
+ * Così una dimenticanza ha due esiti, entrambi accettabili: sul VPS il ripiego **indovina**
+ * (era la risposta giusta), su Vercel sbaglia dentro l'ambiente di prove, che è l'unico posto
+ * dove uno sbaglio non fa danno.
+ *
+ * Un ospite che non sia `*.vercel.app` **non** ricade su Railway, e vale la pena dirlo: se un
+ * giorno la prova si sposta su un dominio proprio, là il ripiego darà `/api` e la chiamata
+ * tornerà una pagina HTML — un errore parlante (`apiFetch` lo spiega) invece di un salvataggio
+ * nella produzione sbagliata. Il verso in cui si sbaglia è scelto apposta.
+ *
+ * Perché non «relativo sempre»: su Vercel `/api` non esiste (ci passa solo `send-email`), quindi
+ * un ripiego cieco spezzerebbe l'ambiente di prove al primo deploy senza variabile d'ambiente.
+ */
+function scegliBaseApi(dichiarata: unknown, originePagina: string): string {
+  const origine = normalizzaBase(originePagina);
+  const ospite = ospiteDi(origine);
+  const ambienteDiProva = OSPITE_DI_PROVA.test(ospite);
 
   if (dichiarata) {
     const base = normalizzaBase(String(dichiarata));
-    const origineDellaPagina = typeof window !== 'undefined' ? normalizzaBase(window.location.origin) : '';
-    if (base && base !== origineDellaPagina) return base;
-    if (base) {
-      // Non è un dettaglio di stile: su questo dominio non esiste nessuna rotta
-      // API, quindi la richiesta tornerebbe muta invece di arrivare al backend.
-      console.error(
-        `[bluman] VITE_API_BASE punta al dominio del frontend (${base}): su quel dominio le rotte API non esistono. Uso ${API_BACKEND_RAILWAY}.`,
-      );
-    }
+    // La base dichiarata vince — è il punto di tutto il §36. Non vince quando è **questa**
+    // origine: non aggiunge niente che il ripiego non sappia già fare meglio, perché `/api`
+    // dice *dove* sta l'API dentro l'origine mentre un dominio nudo non lo dice.
+    if (base && base !== origine) return base;
   }
 
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return 'http://localhost:3000';
-  }
-  return API_BACKEND_RAILWAY;
-};
+  if (ospite === 'localhost' || ospite === '127.0.0.1') return 'http://localhost:3000';
+
+  const scelta = ambienteDiProva ? API_BACKEND_RAILWAY : PREFISSO_API;
+  const motivo = dichiarata
+    ? `VITE_API_BASE vale «${normalizzaBase(String(dichiarata))}», cioè il dominio di questa pagina`
+    : 'VITE_API_BASE non è dichiarata in questa build';
+  console.error(
+    `[bluman] ${motivo}: ${ambienteDiProva ? 'siamo nell\'ambiente di prove' : 'questa origine non è l\'ambiente di prove'}, uso «${scelta}».` +
+      (scelta === PREFISSO_API
+        ? ' Se il backend di questa build è altrove, il frontend è compilato per il deployment sbagliato.'
+        : ''),
+  );
+  return scelta;
+}
+
+const getApiBase = () => scegliBaseApi(
+  typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE : undefined,
+  typeof window !== 'undefined' ? window.location.origin : '',
+);
 
 const API_BASE = getApiBase();
 
@@ -226,4 +281,4 @@ async function leggiErroreApi(res: Response, fallback: string): Promise<string> 
   return body?.errore || body?.error || body?.message || `${fallback} (HTTP ${res.status})`;
 }
 
-export { API_BASE, fetchWithTimeout, apiFetch, conCorpoCoerente, urlDocumentoAssoluto, erroreDellaRisposta, leggiErroreApi };
+export { API_BASE, scegliBaseApi, fetchWithTimeout, apiFetch, conCorpoCoerente, urlDocumentoAssoluto, erroreDellaRisposta, leggiErroreApi };

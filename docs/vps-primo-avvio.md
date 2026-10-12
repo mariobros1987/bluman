@@ -476,7 +476,7 @@ Sono **cinque** cose, e saltarne una lascia l'ambiente incoerente in un modo che
 | Passo | Comando | Cosa succede se si salta |
 |---|---|---|
 | Codice | `cd /opt/bluman && git pull --ff-only` | l'immagine si costruisce dal codice vecchio |
-| Frontend | build `node:22` usa-e-getta con `VITE_API_BASE=/api` | l'app parla col backend di Railway **in silenzio** |
+| Frontend | build `node:22` usa-e-getta con `VITE_API_BASE=/api` | dal 12/10/2026 non più in silenzio: senza la variabile il ripiego è `/api` di questa stessa origine, che sul VPS è la risposta giusta (`scegliBaseApi` in `http.ts`, §37) |
 | Database | `compose build api migrate` → `run --rm -T migrate` → `run --rm -T rls` | schema vecchio; e senza `rls` la tabella nuova resta **scoperta** |
 | Backend | `compose up -d` | il container continua a girare con l'immagine precedente |
 | nginx | `compose exec -T nginx nginx -s reload` | **502 su tutte le rotte API** con l'API perfettamente viva (vedi sotto) |
