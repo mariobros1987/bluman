@@ -19,5 +19,9 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "src/test/setup.ts"]
+  // `src/test/setup.ts` NON sta qui: è un file di ambiente jsdom e questo progetto ha
+  // `lib: ["ES2023"]`, senza DOM — compilarlo in entrambi i progetti lo faceva fallire qui
+  // («Cannot find name 'Element'») pur essendo corretto. Lo copre già tsconfig.app.json, che
+  // include tutto `src` con la libreria DOM.
+  "include": ["vite.config.ts"]
 }

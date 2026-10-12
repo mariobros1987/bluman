@@ -31,6 +31,23 @@ export function InvoicePreviewModal({
   return (
         <Modal onClose={() => setPreviewOpen(false)} zIndex={120} overlayBackground="rgba(0,0,0,.85)" dirty={false} ariaLabel="Anteprima fattura PDF">
           <div data-theme="light" style={{ background: '#fff', color: 'var(--text)', borderRadius: 16, padding: 32, width: '100%', maxWidth: 660, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20, boxShadow: '0 24px 60px rgba(0,0,0,.6)' }}>
+            {/*
+              §FAC-SIMILE — questa finestra serve a far vedere l'impaginazione (logo, colore,
+              intestazione, piè di pagina), non a mostrare una fattura. Prima qui c'erano i dati
+              di una fattura che non esiste: un cliente inventato («Holding Beta S.r.l.»), la sua
+              P.IVA, un codice destinatario SDI e il numero «FT-2026-PREVIEW». Non erano
+              riconoscibili come esempio e questo modale ha anche un pulsante di stampa, quindi
+              potevano uscire su un foglio con l'aria di un documento vero.
+
+              Ora il fac-simile è dichiarato in cima e i dati che potrebbero essere scambiati per
+              reali (identificativi fiscali, codice SDI, numero documento) non ci sono più: al
+              loro posto un trattino. L'importo resta perché senza uno si vedrebbe male
+              l'allineamento delle colonne, ed è coperto dalla dichiarazione.
+            */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--pill-amber-bg, #fef3c7)', border: '1px solid var(--amber, #f59e0b)', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: 'var(--pill-amber-fg, #78350f)' }}>
+              <span aria-hidden="true">⚠</span>
+              <span>FAC-SIMILE — questi sono dati di esempio per vedere l'impaginazione: non appartengono a nessun cliente e non compaiono in nessuna fattura.</span>
+            </div>
             {/* Header Documento con Colore Personalizzato */}
             <div style={{ borderBottom: `3px solid ${coloreTemaFattura}`, paddingBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
@@ -46,22 +63,22 @@ export function InvoicePreviewModal({
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: coloreTemaFattura }}>FATTURA DI VENDITA</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>FT-2026-PREVIEW</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>ANTEPRIMA</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Data: {new Date().toLocaleDateString('it-IT')}</div>
               </div>
             </div>
 
-            {/* Dati Cliente */}
+            {/* Dati Cliente — di esempio, senza identificativi (vedi la nota in cima) */}
             <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
               <div>
                 <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Cliente Destinatario:</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>Holding Beta S.r.l.</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)' }}>P.IVA: IT09876543210</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>Cliente di esempio</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)' }}>P.IVA: —</div>
               </div>
               {mostraSdi && (
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 700 }}>Canale SDI (invio manuale):</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pill-green-fg)', marginTop: 2 }}>Codice destinatario SUBM70N</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--pill-green-fg)', marginTop: 2 }}>Codice destinatario: —</div>
                 </div>
               )}
             </div>
@@ -78,7 +95,7 @@ export function InvoicePreviewModal({
               <tbody>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '10px' }}>
-                    <strong>Consulenza Structuring Holding & Protezione Patrimoniale</strong>
+                    <strong>Voce di esempio — descrizione dell'incarico</strong>
                   </td>
                   <td style={{ padding: '10px', textAlign: 'right' }}>€ 5.000,00</td>
                   <td style={{ padding: '10px', textAlign: 'right', fontWeight: 700 }}>€ 5.000,00</td>

@@ -168,17 +168,17 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return [
-      {
-        id: `msg-welcome-${progettoId}`,
-        canale: 'whatsapp',
-        mittente: `${contactInfo.whatsapp} (${contactInfo.referente})`,
-        destinatario: 'Studio Advisory (+356 79001122)',
-        direzione: 'entrata',
-        testo: `Buongiorno Studio, confermiamo l'avvio delle attività per la pratica ${nomeCliente || 'Incarico'}. Restiamo a disposizione per i dettagli.`,
-        dataOra: new Date().toLocaleDateString('it-IT'),
-      }
-    ];
+    // §7 — qui c'era un messaggio di benvenuto **inventato**: mittente il numero WhatsApp
+    // reale del cliente con il nome del suo referente, destinatario «Studio Advisory
+    // (+356 79001122)», testo «Buongiorno Studio, confermiamo l'avvio delle attività…»,
+    // direzione «entrata». Non era riconoscibile come esempio: assomigliava a un messaggio
+    // ricevuto davvero. E restava a schermo, perché più sotto `setMessaggi` viene chiamato
+    // solo se la lista non è vuota: con zero comunicazioni a database la chat mostrava quel
+    // messaggio al posto del vuoto.
+    //
+    // Una chat vuota è un'informazione vera; una conversazione inventata no. Quando il
+    // database ha messaggi veri è il ramo sotto a riempirla.
+    return [];
   });
 
   const [filtroCanale, setFiltroCanale] = useState<string>('TUTTI');
@@ -685,6 +685,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
           onScroll={handleChatScroll}
           style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', flexDirection: 'column', gap: 14, maxHeight: 520, overflowY: 'auto' }}
         >
+          {messaggiFiltrati.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '28px 12px', color: 'var(--muted)', fontSize: 12 }}>
+              <div style={{ fontSize: 22, marginBottom: 6 }} aria-hidden="true">💬</div>
+              <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Nessun messaggio in questa pratica</div>
+              <div>Qui compaiono le comunicazioni scambiate con il cliente su WhatsApp, Telegram ed email. Quelle in entrata arrivano dai canali configurati in Impostazioni → Canali.</div>
+            </div>
+          )}
+
           {messaggiFiltrati.map(m => {
             const badge = getCanaleBadge(m.canale);
             const isUscita = m.direzione === 'uscita';
