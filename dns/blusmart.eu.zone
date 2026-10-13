@@ -1,0 +1,25 @@
+; ═════════════════════════════════════════════════════════════════════
+; BluMan — zona DNS di blusmart.eu (formato BIND)
+; ═════════════════════════════════════════════════════════════════════
+; Due record soli, e sono quelli che so: l'indirizzo del VPS di produzione.
+; Tutto ciò che riguarda la posta (MX, SPF, DKIM, DMARC) è deliberatamente
+; assente — quei valori li pubblica il provider della casella, non io.
+; Vedi LEGGIMI.md, e il pannello Record DNS dell'app che dice la stessa cosa.
+
+$TTL 300
+
+@       IN  A       136.144.234.118
+www     IN  A       136.144.234.118
+
+; ─── Opzionale ma consigliato: vincola i certificati a Let's Encrypt ───
+; Senza questo record qualunque CA può emettere un certificato per il dominio.
+; Con questo, solo Let's Encrypt può — ed è esattamente la CA che usiamo.
+; @     IN  CAA     0 issue "letsencrypt.org"
+
+; ─── NON qui: la posta ───
+; MX      → lo pubblica il provider della casella (per una casella Register.it:
+;           mail.register.it, ma leggi il valore nel pannello, non fidarti di questa riga)
+; TXT SPF → v=spf1 include:<indicato dal provider> ~all
+; TXT DKIM→ <selettore>._domainkey, chiave generata dal provider
+; TXT DMARC → v=DMARC1; p=none; rua=mailto:<indirizzo dello studio>
+; Un `include:` SPF sbagliato peggiora il recapito invece di migliorarlo: va chiesto.
