@@ -10,9 +10,13 @@ lavoro fatto.
 | `@` (la radice, `blusmart.eu`) | A | `136.144.234.118` | 3600 |
 | `www` | A | `136.144.234.118` | 300 |
 
-Verificati il **13/10/2026** interrogando un resolver **pubblico** (il DoH di Cloudflare) e non quello
-di casa: la rete di casa è dirottata da TIM e per questo dominio risponde `127.0.0.1`, quindi da lì si
-concluderebbe che il DNS è rotto mentre è solo il proprio.
+Verificati il **13/10/2026**, in due modi: con un resolver **pubblico** (il DoH di Cloudflare) e con una
+richiesta normale, che risponde 200 dal VPS. Non è una precauzione teorica — il 12/10/2026, per qualche
+ora, la rete di casa rispondeva `127.0.0.1` per questo dominio: è la pagina «dominio inesistente» che
+TIM serve al posto di un NXDOMAIN, e sembra un sito caduto quando non lo è. **Oggi il nome risolve
+regolarmente anche da qui**, ma la lezione resta: davanti a un «non risolve», la prima domanda non è se
+il DNS è pubblicato, ma **da dove** lo si sta guardando. Da dentro, «non è pubblicato» e «il mio
+resolver mente» sono indistinguibili — e si conclude il primo.
 
 ⚠️ Il TTL della radice è **3600**, non i 300 chiesti: è Register.it che ha pubblicato così. Non è un
 guasto, ma cambia una cosa che conta il giorno in cui servirà — una modifica su `@` si propaga in
@@ -79,10 +83,11 @@ stesso ti dà MX e SPF: sono valori che pubblica lui, non che scelgo io.
 I passi che qui erano elencati come **da fare** sono fatti, e vale la pena tenerne il *modo*, perché è
 quello che rende la verifica ripetibile:
 
-- `blusmart.eu` e `www.blusmart.eu` **risolvono al VPS**. Verificato il 13/10/2026 da un resolver
-  **pubblico** (DoH di Cloudflare) e non da quello di casa: per questo dominio la rete di casa
-  risponde `127.0.0.1`, e da lì dentro non si distingue «il DNS non è pubblicato» da «il mio resolver
-  mente» — con la conclusione sbagliata che è sempre la prima.
+- `blusmart.eu` e `www.blusmart.eu` **risolvono al VPS**. Verificato il 13/10/2026 due volte: da un
+  resolver **pubblico** (DoH di Cloudflare) e con una richiesta normale. Il doppio controllo serve al
+  caso del 12/10/2026, quando per qualche ora la rete di casa rispondeva `127.0.0.1` per questo
+  dominio: da lì dentro «il DNS non è pubblicato» e «il mio resolver mente» sono indistinguibili, e la
+  conclusione sbagliata è sempre la prima.
 - **Certificato Let's Encrypt** per entrambi i nomi: emesso il **12/10/2026 09:15 UTC**, scade il
   **10/01/2027**, SAN `blusmart.eu` + `www.blusmart.eu`. Lo rinnova il servizio `certbot` del compose
   (webroot, ogni 12h), e il rinnovo ripassa dalla sfida su `:80`, che per questo resta in chiaro di
