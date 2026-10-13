@@ -61,6 +61,46 @@ Nessuna data è modificabile a posteriori: un periodo chiuso è un fatto registr
 Se è stato scritto male, si riattiva e si richiude con la data giusta — e restano agli atti entrambe
 le operazioni.
 
+### 📋 Dati obbligatori dello studio (i sei che servono per fatturare)
+
+Sei campi dell'anagrafica sono la materia prima di ogni documento fiscale: **senza di loro l'app non
+compone la fattura elettronica e lo dice**, invece di riempire i vuoti con un valore plausibile. Non è
+una formalità — fino a ottobre 2026 l'app **inventava**: un XML con la P.IVA a zero, l'indirizzo «Via
+Roma 1» e il regime «RF01» non è un documento con un buco, è un documento che dice il falso, e SdI o
+lo scarta o — peggio — lo accetta.
+
+| Campo (Impostazioni → Anagrafica) | Dove finisce | Cosa l'app scriveva al suo posto |
+|---|---|---|
+| **Ragione Sociale Studio** | la «Denominazione» del cedente in ogni fattura elettronica e l'intestazione dei documenti | «Studio Advisory» |
+| **Partita IVA / VAT Number** | l'`IdCodice` dell'identificativo fiscale del cedente nell'XML SDI | «00000000000» |
+| **Codice Fiscale Societario** | il `CodiceFiscale` del cedente nell'XML SDI | ripiegava sulla P.IVA e, senza quella, «00000000000» |
+| **Indirizzo Sede Legale** | l'indirizzo della sede del cedente nell'XML e nelle intestazioni | «Via Roma 1» |
+| **Regime Fiscale** | il `RegimeFiscale` del cedente nell'XML SDI | «RF01», cioè «ordinario», che potrebbe non essere il tuo |
+| **IBAN per Accredito Fatture** | le coordinate di pagamento stampate in fattura e nei solleciti | la fattura usciva senza coordinate su cui pagare |
+
+Come si comporta l'app:
+
+- **Al primo accesso** del responsabile dello studio compare una guida che elenca i campi mancanti, a
+  che cosa servono e cosa l'app scriveva al loro posto. Si chiude con **«Più tardi»** e non ricompare
+  per quello studio; resta richiamabile da **Impostazioni → Anagrafica** («📋 Dati obbligatori per
+  fatturare» → **Rivedi la guida**), dove lo stesso riquadro dice se l'anagrafica è completa o quali
+  campi mancano.
+- **Scaricando l'XML di una fattura** (`GET /invoices/:id/sdi-xml`) con l'anagrafica incompleta, la
+  risposta è **409** e il messaggio **nomina i campi** mancanti: non «anagrafica incompleta», che
+  costringerebbe a indovinare fra sei campi in un'altra schermata.
+- Nel **fascicolo fiscale per il commercialista** (ZIP), le fatture con l'anagrafica incompleta restano
+  nel registro CSV — sono comunque accadute — ma **non producono XML**, e l'indice del fascicolo dice
+  quali campi mancano. Far fallire l'intero archivio per una fattura sarebbe peggio che dirlo.
+- La lista dei sei campi è **una sola**, in `src/domain/anagraficaStudio.ts`: la usano la rotta della
+  guida (`GET /tenant/anagrafica`), il controllo prima dell'XML e il motore dello ZIP. Due copie
+  divergerebbero.
+
+Cosa **non** è ancora strutturato, ed è bene saperlo: `Tenant.sedeLegale` è una riga di testo libero,
+mentre l'XML richiede CAP, Comune e Provincia separati. Il generatore non li valorizza e ripiega su
+`00100` / `Roma` / `RM`, e la nazione del cedente è fissa a `IT`. Per uno studio non italiano quei
+campi sono da correggere: serve separare l'indirizzo in quattro colonne e aggiungere i campi nel
+modulo (decisione a sé, non ancora presa).
+
 ## 🔗 Collegamenti
 - **Comunicazioni** (§15): SMTP/IMAP e canali si impostano qui.
 - **RBAC** (§17): la Matrice Permessi e il team si gestiscono da qui.
@@ -83,7 +123,8 @@ le operazioni.
 
 ## 🔧 Nota tecnica
 - Rotte: `src/routes/tenant.ts` (`/tenant/info`, `/tenant/settings`, `/tenant/utenti`,
-  `POST /tenant/utenti/:id/disattiva`, `POST /tenant/utenti/:id/riattiva`, `/tenant/moduli`).
+  `POST /tenant/utenti/:id/disattiva`, `POST /tenant/utenti/:id/riattiva`, `/tenant/moduli`,
+  `GET /tenant/anagrafica` — i dati obbligatori, §7).
 - **Invariante dei periodi**: `user.stato = 'disattivato'` **se e solo se** non esiste una riga di
   `periodo_collaborazione` con `al` nullo. A presidiarla è un solo punto di scrittura,
   `src/services/periodiCollaborazione.ts` (`disattivaCollaboratore` / `riattivaCollaboratore` /
@@ -107,7 +148,8 @@ le operazioni.
   che si archiviano a vicenda nello stesso istante passerebbero entrambi un controllo fatto fuori.
 - Frontend: `pages/SettingsPage.tsx`, `components/settings/` (`TabCompany`, `TabChannels`, `TabSdi`,
   `TabUsers`, `ArchiviaOperatoreModal`, `OperatorDetailModal`, `TabSicurezza`, `TabCompliance`,
-  `TabInvoiceDesign`).
+  `TabInvoiceDesign`); la guida ai dati obbligatori è `components/AnagraficaStudioModal.tsx`, montata
+  in `components/layout/AppLayout.tsx` e letta da `hooks/useAnagraficaStudio.ts`.
 - **Il logo dello studio** si carica con `POST /upload` e finisce in `tenant.logo_url`. Quando lo
   storage in uso è il **ripiego locale**, il backend ne restituisce un percorso **relativo**
   (`/uploads/<nome>?firma=…`, da `storageService.urlUploadFirmato`) ed è il frontend a risolverlo:

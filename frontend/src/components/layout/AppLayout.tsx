@@ -5,11 +5,13 @@ import { GlobalSearch } from './GlobalSearch';
 import { NotificationModal, type NotificationItem } from '../NotificationModal';
 import { UserProfileModal } from '../UserProfileModal';
 import { MustChangePasswordModal } from '../MustChangePasswordModal';
+import { AnagraficaStudioModal } from '../AnagraficaStudioModal';
+import { useAnagraficaStudio } from '../../hooks/useAnagraficaStudio';
 import { fetchNotificheApi, markNotificheReadApi, apriStreamNotifiche, fetchAdminTenantsApi, type NotificaStreamEvent } from '../../api/client';
 import { QuickTimeTracker } from '../QuickTimeTracker';
 import { ThemeToggle } from './ThemeToggle';
 import { SelettorePeriodo } from './SelettorePeriodo';
-import { getCurrentTenantId, getAllAvailableTenants, setActiveTenantId } from '../../utils/tenant';
+import { getCurrentTenantId, getAllAvailableTenants, getTenantStorageKey, isAdminStudio, setActiveTenantId } from '../../utils/tenant';
 import styles from './AppLayout.module.css';
 
 const TITLES: Record<string, string> = {
@@ -88,6 +90,17 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(user);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  // La guida all'anagrafica si chiude con «Più tardi», e la scelta vale per lo **studio** in cui
+  // è stata fatta: la chiave è per tenant come tutto il resto dei dati locali. `datiLocali.ts`
+  // ragiona «per lista di ciò che resta», quindi un azzeramento dei dati locali la cancella da
+  // sola e la guida ricompare — che è il comportamento giusto dopo un reset.
+  const [guidaAnagraficaArchiviata, setGuidaAnagraficaArchiviata] = useState(() => {
+    try {
+      return localStorage.getItem(getTenantStorageKey('bluman_guida_anagrafica')) === 'archiviata';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     setCurrentUser(user);
@@ -174,6 +187,35 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
       navigate(notif.link);
     }
   };
+
+  /**
+   * §7 — la guida ai dati obbligatori dello studio, al primo accesso.
+   *
+   * L'anagrafica dello studio è ciò che l'app scrive (o rifiuta di scrivere) in ogni fattura
+   * elettronica: se manca qualcosa, il documento fiscale non si compone. Chiedere i campi al
+   * momento giusto è più utile che far scoprire il rifiuto al primo tentativo di emissione.
+   *
+   * Chi la vede: solo l'**admin dello studio** — `PATCH /tenant/info` rifiuta gli altri ruoli,
+   * quindi mostrarla a un collaboratore sarebbe una guida su campi che non può scrivere.
+   * Non compare finché `mustChangePassword` è vero: prima la password temporanea, poi il resto —
+   * due modali sovrapposti al primo accesso sono un modo di non far leggere né l'uno né l'altro.
+   * E non compare se non si è potuto **leggere** l'anagrafica (`letto`): «non ho potuto guardare»
+   * non è «manca qualcosa», e dirglielo sarebbe affermare ciò che non si sa.
+   */
+  const mostraGuidaAnagrafica = isAdminStudio()
+    && !(currentUser?.mustChangePassword || currentUser?.stato === 'invitato')
+    && !guidaAnagraficaArchiviata;
+  const anagraficaStudio = useAnagraficaStudio({ abilitato: mostraGuidaAnagrafica });
+
+  /** «Più tardi» vale per **questo** studio: la chiave è per tenant, come tutto il resto. */
+  const archiviaGuidaAnagrafica = () => {
+    setGuidaAnagraficaArchiviata(true);
+    try {
+      localStorage.setItem(getTenantStorageKey('bluman_guida_anagrafica'), 'archiviata');
+    } catch { /* storage non disponibile: la guida ricomparirà, che è il ripiego innocuo */ }
+  };
+
+  const guidaAnagraficaVisibile = mostraGuidaAnagrafica && anagraficaStudio.letto && !anagraficaStudio.completa;
 
   return (
     <div className={styles.app}>
@@ -344,6 +386,19 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
             user={currentUser}
             onSuccess={() => {
               setCurrentUser((prev: any) => prev ? { ...prev, mustChangePassword: false, stato: 'attivo' } : null);
+            }}
+          />
+        )}
+
+        {/* 📋 Guida ai dati obbligatori dello studio (§7): compare dove il documento fiscale
+            non si compone, non quando qualcuno prova a emetterlo e legge un rifiuto. */}
+        {guidaAnagraficaVisibile && (
+          <AnagraficaStudioModal
+            stato={anagraficaStudio}
+            onClose={archiviaGuidaAnagrafica}
+            onCompila={() => {
+              archiviaGuidaAnagrafica();
+              navigate('/settings');
             }}
           />
         )}

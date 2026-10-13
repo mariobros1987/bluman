@@ -155,11 +155,18 @@ export function costruisciDatiFatturaSdi(input: {
     codiceDestinatario: fattura.codiceDestinatario || cliente.sdiCode || '0000000',
     pecDestinatario: fattura.pecDestinatario ?? null,
 
-    cedenteDenominazione: studio?.ragioneSociale || 'Studio Advisory',
+    // §7 — qui c'era `studio?.ragioneSociale || 'Studio Advisory'`: uno studio **inventato**, con
+    // tanto di nome plausibile, come denominazione del cedente su una fattura elettronica. Se la
+    // ragione sociale manca, il documento non si compone: la stringa vuota fa fallire l'XML invece
+    // di fargli dire il falso, e il controllo in `src/domain/anagraficaStudio.ts` rifiuta prima.
+    cedenteDenominazione: studio?.ragioneSociale || '',
     cedentePiva: studio?.piva ?? null,
     cedenteCodiceFiscale: studio?.codiceFiscale || studio?.piva || null,
     cedenteSedeIndirizzo: studio?.sedeLegale ?? null,
-    cedenteRegimeFiscale: studio?.regimeFiscale || 'RF01',
+    // Stessa storia del nome: `|| 'RF01'` dichiarava «regime ordinario» per chiunque non l'avesse
+    // indicato, e RF01 su uno studio forfettario o estero è un regime fiscale falso in un atto
+    // fiscale. Vuoto: l'XML non è valido e si vede, che è meglio di un XML valido e sbagliato.
+    cedenteRegimeFiscale: studio?.regimeFiscale || '',
 
     cessionarioDenominazione: cliente.nome,
     cessionarioPiva: cliente.piva ?? null,

@@ -286,6 +286,64 @@ export async function updateTenantInfoApi(input: any, tenantIdParam?: string) {
   return data;
 }
 
+/**
+ * Un campo dell'anagrafica senza il quale lo studio non può comporre un documento fiscale.
+ *
+ * La forma è quella che il backend restituisce da `src/domain/anagraficaStudio.ts`, e i campi
+ * sono i suoi: `etichetta` è la stessa che l'operatore legge in Impostazioni → Anagrafica, `dove`
+ * dice in quale punto del documento il valore finisce, `senza` dice cosa l'app scriveva al suo
+ * posto finché poteva inventare. Non si duplica la lista nel frontend: chi la possiede è il
+ * backend, perché è la stessa che il controllo prima dell'XML SDI usa per rifiutare — e due copie
+ * divergono (la lezione di `canaliCoerenza`).
+ */
+export interface CampoAnagrafica {
+  chiave: string;
+  etichetta: string;
+  dove: string;
+  senza: string;
+}
+
+export interface StatoAnagraficaStudio {
+  /** Il server ha risposto: si sa qualcosa. Falso quando non si è potuto guardare. */
+  letto: boolean;
+  /** Nessun campo manca. Vero solo se `letto` è vero. */
+  completa: boolean;
+  mancanti: CampoAnagrafica[];
+}
+
+/**
+ * I dati obbligatori dello studio, letti dal server.
+ *
+ * §7 — `letto: false` significa «non ho potuto guardare» (rete giù, server che risponde male,
+ * risposta non riconoscibile), ed è cosa diversa da «mancano dei campi»: senza questa distinzione
+ * la guida direbbe «la tua anagrafica è incompleta» a uno studio che non ha nessun problema,
+ * soltanto perché il backend era irraggiungibile. Chi legge la guida, con `letto: false`, non la
+ * mostra.
+ *
+ * Nessun ripiego su `localStorage`, che pure è dove l'anagrafica viene messa in cache: là c'è
+ * **ciò che il server ha detto l'ultima volta**, e una guida costruita su quella copia direbbe
+ * «manca la P.IVA» a chi l'ha appena salvata — cioè l'errore opposto a quello che serve.
+ */
+export async function fetchAnagraficaStudioApi(): Promise<StatoAnagraficaStudio> {
+  const nonLetto: StatoAnagraficaStudio = { letto: false, completa: false, mancanti: [] };
+  try {
+    const res = await apiFetch(`${API_BASE}/tenant/anagrafica`, { headers: getAuthHeaders() });
+    if (!res.ok) return nonLetto;
+    const dati = await res.json().catch(() => null);
+    // Una risposta che non ha la forma attesa non è una risposta: vale come «non ho potuto
+    // guardare». In particolare `completa: true` senza `letto` non deve mai passare per un
+    // «è tutto a posto» che nessuno ha verificato.
+    if (!dati || typeof dati.letto !== 'boolean' || !Array.isArray(dati.mancanti)) return nonLetto;
+    return {
+      letto: dati.letto,
+      completa: dati.letto && dati.completa === true,
+      mancanti: dati.mancanti as CampoAnagrafica[],
+    };
+  } catch {
+    return nonLetto;
+  }
+}
+
 export async function fetchAuditLogsApi(parametri?: ParametriListaPaginata) {
   try {
     const res = await apiFetch(`${API_BASE}/audit-logs${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });

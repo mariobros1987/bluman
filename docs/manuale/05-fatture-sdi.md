@@ -20,12 +20,18 @@ tracciato **XML SdI** (FatturaPA).
 - **NC parziale**: la fattura resta `emessa` se lo storno non copre tutto; le rate aperte calano in
   proporzione, una rata azzerata senza incassi diventa `stornata`.
 - **Gate KYC**: l'emissione può essere vincolata alla compliance del cliente (§13).
+- **L'XML si compone solo con l'anagrafica dello studio completa**: scaricandolo
+  (`GET /invoices/:id/sdi-xml`) con uno dei sei campi obbligatori vuoto la risposta è **409** e il
+  messaggio **nomina i campi** («manca il Codice Fiscale Societario»), invece di comporre un XML con
+  la P.IVA a zero e l'indirizzo «Via Roma 1» — che non è un documento con un buco, è un documento
+  falso. I sei campi e il perché sono in §16.
 
 ## 🔗 Collegamenti
 - **Progetti** (§01): si fattura sul **modulo**; un progetto con fatture non si elimina (si archivia).
 - **Scadenzario** (§06): la fattura genera le **rate** di incasso.
 - **Prima Nota** (§07): l'incasso registra il movimento.
 - **Clienti** (§02): P.IVA/CF/SDI/IBAN per l'XML.
+- **Impostazioni** (§16): l'anagrafica dello studio — senza i sei dati obbligatori l'XML non si compone.
 
 ## ⚠️ Stati limite & errori
 - Incassare una rata **stornata** → **409**.

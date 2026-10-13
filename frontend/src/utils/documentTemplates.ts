@@ -786,7 +786,11 @@ export function resolveDocumentTemplateHtml(
   const studioPiva = targetStudio?.piva || studioInfo.piva || '';
   const studioSede = targetStudio?.sedeLegale || studioInfo.sedeLegale || '';
   const studioIban = targetStudio?.iban || studioInfo.iban || '';
-  const studioLeadAdvisor = studioInfo.leadAdvisor || 'Lead Senior Advisor';
+  // §7 — qui c'era `|| 'Lead Senior Advisor'`: non un nome, ma un **ruolo**, stampato al posto
+  // del nome del responsabile dello studio su proposte e contratti. Chi lo legge crede che
+  // quello sia il nome di una persona («Advisor Lead: Lead Senior Advisor»). Senza il dato il
+  // campo resta vuoto: si vede che manca, invece di leggere qualcosa che non esiste.
+  const studioLeadAdvisor = studioInfo.leadAdvisor || '';
   const studioTel = targetStudio?.telefono || studioInfo.telefono || '';
   const studioEmail = targetStudio?.email || studioInfo.email || '';
 

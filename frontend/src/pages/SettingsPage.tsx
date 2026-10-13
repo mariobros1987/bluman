@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, testEmailApi, testImapApi, testChannelApi, resetPasswordUtenteApi, rigeneraSlugWhatsappApi } from '../api/client';
 import { chiaviDatiLocali } from '../utils/datiLocali';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, saveTenantInfoToStorage } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, isAdminStudio, saveTenantInfoToStorage } from '../utils/tenant';
+import { useAnagraficaStudio } from '../hooks/useAnagraficaStudio';
+import { AnagraficaStudioModal } from '../components/AnagraficaStudioModal';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { OperatorDetailModal } from '../components/settings/OperatorDetailModal';
 import { useToast } from '../components/ui/ToastProvider';
@@ -26,6 +28,14 @@ type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'compli
 export function SettingsPage() {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('company');
+  /**
+   * §7 — le stesse informazioni della guida al primo accesso (`AnagraficaStudioModal`), richiamabili
+   * da qui: chi arriva in Anagrafica per compilare deve poter vedere **cosa** manca e **perché**,
+   * senza dover aspettare che il promemoria ricompaia. La lettura è la stessa funzione
+   * (`fetchAnagraficaStudioApi`), quindi le due schermate non possono dire cose diverse.
+   */
+  const [guidaAnagraficaAperta, setGuidaAnagraficaAperta] = useState(false);
+  const anagraficaStudio = useAnagraficaStudio({ abilitato: isAdminStudio() });
   // Standby moduli a livello di studio (nav-only): l'admin spegne i moduli non usati.
   const MODULI_STANDBY: Array<{ key: string; label: string }> = [
     { key: 'projects', label: 'Progetti' }, { key: 'clients', label: 'Clienti' },
@@ -668,6 +678,40 @@ export function SettingsPage() {
           setIban={setIban}
           handleSaveCompany={handleSaveCompany}
         />
+        {/* §7 — cosa manca per poter emettere un documento fiscale, accanto ai campi che lo
+            compilano. Il conteggio e l'elenco vengono dal server: qui non si indovina nulla. */}
+        {isAdminStudio() && (
+          <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>📋 Dati obbligatori per fatturare</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.5 }}>
+              Ragione sociale, partita IVA, codice fiscale, sede legale, regime fiscale e IBAN sono ciò che
+              finisce in ogni fattura elettronica. Senza questi dati l'app <strong>rifiuta di comporre</strong> il
+              documento, invece di riempire i campi con un valore inventato.
+            </div>
+            {!anagraficaStudio.letto ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                ℹ️ Stato non verificato: il server non ha risposto all'ultima lettura. Non è detto che manchi
+                qualcosa — non l'ho potuto controllare.
+              </div>
+            ) : anagraficaStudio.completa ? (
+              <div style={{ fontSize: 12, color: 'var(--green)' }}>✓ Anagrafica completa: nessun documento viene rifiutato per dati mancanti.</div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--pill-amber-fg)' }}>
+                ⚠ Mancano {anagraficaStudio.mancanti.length}{' '}
+                {anagraficaStudio.mancanti.length === 1 ? 'campo' : 'campi'}:{' '}
+                {anagraficaStudio.mancanti.map(c => c.etichetta).join(', ')}.
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => setGuidaAnagraficaAperta(true)}>
+                Rivedi la guida
+              </button>
+              {!anagraficaStudio.letto && (
+                <button type="button" className="btn btn-sm" onClick={anagraficaStudio.ricarica}>Riprova la lettura</button>
+              )}
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--border)', borderRadius: 12, background: 'var(--card)' }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>🧩 Moduli in standby</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Spegni i moduli che lo studio non usa per ora: spariscono dalla navigazione per tutti. Non è un blocco di sicurezza (per quello resta la Matrice Permessi per utente). Dashboard e Impostazioni restano sempre attive.</div>
@@ -725,6 +769,18 @@ export function SettingsPage() {
           mostraSdi={mostraSdi}
           notePieDiPagina={notePieDiPagina}
           setPreviewOpen={setPreviewOpen}
+        />
+      )}
+
+      {/* Guida ai dati obbligatori (§7), richiamata dall'Anagrafica. `mostraCompila={false}`:
+          i campi sono già in questa pagina, e un pulsante che ci riporta dove siamo sarebbe
+          una bugia comoda. */}
+      {guidaAnagraficaAperta && (
+        <AnagraficaStudioModal
+          stato={anagraficaStudio}
+          onClose={() => setGuidaAnagraficaAperta(false)}
+          onCompila={() => setGuidaAnagraficaAperta(false)}
+          mostraCompila={false}
         />
       )}
 

@@ -24,11 +24,19 @@ vi.mock('./util/prismaClient.js', () => ({
       ),
     },
     tenant: {
+      // L'anagrafica è **completa**: da quando il motore rifiuta di comporre il `CedentePrestatore`
+      // con campi vuoti (prima li riempiva con `'00000000000'`, `'Studio Advisory'`, `'RF01'`),
+      // una riga `tenant` senza sede legale, regime fiscale o IBAN non produce più nessun XML.
+      // Questi sei campi sono la materia prima di ogni fattura elettronica: un dato di prova
+      // incompleto non prova più niente, nasconde soltanto il caso che si vuole coprire.
       findUnique: vi.fn().mockResolvedValue({
         id: 'tenant-commercialista-test',
         ragioneSociale: 'Studio Fiscale & Advisory Demo',
         piva: '01234567890',
         codiceFiscale: '01234567890',
+        sedeLegale: 'Via dei Tribunali 12, 80138 Napoli NA',
+        regimeFiscale: 'RF01',
+        iban: 'IT60X0542811101000000123456',
       }),
     },
     fattura: {
@@ -207,6 +215,44 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
 
     const indice = zip.file('00_INDICE_FASCICOLO_FISCALE.txt')?.asText() || '';
     expect(indice).toContain('1 documento/i in stato «bozza»');
+  });
+
+  // §7 — il caso che il motore copriva inventando: senza l'anagrafica dello studio il blocco
+  // `CedentePrestatore` non si compone. Prima il generatore lo riempiva da solo (P.IVA
+  // «00000000000», denominazione «Studio Advisory», indirizzo «Via Roma 1», regime «RF01»), e il
+  // commercialista riceveva un XML che sembrava valido e non era la fattura di nessuno.
+  it("senza l'anagrafica dello studio non produce XML e dice quali campi mancano", async () => {
+    (prisma.tenant.findUnique as unknown as Mock).mockResolvedValueOnce({
+      id: 'tenant-commercialista-test',
+      ragioneSociale: 'Studio Fiscale & Advisory Demo',
+      piva: '01234567890',
+      // Manca il codice fiscale, la sede legale, il regime fiscale e l'IBAN.
+    });
+
+    const res = await generaFascicoloFiscaleZip({
+      tenantId: 'tenant-commercialista-test',
+      anno: 2026,
+      tipo: 'mensile',
+      mese: 3,
+    });
+
+    expect(res.conteggioXmlAttiviGenerati).toBe(0);
+    expect(res.conteggioEsclusePerAnagrafica).toBe(1);
+
+    const zip = new PizZip(res.buffer);
+    const files = Object.keys(zip.files);
+    // La fattura resta nel registro CSV — è comunque accaduta — ma senza XML.
+    expect(files).toContain('01_Fatture_Attive_Vendite/Registro_Fatture_Vendite.csv');
+    expect(files).not.toContain('01_Fatture_Attive_Vendite/Fattura_FT_0001.xml');
+
+    const indice = zip.file('00_INDICE_FASCICOLO_FISCALE.txt')?.asText() || '';
+    expect(indice).toContain("all'anagrafica dello studio manca");
+    expect(indice).toContain('Codice Fiscale Societario');
+    expect(indice).toContain('Indirizzo Sede Legale');
+    expect(indice).toContain('Regime Fiscale');
+    expect(indice).toContain('IBAN per Accredito Fatture');
+    // I campi che **ci sono** non vengono nominati: l'elenco è dei mancanti, non dei sei.
+    expect(indice).not.toContain('Partita IVA / VAT Number');
   });
 
   it('risponde correttamente via API Fastify con token JWT autenticato', async () => {

@@ -370,7 +370,9 @@ export function DocumentEditorPage() {
     const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
     const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
     const studioIban = tenantInfo?.iban || studioInfo.iban || '';
-    const studioLeadAdvisor = studioInfo.leadAdvisor || 'Lead Senior Advisor';
+    // §7 — il ripiego era `'Lead Senior Advisor'`, cioè un ruolo al posto di un nome (vedi
+    // `documentTemplates.ts`): senza il responsabile in anagrafica il campo resta vuoto.
+    const studioLeadAdvisor = studioInfo.leadAdvisor || '';
     const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
     const studioEmail = tenantInfo?.email || studioInfo.email || '';
 

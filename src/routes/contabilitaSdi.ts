@@ -8,6 +8,7 @@ import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { generaFatturaElettronicaXml } from '../services/sdiXmlGenerator.js';
 import { costruisciDatiFatturaSdi } from '../services/mappaturaFatturaSdi.js';
+import { campiAnagraficaMancanti, messaggioAnagraficaIncompleta } from '../domain/anagraficaStudio.js';
 import { recordAudit } from '../util/serverHelpers.js';
 
 export async function registraRotteContabilitaSdi(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -33,6 +34,17 @@ export async function registraRotteContabilitaSdi(server: FastifyInstance, app: 
       const cliente = fattura.cliente || fattura.progetto?.cliente;
 
       if (!cliente) return reply.code(400).send({ errore: 'Cliente non associato alla fattura' });
+
+      // §7 — il confine decide se il documento si può comporre: l'anagrafica dello studio è la
+      // materia prima del blocco `CedentePrestatore`, e quando un campo mancava il generatore lo
+      // riempiva con un valore inventato (P.IVA «00000000000», denominazione «Studio Advisory»,
+      // regime «RF01»). Si rifiuta **prima**, nominando i campi — la stessa forma del rifiuto che
+      // `statoIngressoWhatsapp` usa per il canale («non configurato — mancano …»). Elenco e
+      // messaggio vivono in `src/domain/anagraficaStudio.ts`, gli stessi che la guida in-app mostra.
+      const mancanti = campiAnagraficaMancanti(studio as unknown as Record<string, unknown> | null);
+      if (mancanti.length) {
+        return reply.code(409).send({ errore: messaggioAnagraficaIncompleta(mancanti), mancanti });
+      }
 
       // La mappatura vive in src/services/mappaturaFatturaSdi.ts perché il fascicolo ZIP
       // per il commercialista deve produrre lo STESSO XML di questa rotta. Il riepilogo IVA

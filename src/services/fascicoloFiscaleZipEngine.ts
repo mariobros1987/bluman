@@ -3,6 +3,7 @@ import { prisma } from '../util/prismaClient.js';
 import { calcolaLiquidazioneIvaPeriodo, getCodiceTributoIva } from './lipeEngine.js';
 import { generaFatturaElettronicaXml } from './sdiXmlGenerator.js';
 import { costruisciDatiFatturaSdi } from './mappaturaFatturaSdi.js';
+import { campiAnagraficaMancanti } from '../domain/anagraficaStudio.js';
 
 /**
  * Escape per i campi CSV.
@@ -41,6 +42,8 @@ export interface RisultatoFascicoloFiscale {
   /** XML del ciclo attivo effettivamente scritti nello ZIP (le bozze non ne hanno). */
   conteggioXmlAttiviGenerati: number;
   conteggioBozzeEscluseDaXml: number;
+  /** Fatture nel CSV ma senza XML: all'anagrafica dello studio manca la materia prima del cedente. */
+  conteggioEsclusePerAnagrafica: number;
   /** XML d'acquisto allegati: solo quelli che il fornitore ci ha trasmesso davvero. */
   conteggioXmlPassiviAllegati: number;
   totaleImponibileVenditeEuro: number;
@@ -207,12 +210,16 @@ export async function calcolaAnteprimaFascicoloFiscale(
   const d = await raccogliDatiFascicolo(params);
 
   // Gli stessi criteri applicati dal builder, espressi come filtri: una bozza non ha XML
-  // (non è un documento fiscale) e una fattura senza cliente risolvibile non è mappabile
-  // su FatturaPA. Se questi criteri cambiano lì, vanno cambiati anche qui.
+  // (non è un documento fiscale), una fattura senza cliente risolvibile non è mappabile
+  // su FatturaPA, e senza anagrafica dello studio il `CedentePrestatore` non si compone.
+  // Se questi criteri cambiano lì, vanno cambiati anche qui.
+  const mancanti = campiAnagraficaMancanti(d.tenant as unknown as Record<string, unknown> | null);
   const bozze = d.fattureAttive.filter((f) => f.stato === 'bozza').length;
-  const attiveConXml = d.fattureAttive.filter(
-    (f) => f.stato !== 'bozza' && Boolean(f.cliente || f.progetto?.cliente),
-  ).length;
+  const attiveConXml = mancanti.length
+    ? 0
+    : d.fattureAttive.filter(
+        (f) => f.stato !== 'bozza' && Boolean(f.cliente || f.progetto?.cliente),
+      ).length;
 
   return {
     nomeFile: d.nomeFile,
@@ -221,6 +228,11 @@ export async function calcolaAnteprimaFascicoloFiscale(
     conteggioMovimentiPrimaNota: d.movimenti.length,
     conteggioXmlAttiviGenerati: attiveConXml,
     conteggioBozzeEscluseDaXml: bozze,
+    // L'anteprima non genera XML: qui si conta quante fatture resterebbero **senza**, perché è
+    // esattamente la differenza fra «il fascicolo è pronto» e «manca la P.IVA dello studio».
+    conteggioEsclusePerAnagrafica: mancanti.length
+      ? d.fattureAttive.filter((f) => f.stato !== 'bozza' && Boolean(f.cliente || f.progetto?.cliente)).length
+      : 0,
     conteggioXmlPassiviAllegati: d.fatturePassive.filter((fp) => Boolean(fp.xmlSdiRaw)).length,
     totaleImponibileVenditeEuro: d.totaleImponibileVenditeEuro,
     totaleIvaVenditeEuro: d.totaleIvaVenditeEuro,
@@ -254,6 +266,12 @@ export async function generaFascicoloFiscaleZip(
   ];
   let xmlAttiveGenerati = 0;
   let bozzeEscluseDaXml = 0;
+  // §7 — le fatture che restano nel CSV ma non hanno XML perché all'anagrafica dello studio manca
+  // la materia prima del cedente. Non si fa fallire l'intero fascicolo per una fattura: si dichiara
+  // quante sono e perché, come si fa per le bozze. Il controllo è lo stesso che rifiuta la rotta
+  // singola (`GET /invoices/:id/sdi-xml`), dalla stessa lista (`src/domain/anagraficaStudio.ts`).
+  const mancantiAnagrafica = campiAnagraficaMancanti(tenant as unknown as Record<string, unknown> | null);
+  let esclusePerAnagrafica = 0;
 
   for (const f of fattureAttive) {
     const clienteFattura = f.cliente || f.progetto?.cliente || null;
@@ -282,6 +300,13 @@ export async function generaFascicoloFiscaleZip(
     // per quello che è.
     if (f.stato === 'bozza') {
       bozzeEscluseDaXml += 1;
+      continue;
+    }
+
+    // Nessuna fattura può avere un XML se prima non c'è l'anagrafica dello studio: il blocco
+    // `CedentePrestatore` si compone da lì, e senza di essa il generatore inventava i valori.
+    if (mancantiAnagrafica.length) {
+      esclusePerAnagrafica += 1;
       continue;
     }
 
@@ -424,6 +449,9 @@ export async function generaFascicoloFiscaleZip(
     bozzeEscluseDaXml > 0
       ? `  ${bozzeEscluseDaXml} documento/i in stato «bozza» stanno nel CSV ma NON hanno XML: senza numerazione definitiva e senza trasmissione non sono documenti fiscali.`
       : '  Nessun documento in bozza nel periodo.',
+    esclusePerAnagrafica > 0
+      ? `  ${esclusePerAnagrafica} documento/i stanno nel CSV ma NON hanno XML: all'anagrafica dello studio manca ${mancantiAnagrafica.map(c => c.etichetta).join(', ')}. Si compila in Impostazioni → Anagrafica; l'XML si rigenera da qui.`
+      : '  Anagrafica dello studio completa: nessun documento escluso per dati mancanti.',
     '  Gli XML sono rigenerati dai dati a database con lo stesso generatore usato per la',
     '  trasmissione a SdI: rappresentano il documento registrato, non sostituiscono la',
     '  copia conservata a norma.',
@@ -464,6 +492,7 @@ export async function generaFascicoloFiscaleZip(
     conteggioMovimentiPrimaNota: movimenti.length,
     conteggioXmlAttiviGenerati: xmlAttiveGenerati,
     conteggioBozzeEscluseDaXml: bozzeEscluseDaXml,
+    conteggioEsclusePerAnagrafica: esclusePerAnagrafica,
     conteggioXmlPassiviAllegati: xmlPassiveAllegati,
     totaleImponibileVenditeEuro,
     totaleIvaVenditeEuro,

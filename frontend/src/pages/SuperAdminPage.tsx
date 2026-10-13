@@ -124,18 +124,33 @@ export function SuperAdminPage() {
   // Creazione Nuovo Tenant
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName || !formEmail) return;
+    // Il responsabile è una persona che il super admin conosce: senza il suo nome l'account che
+    // nasce è intestato a un ruolo, non a qualcuno. Il campo è `required` nel modulo, e questa
+    // è la stessa condizione scritta dove la decisione conta.
+    if (!formName || !formEmail || !formAdvisorNome) return;
 
     const today = new Date();
     const expDate = new Date();
     expDate.setMonth(expDate.getMonth() + Number(formDurataMesi));
 
+    /**
+     * §7 — qui c'erano due valori inventati dal browser:
+     *
+     * - l'**id** dello studio, costruito sul timestamp (`00000000-…-<millisecondi>`) e spedito al
+     *   server, che lo accettava (`id: b.id || undefined`): un identificativo di tenant scelto dal
+     *   client, cioè un dato di piattaforma deciso dal browser;
+     * - la **partita IVA**, `'IT' + Date.now()`, scritta quando il campo era vuoto. Un
+     *   identificativo fiscale fabbricato e salvato in colonna: se sopravvive, finisce su una
+     *   fattura elettronica con l'aria di essere vero.
+     *
+     * L'id lo genera il database, la P.IVA vuota resta vuota: la chiede la guida ai dati
+     * obbligatori, che è il posto in cui risponde una persona.
+     */
     const nuovoStudio = {
-      id: `00000000-0000-0000-0000-${Date.now().toString().padStart(12, '0')}`,
       ragioneSociale: formName,
       giurisdizione: formGiurisdizione,
-      pIva: formPiva || 'IT' + Date.now().toString().substring(0, 9),
-      leadAdvisorNome: formAdvisorNome || 'Lead Senior Advisor',
+      pIva: formPiva,
+      leadAdvisorNome: formAdvisorNome,
       leadAdvisorEmail: formEmail,
       piano: formPiano,
       stato: 'attivo' as const,
@@ -156,15 +171,24 @@ export function SuperAdminPage() {
       return;
     }
 
+    const idCreato: string = typeof creato?.id === 'string' ? creato.id : '';
     const newTenant: TenantStudio = {
       ...nuovoStudio,
-      id: creato?.id || nuovoStudio.id,
+      id: idCreato,
       utentiCount: 1,
       progettiCount: 0,
       fatturatoMensile: 0,
     };
 
-    setTenants([newTenant, ...tenants]);
+    // Lo studio è stato creato, ma senza identificativo non si può mettere in elenco: sarebbe una
+    // riga con i pulsanti di modifica ed eliminazione che non portano a niente, indistinguibile
+    // da uno studio vero. In quel caso si rilegge l'elenco dal server, che è la fonte.
+    if (idCreato) {
+      setTenants([newTenant, ...tenants]);
+    } else {
+      toast.errore('Lo studio è stato creato, ma il server non ha restituito il suo identificativo: rileggo l\'elenco dal server.');
+      caricaStudi();
+    }
     setCreateModalOpen(false);
 
     // Reset Form

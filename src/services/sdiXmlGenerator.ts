@@ -90,8 +90,17 @@ export interface DatiFatturaSdiXml {
 }
 
 export function generaFatturaElettronicaXml(dati: DatiFatturaSdiXml): string {
-  const pivaCedente = dati.cedentePiva || dati.cedenteCodiceFiscale || '00000000000';
-  const cfCedente = dati.cedenteCodiceFiscale || dati.cedentePiva || '00000000000';
+  // Il cedente è lo studio, e i suoi identificativi **non si inventano**: qui c'erano
+  // `'00000000000'` come ripiego della partita IVA e del codice fiscale. Un XML con la P.IVA a zero
+  // non è un documento incompleto, è un documento che dice il falso — e SdI o lo scarta o lo
+  // accetta, mai producendo la fattura dello studio. Ora il campo resta **vuoto**: un `IdCodice`
+  // vuoto è un rifiuto rumoroso e immediato, che è il verso giusto dell'errore. Chi chiama ha già
+  // verificato l'anagrafica con `campiAnagraficaMancanti` (`src/domain/anagraficaStudio.ts`) e
+  // rifiuta prima di arrivare qui: questa è la seconda linea di difesa, non l'unica.
+  const pivaCedente = dati.cedentePiva || dati.cedenteCodiceFiscale || '';
+  // Il codice fiscale di una società italiana coincide spesso con la partita IVA: ripiegare l'uno
+  // sull'altra è legittimo. Ripiegare su zeri non lo era.
+  const cfCedente = dati.cedenteCodiceFiscale || dati.cedentePiva || '';
 
   const cfCessionario = dati.cessionarioCodiceFiscale || dati.cessionarioPiva || '00000000000';
   const pivaCessionario = dati.cessionarioPiva || '';
@@ -128,10 +137,18 @@ export function generaFatturaElettronicaXml(dati: DatiFatturaSdiXml): string {
     `        <Anagrafica>`,
     `          <Denominazione>${escapeXml(dati.cedenteDenominazione)}</Denominazione>`,
     `        </Anagrafica>`,
-    `        <RegimeFiscale>${dati.cedenteRegimeFiscale || 'RF01'}</RegimeFiscale>`,
+    `        <RegimeFiscale>${dati.cedenteRegimeFiscale || ''}</RegimeFiscale>`,
     `      </DatiAnagrafici>`,
     `      <Sede>`,
-    `        <Indirizzo>${escapeXml(dati.cedenteSedeIndirizzo || 'Via Roma 1')}</Indirizzo>`,
+    `        <Indirizzo>${escapeXml(dati.cedenteSedeIndirizzo || '')}</Indirizzo>`,
+    // CAP, Comune e Provincia qui sotto sono **ancora** inventati, e non è una svista: sono campi
+    // obbligatori del blocco `Sede` di FatturaPA, `Tenant.sedeLegale` è una riga di testo libera
+    // (una sola colonna, senza le parti separate) e `mappaturaFatturaSdi` non li valorizza mai —
+    // quindi `'00100'`, `'Roma'` e `'RM'` finiscono in **ogni** XML che questa app produce, anche
+    // in quelli che portano l'indirizzo vero. Toglierli senza sostituirli renderebbe invalido ogni
+    // file; sostituirli bene richiede quattro colonne strutturate (via, CAP, comune, provincia) più
+    // i campi nel form dell'anagrafica. È una decisione a sé, segnalata al titolare: questo commento
+    // resta perché chi legge non creda che l'indirizzo del cedente sia a posto.
     `        <CAP>${escapeXml(dati.cedenteSedeCap || '00100')}</CAP>`,
     `        <Comune>${escapeXml(dati.cedenteSedeComune || 'Roma')}</Comune>`,
     `        <Provincia>${escapeXml(dati.cedenteSedeProvincia || 'RM')}</Provincia>`,

@@ -161,7 +161,9 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
             bic: '',
             bancaNome: '',
             codiceSdi: '',
-            leadAdvisor: found.leadAdvisorNome || 'Lead Senior Advisor',
+            // §7 — qui c'era `found.leadAdvisorNome || 'Lead Senior Advisor'`: senza il nome del
+            // responsabile si stampava un **ruolo** nel campo di una persona. Vuoto è la verità.
+            leadAdvisor: found.leadAdvisorNome || '',
           };
         }
       }
@@ -184,7 +186,9 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
       bic: '',
       bancaNome: '',
       codiceSdi: '',
-      leadAdvisor: 'Lead Senior Advisor',
+      // Nessun nome di responsabile: uno studio di cui non si sa nulla non ha un responsabile
+      // di nome «Lead Senior Advisor». Il campo vuoto dice che manca il dato (regola 7).
+      leadAdvisor: '',
     };
   }
 

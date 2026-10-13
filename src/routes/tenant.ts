@@ -20,6 +20,7 @@ import { numeroSignal, statoSignal } from '../services/signalService.js';
 import { usernameBotTelegram } from '../services/telegramService.js';
 import { inMemoryTenantStore, recordAudit, senzaHash, TENANT_DEFAULT } from '../util/serverHelpers.js';
 import { moduloConcessoAlTenant } from '../util/moduliTenant.js';
+import { campiAnagraficaMancanti } from '../domain/anagraficaStudio.js';
 import { eliminaTenantCompleto } from '../services/eliminazioneTenant.js';
 import { disattivaCollaboratore, riattivaCollaboratore, apriPeriodoIniziale } from '../services/periodiCollaborazione.js';
 import {
@@ -216,6 +217,23 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     const concessi = chiaviModulo(t?.moduliConcessi);
     const disattivati = chiaviModulo(t?.moduliDisattivati);
     return { concessi, disattivati, attivi: concessi.filter((k) => !disattivati.includes(k)) };
+  });
+
+  /**
+   * I dati dell'anagrafica dello studio che mancano, per la guida in-app e per il controllo che
+   * rifiuta di comporre un documento fiscale inventando i valori (`src/domain/anagraficaStudio.ts`).
+   *
+   * `letto: false` quando la riga non si è potuta leggere: è la differenza fra «so che manca la
+   * P.IVA» e «non ho potuto guardare», e la guida si mostra solo nel primo caso. Un guasto di
+   * lettura non è un'anagrafica vuota — è la stessa distinzione che `!apiDisponibile` fa nel
+   * frontend, e senza di essa un errore del database si presenterebbe all'operatore come «devi
+   * compilare sei campi».
+   */
+  server.get('/tenant/anagrafica', async (req) => {
+    const t = await prisma.tenant.findUnique({ where: { id: req.tenantId } }).catch(() => null);
+    if (!t) return { letto: false, completa: false, mancanti: [] };
+    const mancanti = campiAnagraficaMancanti(t as unknown as Record<string, unknown>);
+    return { letto: true, completa: mancanti.length === 0, mancanti };
   });
 
   server.patch<{ Body: { chiave?: string; attivo?: boolean } }>('/tenant/moduli', async (req, reply) => {
@@ -1043,7 +1061,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         ragioneSociale: t.ragioneSociale,
         giurisdizione: t.giurisdizione || 'Italia',
         pIva: t.piva || '',
-        leadAdvisorNome: t.leadAdvisorNome || 'Lead Senior Advisor',
+        // §7 — qui c'era `t.leadAdvisorNome || 'Lead Senior Advisor'`: non il nome di una persona
+        // ma un **ruolo**, mostrato all'elenco studi come se fosse il responsabile di quello
+        // studio. Vuoto quando il dato non c'è (il modulo di creazione lo chiede obbligatorio).
+        leadAdvisorNome: t.leadAdvisorNome || '',
         leadAdvisorEmail: t.leadAdvisorEmail || t.email || '',
         // `leadAdvisorPassword` non viene più restituito: era la password in chiaro del
         // responsabile dello studio, con `'Studio2026!'` come ripiego quando la colonna
@@ -1118,7 +1139,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
             await prisma.user.create({
               data: {
                 email: emailResponsabile,
-                nome: b.leadAdvisorNome || 'Lead Senior Advisor',
+                // §7 — qui c'era `b.leadAdvisorNome || 'Lead Senior Advisor'`: nel campo `nome` di
+                // una persona finiva un ruolo, e da lì passava nelle intestazioni dei documenti.
+                // Senza il nome si ripiega sull'email, che è comunque **sua**: il modulo la chiede
+                // obbligatoria insieme al nome, quindi questa riga copre solo le chiamate dirette.
+                nome: b.leadAdvisorNome || emailResponsabile,
                 ruolo: 'advisor',
                 tenantId: tenant.id,
                 specializzazione: `Lead Partner — ${tenant.ragioneSociale}`,
