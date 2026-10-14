@@ -21,3 +21,5 @@ export * from './fornitori';
 export * from './liquidazioneIva';
 export * from './solleciti';
 export * from './cache';
+// Help in-app: le schede di `docs/manuale/`, servite dal backend come JSON.
+export * from './manuale';

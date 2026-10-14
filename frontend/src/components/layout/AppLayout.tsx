@@ -27,6 +27,9 @@ const TITLES: Record<string, string> = {
   '/archivio':  'Archivio Documentale',
   '/audit':     'Log Audit Studio',
   '/timesheet': 'Timesheet Settimanale Ore',
+  // Senza questa riga la barra in alto direbbe «BluMan», cioè il nome dell'app al posto del nome
+  // della pagina.
+  '/aiuto':     'Aiuto',
 };
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
@@ -166,7 +169,12 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
     return chiudi;
   }, []);
 
-  const title = TITLES[location.pathname] || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : 'BluMan');
+  // `TITLES` è a corrispondenza esatta, quindi le pagine con un parametro nel percorso hanno il
+  // loro ramo: `/aiuto/05-fatture-sdi` è una scheda, e nella barra in alto si chiama «Aiuto».
+  const title = TITLES[location.pathname]
+    || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : null)
+    || (location.pathname.startsWith('/aiuto/') ? 'Aiuto' : null)
+    || 'BluMan';
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAllRead = async () => {

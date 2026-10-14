@@ -1,0 +1,406 @@
+/* ❓ Aiuto — il manuale dentro l'app.
+ *
+ * Questo file non è decorazione: è la metà leggibile del compito. Le schede di `docs/manuale/` sono
+ * scritte a capo a ~100 colonne e hanno una struttura precisa (una 👤, una 📐, una 🔗, una ✍️, una
+ * ⚠️ e — per pochi — una 🔧); mostrarle a piena larghezza con i titoli appiccicati al paragrafo
+ * successivo le farebbe sembrare quello che non sono. Quattro scelte valgono più delle altre:
+ *
+ * 1. **la misura del testo** (`max-width: 76ch`). È la riga che rende leggibile il resto: oltre le
+ *    ~90 battute l'occhio perde il ritorno a capo e si legge più lentamente, anche se il carattere
+ *    è lo stesso;
+ * 2. **l'aria sopra i titoli, non sotto.** Un titolo con lo stesso spazio sopra e sotto sembra
+ *    appartenere a metà a quello che precede; con più spazio sopra, il titolo si attacca alla sua
+ *    sezione e si scorre la pagina leggendo solo i titoli;
+ * 3. **le tabelle respirano.** Le schede che ne hanno (§16, e l'indice del README) le usano per
+ *    elenchi di campi e valori: con le celle strette diventano un muro;
+ * 4. **il tema non si inventa qui.** Tutti i colori sono i token di `styles/tokens.css`, perché il
+ *    chiaro/scuro è già un interruttore dell'app e un colore scritto a mano qui dentro sarebbe
+ *    quello che resta indietro.
+ *
+ * Sotto la soglia mobile la seconda colonna sparisce e l'indice diventa un pannello richiudibile:
+ * su un telefono due colonne sarebbero due colonne da 20 caratteri.
+ */
+
+.pagina {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+/* ── La colonna dell'indice ─────────────────────────────────────────── */
+
+.colonnaIndice {
+  /* `sticky` e non `fixed`: l'indice resta accanto alla scheda mentre si scorre, senza uscire dal
+     flusso. Il tetto di altezza è quello che gli permette di scorrere da solo quando le schede
+     diventano venti, invece di allungare la pagina. */
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.intestazioneIndice {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.titoloIndice {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+/* Visibile solo sotto la soglia mobile, dove l'indice si apre e si chiude. */
+.pulsanteIndice {
+  display: none;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.campoRicerca {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-family: inherit;
+}
+
+.campoRicerca:focus {
+  outline: none;
+  border-color: var(--indigo);
+}
+
+.elencoSchede {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.conteggio {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 4px 2px 8px;
+  line-height: 1.4;
+}
+
+.voce {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 8px 8px 0;
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.voce:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.voceAttiva {
+  background: var(--surface-2);
+  border-left-color: var(--indigo);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.voceTitolo {
+  display: block;
+}
+
+/* Il numero in cifre tabellari e in un colore spento: allinea le voci fra loro senza rubare
+   l'occhio al titolo, che è quello che si legge per scegliere. */
+.numero {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.lucchetto {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+/* Il rigo che ha trovato la ricerca. È il motivo per cui i risultati non sono solo titoli: senza,
+   per sapere se una scheda è quella giusta bisognerebbe aprirla. */
+.estratto {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ── La colonna della scheda ────────────────────────────────────────── */
+
+.colonnaScheda {
+  min-width: 0;
+}
+
+.attesa {
+  color: var(--muted);
+  font-size: 13.5px;
+  padding: 10px 0;
+}
+
+.avviso {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  max-width: 76ch;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.avvisoTitolo {
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.notaRiservata {
+  background: var(--pill-amber-bg);
+  border-radius: 9px;
+  padding: 9px 13px;
+  margin-bottom: 18px;
+  font-size: 12.5px;
+  color: var(--text);
+  max-width: 76ch;
+}
+
+/* ── Il testo della scheda ──────────────────────────────────────────── */
+
+.testo {
+  /* La riga che conta più di tutte: vedi il punto 1 in testa al file. `76ch` è una misura comoda
+     per un testo argomentativo, e le schede sono testo argomentativo. */
+  max-width: 76ch;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.testo > :first-child { margin-top: 0; }
+.testo > :last-child { margin-bottom: 0; }
+
+/* Il titolo della scheda è il titolo della pagina: la riga sotto lo stacca dal resto senza
+   aggiungere un riquadro. */
+.testo h1 {
+  font-size: 26px;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Punto 2: più spazio sopra che sotto, così il titolo appartiene a quello che segue. */
+.testo h2 {
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 700;
+  margin: 36px 0 10px;
+}
+
+.testo h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  margin: 26px 0 8px;
+}
+
+.testo h4,
+.testo h5,
+.testo h6 {
+  font-size: 12.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin: 20px 0 6px;
+}
+
+.testo p {
+  margin: 0 0 1em;
+}
+
+.testo strong { font-weight: 700; }
+
+.testo a {
+  color: var(--indigo);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.testo hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 28px 0;
+}
+
+/* ── Elenchi ────────────────────────────────────────────────────────── */
+
+.testo ul,
+.testo ol {
+  margin: 0 0 1em;
+  padding-left: 1.35em;
+}
+
+.testo ul { list-style: disc; }
+.testo ul ul { list-style: circle; }
+.testo ol { list-style: decimal; }
+
+.testo li { margin-bottom: 0.45em; }
+
+/* Un sotto-elenco sta **dentro** il suo punto: lo spazio in alto lo tiene attaccato al genitore
+   invece di farlo sembrare un elenco nuovo. */
+.testo li > ul,
+.testo li > ol {
+  margin: 0.45em 0 0;
+}
+
+.testo li::marker { color: var(--muted); }
+
+/* ── Tabelle (punto 3) ──────────────────────────────────────────────── */
+
+.testo table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1.3em;
+  font-size: 13.5px;
+}
+
+.testo th {
+  text-align: left;
+  vertical-align: bottom;
+  font-weight: 700;
+  padding: 9px 12px;
+  border-bottom: 2px solid var(--border);
+  color: var(--text);
+}
+
+.testo td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.testo tbody tr:last-child td { border-bottom: 0; }
+.testo tbody tr:hover { background: var(--surface-2); }
+
+/* ── Codice ─────────────────────────────────────────────────────────── */
+
+.testo code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.testo pre {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0 0 1.3em;
+  overflow-x: auto;
+}
+
+/* Dentro un blocco il `code` non porta la sua cornice: due bordi annidati si vedono. */
+.testo pre code {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* ── Citazioni ──────────────────────────────────────────────────────── */
+
+.testo blockquote {
+  margin: 0 0 1.3em;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--indigo);
+  color: var(--text-muted);
+}
+
+.testo blockquote p { margin: 0; }
+
+/* ── Mobile: una colonna sola ───────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .pagina {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .colonnaIndice {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .pulsanteIndice { display: block; }
+
+  /* Chiuso per difetto: su un telefono l'elenco delle diciannove schede occuperebbe tutto lo
+     schermo, e la scheda — che è quello che si è venuti a leggere — comincerebbe sotto la piega. */
+  .elencoSchede,
+  .campoRicerca {
+    display: none;
+  }
+
+  .indiceAperto .elencoSchede,
+  .indiceAperto .campoRicerca {
+    display: flex;
+  }
+
+  .indiceAperto .elencoSchede {
+    max-height: 52vh;
+  }
+
+  .testo { font-size: 15.5px; }
+  .testo h1 { font-size: 22px; }
+
+  /* Le tabelle sono l'unica cosa che su un telefono non si può impaginare: invece di farle
+     uscire dallo schermo, si lasciano scorrere di lato dentro il proprio riquadro. */
+  .testo table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

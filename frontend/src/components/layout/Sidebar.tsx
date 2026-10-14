@@ -26,6 +26,10 @@ const NAV = [
   { path: '/audit',      moduleKey: 'audit',       label: 'Log Audit Studio',       icon: '📋' },
   { path: '/library',    moduleKey: 'library',     label: 'Libreria moduli',        icon: '📚' },
   { path: '/settings',   moduleKey: 'settings',    label: 'Impostazioni',           icon: '⚙️' },
+  // Il manuale in-app (§docs/manuale). `moduleKey: 'settings'` è una scelta, non una svista: le
+  // schede spiegano anche le sezioni, quindi l'aiuto non può essere spento dal modulo che spiega —
+  // sarebbe come chiudersi la porta alle spalle. La voce non è un modulo e non si nega.
+  { path: '/aiuto',      moduleKey: 'settings',    label: 'Aiuto',                  icon: '❓' },
 ];
 
 interface SidebarProps {
@@ -55,6 +59,10 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
   const navItems = baseItems.filter(item => {
     if (item.path === '/') return true;
     if (item.path === '/admin/tenants') return isSuperAdmin;
+    // L'aiuto non è un modulo: non ha una voce nella matrice permessi e non c'è niente da
+    // disattivare. L'eccezione è esplicita per lo stesso motivo di `/` — un `moduleKey` messo lì
+    // per far contento il filtro è una decisione che poi nessuno ritrova.
+    if (item.path === '/aiuto') return true;
     // Standby moduli deciso dallo studio (Impostazioni non si disattiva, per non chiudersi fuori).
     if (item.moduleKey !== 'settings' && disattivati.includes(item.moduleKey)) return false;
     const perm = getUserPermission(user, item.moduleKey);

@@ -10,6 +10,46 @@ Ogni scheda è su **due livelli**, così serve sia a chi usa lo studio sia a chi
 
 Convenzioni: 📐 calcoli/logica · 🔗 collegamenti ad altri moduli · ✍️ firma · ⚙️ impostazioni · ⚠️ stati limite/errori.
 
+## Come si legge dentro l'app
+Queste schede **sono** l'aiuto in-app: l'app le legge da qui a runtime e le mostra in **❓ Aiuto**
+(`/aiuto`), con l'indice a sinistra e la ricerca nel testo. Non c'è una seconda copia da tenere
+allineata: si modifica il `.md`, si rilascia, e la pagina cambia. La regola in fondo a questo file
+vale quindi due volte.
+
+**Chi vede cosa.** Tutti i ruoli autenticati vedono 👤 📐 🔗 ✍️ ⚙️ ⚠️. Restano al `super_admin`:
+
+- tutto ciò che sta da `## 🔧 Nota tecnica` **in giù** — per questo quel titolo va **sempre per
+  ultimo**: è il punto in cui il testo viene tagliato per gli altri ruoli;
+- **l'intera scheda `19-infra-deploy.md`** (indirizzo del VPS, backup, nginx): è il manuale
+  dell'operatore della piattaforma, non dello studio. L'elenco delle schede riservate è
+  `SCHEDE_RISERVATE` in `src/domain/manuale.ts`, ed è esplicito, non dedotto dai titoli — la §19 apre
+  con `## 👤`, quindi un filtro per titolo la lascerebbe passare.
+
+A un `advisor` la §19 non compare nell'indice e il suo URL risponde **403**; il testo delle schede
+riservate non lascia il server, quindi non è indicizzato nemmeno dalla ricerca.
+
+**Una scheda nuova compare da sola.** Basta che il file si chiami `NN-nome.md` (due cifre, trattino,
+minuscole, estensione `.md`) in questa cartella: l'indice, l'ordine e la ricerca si aggiornano da
+soli. Il titolo mostrato è il primo `# ` del file. Questo `README.md` invece **non** entra nell'app:
+è l'indice di chi scrive, e le sezioni in fondo sono istruzioni, non aiuto per lo studio.
+
+**Come si scrive** (le forme che il convertitore rende): titoli da `#` a `######`, `**grassetto**`,
+`*corsivo*` — **solo con l'asterisco**, mai con il trattino basso, perché `moduliConcessi` non deve
+diventare corsivo —, il codice fra apici inversi (una parola, oppure un blocco delimitato da tre
+apici su una riga propria), tabelle con le barre verticali, elenchi con il trattino o con i numeri
+(annidati di due spazi), citazioni con il segno di maggiore, e una riga di trattini per la
+separazione. I righi a capo consecutivi di un paragrafo diventano un paragrafo solo (le schede sono
+scritte a capo a ~100 colonne, e sarebbero una scaletta). **I link in forma markdown non sono
+resi**: restano testo, quindi nel dubbio si scrive il percorso nudo. I `§NN` sono rimandi **fra
+schede** solo quando il numero è quello di una scheda: altrove sono sezioni del codice, e restano
+testo — non diventano link da soli.
+
+Due trappole della scrittura, che non danno errore ma si vedono a schermo: il trattino basso **non**
+è corsivo (apposta: `moduliDisattivati` è una colonna, non due parole in enfasi), e gli apici
+inversi vanno **sempre in coppia** — uno spaiato si accoppia con il successivo dello stesso blocco e
+si porta dentro il testo che sta in mezzo, che quindi sparisce dal paragrafo. Un blocco di codice
+**non** si può citare dentro una riga di testo: si descrive a parole.
+
 ## Panoramica di BluMan
 **Cos'è**: ERP multitenant per studi di consulenza/commercialisti (Malta + Italia) — pratiche,
 contabilità, documenti con firma, compliance KYC/AML, portale cliente.

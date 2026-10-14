@@ -91,6 +91,9 @@ import { registraRotteFirma } from './routes/firma.js';
 // Rotte notifiche (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteNotifiche } from './routes/notifiche.js';
+// L'aiuto in-app: le schede di `docs/manuale/` servite all'app (JSON, mai HTML —
+// vedi l'intestazione di src/routes/manuale.ts).
+import { registraRotteManuale } from './routes/manuale.js';
 // Rotte webhook comunicazioni (split dei monoliti): la registrazione avviene
 // dentro il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteWebhooks } from './routes/webhooks.js';
@@ -646,6 +649,11 @@ export function buildServer(app: AppPort): FastifyInstance {
   // Rotte estratte in src/routes/tenant.ts (split dei monoliti): stessa identica
   // registrazione, sempre dentro questo wrapper.
   await registraRotteTenant(server);
+
+  // ─── AIUTO IN-APP (docs/manuale/) ─────────────────────────────────
+  // Dopo `registraRotteAuth`, che è l'hook che mette `req.ruolo` a disposizione:
+  // il filtro per ruolo delle schede riservate legge da lì.
+  await registraRotteManuale(server);
 
   // Audit Logs API (Isolato per Tenant): rotte GET/POST /audit-logs estratte in
   // src/routes/tenant.ts, registrate in coda alla sezione tenant.
