@@ -6,6 +6,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
+import { recordAudit } from '../util/serverHelpers.js';
+import { saldoContoCentesimi } from '../domain/saldoConto.js';
 import { costruisciReport, REPORT_DISPONIBILI, type ChiaveReport } from '../services/reportsService.js';
 import { generaPdfReport, generaExcelReport } from '../services/reportExport.js';
 
@@ -18,7 +20,53 @@ export async function registraRotteContabilitaContiReport(server: FastifyInstanc
         where: { tenantId },
         orderBy: { isDefault: 'desc' },
       });
-      return reply.send(conti);
+
+      // Il saldo si **ricava** dai movimenti (`domain/saldoConto.ts`): è la regola che il manuale
+      // (§07) già dichiarava e che la colonna `saldoAttuale` imitava a mano. Qui la copia viene
+      // verificata a ogni lettura, ed è l'unico posto che può accorgersi che un percorso di
+      // scrittura l'ha dimenticata — cioè che il conto dice il falso. I movimenti sono la verità:
+      // è il loro totale che si risponde, non quello memorizzato.
+      const sommePerConto = await prisma.movimentoPrimaNota.groupBy({
+        by: ['contoBancarioId', 'tipo'],
+        where: { tenantId, contoBancarioId: { not: null } },
+        _sum: { importoCentesimi: true },
+      });
+
+      const conSaldo = conti.map((conto) => {
+        const movimenti = sommePerConto
+          .filter((s) => s.contoBancarioId === conto.id)
+          .map((s) => ({ tipo: s.tipo, importoCentesimi: s._sum.importoCentesimi ?? 0 }));
+        const saldoCalcolato = saldoContoCentesimi(conto.saldoIniziale, movimenti);
+        return { conto, saldoCalcolato, memorizzato: conto.saldoAttuale };
+      });
+
+      const divergenti = conSaldo.filter((c) => c.saldoCalcolato !== c.memorizzato);
+      for (const d of divergenti) {
+        try {
+          await prisma.contoBancario.update({
+            where: { id: d.conto.id },
+            data: { saldoAttuale: d.saldoCalcolato },
+          });
+          await recordAudit({
+            tenantId,
+            userId: req.userId,
+            ruolo: req.ruolo,
+            azione: 'SALDO_CONTO_RICONCILIATO',
+            entita: d.conto.nomeConto,
+            dettagli:
+              `Saldo del conto riportato ai movimenti: da €${(d.memorizzato / 100).toFixed(2)} ` +
+              `a €${(d.saldoCalcolato / 100).toFixed(2)} (differenza di €${((d.saldoCalcolato - d.memorizzato) / 100).toFixed(2)})`,
+            ipAddress: req.ip,
+          });
+        } catch {
+          // La riparazione è manutenzione, la lettura è il servizio: se la copia non si aggiorna,
+          // la pagina mostra comunque il saldo vero e il prossimo accesso ci riprova. Far fallire
+          // la lettura per non essere riusciti ad aggiornare una copia nasconderebbe il numero
+          // giusto, che è l'unica cosa che l'operatore è venuto a vedere.
+        }
+      }
+
+      return reply.send(conSaldo.map((c) => ({ ...c.conto, saldoAttuale: c.saldoCalcolato })));
     } catch (err: any) {
       return reply.code(500).send({ errore: err?.message || 'Errore lettura conti bancari' });
     }

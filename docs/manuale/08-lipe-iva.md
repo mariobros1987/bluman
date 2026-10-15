@@ -6,7 +6,8 @@ prospetto **F24**.
 - Scegli il **periodo** (mensile o trimestrale); vedi la **simulazione live** di IVA a debito/credito
   e i **codici tributo** F24.
 - **Salvi** la liquidazione e, quando versi, la marchi **versata**: il pagamento F24 registra in
-  automatico il movimento in **Prima Nota** (§07).
+  automatico il movimento in **Prima Nota** (§07) e, se indichi il conto, ne muove anche il saldo:
+  l'IVA versata esce dal conto come esce dalla cassa.
 
 ## 📐 Calcoli & logica
 - Motore deterministico `lipeEngine` conforme **DPR 633/72**: aggregazione mensile/trimestrale,

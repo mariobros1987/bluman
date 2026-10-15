@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { AppPort } from '../services/appPort.js';
 import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/prismaClient.js';
 import { notificaStudio, notificaCliente } from '../services/notificheService.js';
+import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { RegistraIncassoSchema } from '../schemas/contabilita.schema.js';
 import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
@@ -141,12 +142,27 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                 data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
               });
 
-              // 4. Generazione Movimento Automatico in Prima Nota (OpenSTAManager Engine)
-              const targetContoId = contoBancarioId || scadenza.fattura.contoAccreditoId;
-              await tx.movimentoPrimaNota.create({
+              // 4. Il conto su cui entra il denaro, deciso **una volta sola** — e poi usato sia dal
+              // movimento sia dal saldo. Prima il movimento prendeva `contoBancarioId` della
+              // fattura (che può essere nullo) e il saldo, quando quello mancava, finiva sul conto
+              // predefinito: il denaro entrava in un conto che nessuna riga nominava.
+              const contoIncasso =
+                contoBancarioId ||
+                scadenza.fattura.contoAccreditoId ||
+                (
+                  await tx.contoBancario.findFirst({
+                    where: { tenantId, isDefault: true },
+                    select: { id: true },
+                  })
+                )?.id ||
+                null;
+
+              // 5. Movimento in Prima Nota e accredito del saldo: un atto solo
+              // (`services/primaNotaMovimento.ts`).
+              await creaMovimentoConSaldo(tx, {
                 data: {
                   tenantId,
-                  contoBancarioId: targetContoId || null,
+                  contoBancarioId: contoIncasso,
                   fatturaId: scadenza.fatturaId,
                   clienteId: scadenza.fattura.clienteId,
                   tipo: 'entrata',
@@ -158,24 +174,6 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                   note: noteOperatore || null,
                 },
               });
-
-              // 5. Accredito Saldo Conto Bancario
-              if (targetContoId) {
-                await tx.contoBancario.update({
-                  where: { id: targetContoId },
-                  data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
-                });
-              } else {
-                const contoPredefinito = await tx.contoBancario.findFirst({
-                  where: { tenantId, isDefault: true },
-                });
-                if (contoPredefinito) {
-                  await tx.contoBancario.update({
-                    where: { id: contoPredefinito.id },
-                    data: { saldoAttuale: { increment: importoIncassatoCentesimi } },
-                  });
-                }
-              }
 
               return { registrazione, tutteSaldate, scadenza };
             }),

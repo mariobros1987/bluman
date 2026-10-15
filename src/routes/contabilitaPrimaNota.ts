@@ -7,6 +7,10 @@ import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import {
+  creaMovimentoConSaldo,
+  eliminaMovimentoEStornaSaldo,
+} from '../services/primaNotaMovimento.js';
 import { CreaMovimentoPrimaNotaSchema } from '../schemas/contabilita.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 
@@ -187,7 +191,10 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
     const body = parseResult.data;
 
     try {
-      const movimento = await prisma.movimentoPrimaNota.create({
+      // Movimento e saldo del conto si scrivono insieme (`services/primaNotaMovimento.ts`): le due
+      // chiamate separate di prima potevano restare a metà, e il saldo era quello che restava
+      // indietro senza che nessuno se ne accorgesse.
+      const movimento = await creaMovimentoConSaldo(prisma, {
         data: {
           tenantId,
           contoBancarioId: body.contoBancarioId || null,
@@ -205,15 +212,6 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
         },
         include: { contoBancario: true, cliente: true, fornitore: true },
       });
-
-      // Aggiorna saldo conto bancario
-      if (body.contoBancarioId) {
-        const delta = body.tipo === 'entrata' ? body.importoCentesimi : -body.importoCentesimi;
-        await prisma.contoBancario.update({
-          where: { id: body.contoBancarioId },
-          data: { saldoAttuale: { increment: delta } },
-        });
-      }
 
       await recordAudit({
         tenantId,
@@ -298,7 +296,11 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
         // Matching automatico cliente
         const matchedClient = clienti.find((c) => rawDesc.toLowerCase().includes(c.nome.toLowerCase()));
 
-        const m = await prisma.movimentoPrimaNota.create({
+        // Movimento e saldo si scrivono insieme anche qui: l'import creava i movimenti sul conto
+        // scelto senza toccare alcun saldo, quindi il conto restava indietro di tutto l'estratto
+        // conto importato. Senza conto scelto il movimento resta non attribuito e nessun saldo si
+        // muove — l'import non sceglie una banca al posto dell'operatore.
+        const m = await creaMovimentoConSaldo(prisma, {
           data: {
             tenantId,
             contoBancarioId: contoBancarioId || null,
@@ -357,16 +359,8 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
       });
       if (!movimento) return reply.code(404).send({ errore: 'Movimento non trovato' });
 
-      // Storno saldo conto bancario
-      if (movimento.contoBancarioId) {
-        const delta = movimento.tipo === 'entrata' ? -movimento.importoCentesimi : movimento.importoCentesimi;
-        await prisma.contoBancario.update({
-          where: { id: movimento.contoBancarioId },
-          data: { saldoAttuale: { increment: delta } },
-        });
-      }
-
-      await prisma.movimentoPrimaNota.delete({ where: { id } });
+      // Storno del saldo e cancellazione sono un atto solo (`services/primaNotaMovimento.ts`).
+      await eliminaMovimentoEStornaSaldo(prisma, movimento);
 
       return reply.send({ ok: true, message: 'Movimento eliminato con successo' });
     } catch (err: any) {

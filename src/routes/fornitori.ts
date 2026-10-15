@@ -10,6 +10,7 @@ import {
   PagaFatturaRicevutaSchema,
 } from '../schemas/fornitori.schema.js';
 import { parseXmlFatturaPassiva } from '../services/fatturaPassivaParser.js';
+import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 
 export async function registraRotteFornitori(server: FastifyInstance): Promise<void> {
   // ─── ANAGRAFICA FORNITORI ──────────────────────────────────────────
@@ -242,9 +243,11 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         include: { fornitore: true },
       });
 
-      // Se pagata e richiesto, registriamo l'uscita in Prima Nota
+      // Se pagata e richiesto, registriamo l'uscita in Prima Nota — e con essa il saldo del conto
+      // (`services/primaNotaMovimento.ts`): un pagamento che non muove il saldo lascia il conto
+      // pieno di denaro che è uscito.
       if (pagata && registraMovimentoPrimaNota) {
-        await prisma.movimentoPrimaNota.create({
+        await creaMovimentoConSaldo(prisma, {
           data: {
             tenantId,
             fatturaRicevutaId: fatturaRicevuta.id,
@@ -389,8 +392,8 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         include: { fornitore: true },
       });
 
-      // 2. Creiamo registrazione di uscita in Prima Nota
-      const movimentoPrimaNota = await prisma.movimentoPrimaNota.create({
+      // 2. Creiamo registrazione di uscita in Prima Nota, e insieme muoviamo il saldo del conto
+      const movimentoPrimaNota = await creaMovimentoConSaldo(prisma, {
         data: {
           tenantId,
           fatturaRicevutaId: fattura.id,

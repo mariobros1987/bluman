@@ -15,8 +15,20 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 ## 📐 Calcoli & logica
 - Ogni movimento ha **segno** (entrata/uscita), importo in centesimi, categoria (`incasso_fattura`,
   ecc.) ed eventuale collegamento a `fattura`/`fatturaRicevuta`/cliente/fornitore.
-- Il saldo si ricava dai movimenti; la riconciliazione confronta le righe importate con i movimenti
-  registrati.
+- **Il saldo di un conto si ricava dai suoi movimenti**: `saldo iniziale + entrate − uscite`. Non è
+  un numero conservato a parte — è il totale di quello che il conto ha registrato. Un movimento
+  **senza conto** non entra nel saldo di nessuna banca, e resta visibile in Prima Nota come non
+  attribuito: è la differenza tra «non so dove sia questo denaro» e «l'ho messo io nella banca X».
+- **Il conto di un incasso si decide una volta sola**: quello scelto da chi registra l'incasso, o in
+  mancanza quello di **accredito della fattura**, o in mancanza il conto **predefinito** dello
+  studio. Il movimento in Prima Nota e il saldo nominano **lo stesso** conto, sempre: se il denaro
+  entra in una banca, la riga che lo registra lo dice.
+- **Il saldo memorizzato è una copia, e viene verificata**: aprendo la pagina dei conti l'app
+  ricalcola il saldo dai movimenti e, se la copia non torna, la riporta al valore vero e lo annota
+  nel **registro attività** (voce `SALDO_CONTO_RICONCILIATO`, con il nome del conto e i due
+  importi). Se il registro mostra una voce così, un percorso aveva dimenticato di aggiornare il
+  saldo: il numero mostrato è comunque quello giusto, perché viene dai movimenti.
+- La riconciliazione confronta le righe importate con i movimenti registrati.
 - Cancellando una fattura collegata, il movimento **non** sparisce: la FK va a `null` (SetNull), il
   movimento resta come riga di prima nota.
 - **Forme accettate nell'import**: la data come `2026-10-15` (ISO) o `15/10/2026`; l'importo con la
@@ -39,8 +51,19 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 ## 🔧 Nota tecnica
 - Rotte: `src/routes/contabilitaPrimaNota.ts` — `GET /prima-nota`, `POST /prima-nota` (movimento),
   `POST /prima-nota/import-csv` (riconciliazione), `DELETE /prima-nota/:id`. I conti bancari hanno il
-  proprio prefisso `/conti-bancari`.
-- Frontend: `pages/PrimaNotaPage.tsx`.
+  proprio prefisso `/conti-bancari` (`src/routes/contabilitaContiReport.ts`, che è anche l'unica
+  lettura che verifica la copia del saldo).
+- **Movimento e saldo si scrivono in un posto solo**: `src/services/primaNotaMovimento.ts`
+  (`creaMovimentoConSaldo`, `eliminaMovimentoEStornaSaldo`). Ci passano tutti i dieci percorsi che
+  scrivono in Prima Nota — incasso rata, versamento F24, registrazione e saldo di fattura passiva,
+  import CSV, movimento manuale, cancellazione, rimborso per Nota di Credito. La definizione del
+  saldo è in `src/domain/saldoConto.ts` (`deltaSaldoCentesimi`, `saldoContoCentesimi`).
+  `src/primaNotaSaldoCoerenza.test.ts` tiene l'elenco **chiuso**: solo quel servizio può creare o
+  cancellare un movimento, e solo quel servizio e la lettura dei conti possono nominare la colonna
+  del saldo. È il presidio che vale per il percorso che non è ancora stato scritto — sei su dieci
+  lasciavano il saldo indietro, e nessuno dei sei faceva rumore.
+- Frontend: `pages/PrimaNotaPage.tsx`, `pages/BanksPage.tsx` (liquidità complessiva e saldo per conto).
 - Schema: `MovimentoPrimaNota` (`tipo`, `categoria`, `importoCentesimi`, FK `fattura`/`fatturaRicevuta`/
-  `cliente`/`fornitore` a SetNull), `ContoBancario`.
+  `cliente`/`fornitore` a SetNull), `ContoBancario` (`saldoIniziale` è un dato, `saldoAttuale` una
+  copia verificata).
 - Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

@@ -12,6 +12,7 @@ import {
   SalvaLipeSchema,
   MarcaVersataLipeSchema,
 } from '../schemas/liquidazioneIva.schema.js';
+import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 
 export async function registraRotteLiquidazioneIva(server: FastifyInstance): Promise<void> {
   // GET /liquidazione-iva — Elenco liquidazioni registrate
@@ -232,7 +233,10 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
 
       let movimentoPrimaNota = null;
       if (registraPrimaNota && lipe.saldoCentesimi > 0) {
-        movimentoPrimaNota = await prisma.movimentoPrimaNota.create({
+        // Il versamento F24 è denaro che esce: anche qui movimento e saldo sono un atto solo
+        // (`services/primaNotaMovimento.ts`). Prima nasceva solo il movimento, quindi il conto
+        // restava pieno dell'IVA che era stata versata.
+        movimentoPrimaNota = await creaMovimentoConSaldo(prisma, {
           data: {
             tenantId,
             contoBancarioId: contoBancarioId || null,

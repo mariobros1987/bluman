@@ -14,7 +14,12 @@ import { leggiImporto, leggiData } from './routes/contabilitaPrimaNota.js';
 // `vi.mock` è issato in cima al file, quindi una `const` normale non esiste ancora quando la
 // fabbrica gira: `vi.hoisted` la issa insieme al mock. È il modo giusto di condividere una spia
 // con la fabbrica, non quello di spostare la `const` più in alto — che non basterebbe.
-const { createMovimento } = vi.hoisted(() => ({ createMovimento: vi.fn() }));
+const { createMovimento, aggiornaSaldo } = vi.hoisted(() => ({
+  createMovimento: vi.fn(),
+  // Il parametro si dichiara anche se il finto non lo usa: senza, `mock.calls[0]` sarebbe la tupla
+  // vuota e i test non potrebbero leggere l'incremento scritto — cioè la cosa da verificare.
+  aggiornaSaldo: vi.fn(async (_args: any) => ({})),
+}));
 createMovimento.mockImplementation(async (args: any) => ({ id: `mv-${args.data.riferimentoTransazione}`, ...args.data }));
 
 vi.mock('./util/prismaClient.js', () => ({
@@ -38,7 +43,7 @@ vi.mock('./util/prismaClient.js', () => ({
       findUnique: vi.fn(async () => ({ id: 't-1', moduliDisattivati: [] })),
       findFirst: vi.fn(async () => ({ id: 't-1', moduliDisattivati: [] })),
     },
-    contoBancario: { update: vi.fn(async () => ({})) },
+    contoBancario: { update: aggiornaSaldo },
     // La matrice dei permessi per modulo. `null` = nessuna riga, quindi si applica il default per
     // ruolo (che per un advisor su `primanota` è `write`). Il mock deve esistere comunque: senza,
     // la verifica *lancia*, e il fail-closed ripiega sul default — funziona, ma riempie l'uscita
@@ -153,9 +158,10 @@ describe('leggiData', () => {
 describe('POST /prima-nota/import-csv', () => {
   beforeEach(() => {
     createMovimento.mockClear();
+    aggiornaSaldo.mockClear();
   });
 
-  async function importa(csvContent: string) {
+  async function importa(csvContent: string, contoBancarioId?: string) {
     const { buildServer } = await import('./server.js');
     const { signJwt } = await import('./util/jwt.js');
     const server = buildServer({} as any);
@@ -171,7 +177,7 @@ describe('POST /prima-nota/import-csv', () => {
       method: 'POST',
       url: '/prima-nota/import-csv',
       headers: { authorization: `Bearer ${token}` },
-      payload: { csvContent },
+      payload: contoBancarioId ? { csvContent, contoBancarioId } : { csvContent },
     });
     return res;
   }
@@ -257,5 +263,37 @@ describe('POST /prima-nota/import-csv', () => {
     expect(body.scartate).toHaveLength(1);
     expect(body.scartate[0].riga).toBe(1);
     expect(body.scartate[0].contenuto).toContain('Data;Causale');
+  });
+
+  it('muove il saldo del conto scelto, con il segno di ogni riga', async () => {
+    // L'import creava i movimenti sul conto indicato e non toccava alcun saldo: il conto restava
+    // indietro di tutto l'estratto conto importato, e l'unico modo di accorgersene era rifare il
+    // conto a mano. Le due righe hanno versi opposti perché il segno è la metà del risultato.
+    const res = await importa(
+      ['2026-09-01;Bonifico da Alpha Corp;5000.00;TRN1', '2026-09-02;Acquisto cancelleria;-150.00;TRN2'].join('\n'),
+      'c-1',
+    );
+
+    expect(res.json().importati).toBe(2);
+    expect(aggiornaSaldo).toHaveBeenCalledTimes(2);
+    expect(aggiornaSaldo.mock.calls[0]![0]).toEqual({
+      where: { id: 'c-1' },
+      data: { saldoAttuale: { increment: 500000 } },
+    });
+    expect(aggiornaSaldo.mock.calls[1]![0]).toEqual({
+      where: { id: 'c-1' },
+      data: { saldoAttuale: { increment: -15000 } },
+    });
+  });
+
+  it('senza conto scelto l\'import non attribuisce il denaro a una banca, e non muove saldi', async () => {
+    // Il conto lo sceglie l'operatore: se non lo sceglie, i movimenti restano non attribuiti — che
+    // è una cosa visibile in Prima Nota («questo movimento non ha un conto»). Attribuirli d'ufficio
+    // al conto predefinito sarebbe un'informazione inventata su dove sta il denaro.
+    const res = await importa('2026-09-01;Bonifico da Alpha Corp;5000.00;TRN1');
+
+    expect(res.json().importati).toBe(1);
+    expect(createMovimento.mock.calls[0]![0].data.contoBancarioId).toBeNull();
+    expect(aggiornaSaldo).not.toHaveBeenCalled();
   });
 });

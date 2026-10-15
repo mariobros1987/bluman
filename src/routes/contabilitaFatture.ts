@@ -26,6 +26,7 @@ import {
   type OpzioniCalcoloFattura,
 } from '../services/fatturaEngine.js';
 import { recordAudit } from '../util/serverHelpers.js';
+import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 import { EmettiFatturaSchema } from '../schemas/contabilita.schema.js';
 
 export async function registraRotteContabilitaFatture(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -634,10 +635,41 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
                   .flatMap((s) => s.registrazioniRegistrate)
                   .reduce((acc, r) => acc + r.importoIncassatoCentesimi, 0);
                 if (totaleIncassato > 0) {
-                  await tx.movimentoPrimaNota.create({
+                  // Il rimborso esce dal conto in cui il denaro è **entrato**. L'unica traccia di
+                  // dove sia finito è il movimento d'incasso in Prima Nota: la registrazione
+                  // dell'incasso il conto non lo conserva. Se gli incassi nominano conti diversi
+                  // (o nessuno) si ripiega sul conto di accredito della fattura e poi sul conto
+                  // predefinito — la stessa regola dell'incasso. Il rimborso è un movimento solo,
+                  // quindi incassi su più conti si rimborsano comunque da un conto: è una scelta,
+                  // non una derivazione, ed è l'unico caso in cui questo conto può non tornare.
+                  const contiIncasso = [
+                    ...new Set(
+                      (
+                        await tx.movimentoPrimaNota.findMany({
+                          where: { tenantId, fatturaId: fatturaOrigine.id, tipo: 'entrata' },
+                          select: { contoBancarioId: true },
+                        })
+                      )
+                        .map((m) => m.contoBancarioId)
+                        .filter((id): id is string => !!id),
+                    ),
+                  ];
+                  const contoRimborso =
+                    (contiIncasso.length === 1 ? contiIncasso[0] : null) ||
+                    fatturaOrigine.contoAccreditoId ||
+                    (
+                      await tx.contoBancario.findFirst({
+                        where: { tenantId, isDefault: true },
+                        select: { id: true },
+                      })
+                    )?.id ||
+                    null;
+                  // Anche qui movimento e saldo sono un atto solo: il conto teneva il denaro
+                  // rimborsato perché questa riga non c'era.
+                  await creaMovimentoConSaldo(tx, {
                     data: {
                       tenantId,
-                      contoBancarioId: fatturaOrigine.contoAccreditoId,
+                      contoBancarioId: contoRimborso,
                       fatturaId: nc.id,
                       clienteId: fatturaOrigine.clienteId,
                       tipo: 'uscita',

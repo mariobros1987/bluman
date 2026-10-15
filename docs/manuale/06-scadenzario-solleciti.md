@@ -4,7 +4,10 @@
 Lo **Scadenzario** (`/invoices/scadenzario`) tiene le **rate di incasso** generate dalle fatture:
 scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
 - **Registrare un incasso**: da una rata → importo, metodo, conto → registra il pagamento (e crea in
-  automatico il movimento di Prima Nota, §07).
+  automatico il movimento di Prima Nota, §07). Il conto scelto è quello che riceve il denaro: se non
+  lo si sceglie si usa il conto di accredito della fattura e, in mancanza, il conto predefinito dello
+  studio — e il movimento in Prima Nota lo **nomina**, così la banca che ha il denaro è scritta da
+  qualche parte.
 - **Solleciti**: da una rata scaduta si invia un sollecito con **escalation** a 3 livelli
   (promemoria → sollecito → diffida) via email/WhatsApp.
 - **Filtri**: stato, cliente, ricerca e **periodo** (data di scadenza).
