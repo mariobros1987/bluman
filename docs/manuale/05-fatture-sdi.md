@@ -13,8 +13,14 @@ tracciato **XML SdI** (FatturaPA).
   riepilogo (emesso/incassato/sospeso/NC).
 
 ## 📐 Calcoli & logica
-- **Numerazione progressiva** per serie/anno = `max(numeroProgressivoSerie) + 1` (nessun contatore
-  separato: cancellando le fatture, riparte da 1). Un indice UNIQUE parziale protegge dai doppioni.
+- **Numerazione progressiva per serie e per anno**: il progressivo è `max(numeroProgressivoSerie) +
+  1` fra le fatture **emesse nell'anno in corso**, quindi riparte da `001` a ogni gennaio (art. 21
+  DPR 633/72): la prima fattura del 2027 è `FT-2027/001`, non `FT-2027/043`. Un indice UNIQUE
+  parziale su (studio, serie, **anno**, progressivo) protegge dai doppioni, e l'anno è quello
+  **stampato nel numero** — data e progressivo vengono dallo stesso istante, così una fattura emessa
+  a cavallo della mezzanotte di capodanno non è numerata 2027 e contata nel 2026.
+- Nessun contatore separato da tenere allineato: cancellando le fatture, il progressivo riparte da 1.
+  È il rovescio della medaglia di «niente stato in più», e vale la pena saperlo prima di cancellare.
 - **IVA e totali**: calcolati dal motore (`calcolaTotaliFattura`/`fatturaEngine`); riepilogo IVA SdI
   coerente con arrotondamento **di gruppo** (evita il ±1 cent che l'SdI rifiuta).
 - **NC parziale**: la fattura resta `emessa` se lo storno non copre tutto; le rate aperte calano in

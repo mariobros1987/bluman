@@ -20,6 +20,7 @@ import {
   generaPianoScadenze,
   assertFatturaModificabile,
   formattaNumeroDocumento,
+  intervalloAnnoSolare,
   ripartisciStornoScadenze,
   type RigaFatturaInput,
   type OpzioniCalcoloFattura,
@@ -96,8 +97,13 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
       const nuovaFattura = await riprovaSuConflitto(() =>
         prisma.$transaction(          async (tx) =>
             conContestoInTransazione(tx, async () => {
+              // Il progressivo provvisorio della bozza conta **dentro l'anno solare**: il numero
+              // definitivo nascerà all'emissione e ripartirà da `001` a ogni gennaio, quindi anche
+              // la prenotazione deve seguire lo stesso confine o mostrerebbe numeri di un altro
+              // anno. (Le bozze sono fuori dall'indice unico, quindi qui l'anno è coerenza, non
+              // vincolo: a renderlo obbligatorio è l'emissione, dove il vincolo entra in gioco.)
               const lastFattura = await tx.fattura.findFirst({
-                where: { tenantId, serie },
+                where: { tenantId, serie, data: intervalloAnnoSolare() },
                 orderBy: { numeroProgressivoSerie: 'desc' },
               });
               const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
@@ -345,10 +351,17 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
                 throw new Error(`La fattura è già in stato '${fattura.stato}'`);
               }
 
-              // Numerazione progressiva ufficiale atomica per serie (FT o NC)
+              // Numerazione progressiva ufficiale atomica per serie (FT o NC), **e per anno**:
+              // il numero legale riparte da `001` a ogni gennaio (art. 21 DPR 633/72). Il confine
+              // dell'anno è lo stesso che `formattaNumeroDocumento` scrive dentro il numero.
               const dataEmissione = new Date();
               const lastEmessa = await tx.fattura.findFirst({
-                where: { tenantId, serie: fattura.serie, stato: { not: 'bozza' } },
+                where: {
+                  tenantId,
+                  serie: fattura.serie,
+                  stato: { not: 'bozza' },
+                  data: intervalloAnnoSolare(dataEmissione),
+                },
                 orderBy: { numeroProgressivoSerie: 'desc' },
               });
               const progressivoSerie = (lastEmessa?.numeroProgressivoSerie || 0) + 1;
@@ -470,7 +483,12 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
 
               const dataEmissione = new Date();
               const lastNC = await tx.fattura.findFirst({
-                where: { tenantId, serie: 'NC', stato: { not: 'bozza' } },
+                where: {
+                  tenantId,
+                  serie: 'NC',
+                  stato: { not: 'bozza' },
+                  data: intervalloAnnoSolare(dataEmissione),
+                },
                 orderBy: { numeroProgressivoSerie: 'desc' },
               });
               const progressivoNC = (lastNC?.numeroProgressivoSerie || 0) + 1;

@@ -18,10 +18,11 @@ const { createMovimento } = vi.hoisted(() => ({ createMovimento: vi.fn() }));
 createMovimento.mockImplementation(async (args: any) => ({ id: `mv-${args.data.riferimentoTransazione}`, ...args.data }));
 
 vi.mock('./util/prismaClient.js', () => ({
-  // L'hook di autenticazione avvolge la query in `attivaContestoTenant` (che imposta il tenant
-  // come variabile di sessione per la RLS). Senza, l'hook fallisce e la rotta risponde 401: è il
-  // finto accidente che fa sembrare rotta l'autenticazione invece del mock.
-  attivaContestoTenant: vi.fn(async (fn: any) => fn()),
+  // L'hook di autenticazione chiama `attivaContestoTenant({ tenantId, ruolo })` — un **contesto**,
+  // non una callback — e la chiama **senza `await`** (server.ts). Il finto deve quindi essere un
+  // no-op: una firma che trattasse l'argomento come funzione lancerebbe una promessa rifiutata che
+  // nessuno guarda, e il test passerebbe lo stesso nascondendo il proprio errore.
+  attivaContestoTenant: () => {},
   prisma: {
     user: {
       findFirst: vi.fn(async (args: any) =>

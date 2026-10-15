@@ -968,10 +968,18 @@ model Fattura {
 
   tipoDocumento          TipoDocumentoFiscale @default(fattura) @map("tipo_documento")
   serie                  String               @default("FT") // "FT" per Fatture, "NC" per Note di Credito
-  // Numerazione: unica tra le EMESSE per (tenant, serie, progressivo) — garantita
-  // dall'indice parziale `fattura_emesse_tenant_serie_prog_key` (solo DB: gli indici
-  // parziali non si esprimono in schema.prisma, come i trgm). Le bozze restano fuori
-  // dal vincolo perché il numero legale si assegna all'emissione.
+  // Numerazione: unica tra le EMESSE per (tenant, serie, **anno**, progressivo) — garantita
+  // dall'indice parziale `fattura_emesse_tenant_serie_prog_key`, che l'anno lo ricava da
+  // `date_trunc('year', data)` (solo DB: gli indici parziali non si esprimono in
+  // schema.prisma, come i trgm). Le bozze restano fuori dal vincolo perché il numero legale
+  // si assegna all'emissione.
+  //
+  // L'anno fa parte della chiave perché il progressivo **riparte da 1 a ogni gennaio**
+  // (art. 21 DPR 633/72, «in ordine progressivo per anno solare») — vedi
+  // `intervalloAnnoSolare` in `src/services/fatturaEngine.ts`. Senza l'anno nel vincolo, la
+  // seconda `FT-2027/001` verrebbe rifiutata come duplicato della `FT-2026/001`. Fino al
+  // 15/10/2026 il progressivo non ripartiva affatto: il contatore attraversava il capodanno e
+  // la prima fattura del 2027 sarebbe stata `FT-2027/043`.
   numeroProgressivoSerie Int                  @default(1) @map("numero_progressivo_serie")
   numero                 String? // es. "FT-2026/001" o "NC-2026/001"
   data                   DateTime?            @default(now())

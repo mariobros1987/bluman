@@ -23,8 +23,9 @@ prospetto **F24**.
 
 ## ⚠️ Stati limite & errori
 - Periodo senza operazioni: prospetto a zero, non inventato.
-- Le regole aperte (reset annuale numerazione, esigibilità differita) sono decisioni fiscali da
-  confermare col titolare — vedi note di progetto.
+- La **esigibilità differita** resta l'unica regola aperta qui: è una decisione fiscale da
+  confermare col titolare — vedi note di progetto. (Il **reset annuale** della numerazione, che era
+  aperto in questo stesso elenco, è stato chiuso: §05.)
 
 ## 🔧 Nota tecnica
 - Motore: `src/services/lipeEngine.ts` (+ test `lipeEngine.test.ts`). Rotte:

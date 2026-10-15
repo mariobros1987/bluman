@@ -9,6 +9,7 @@ import { prisma, conContestoInTransazione, riprovaSuConflitto } from '../util/pr
 import {
   calcolaTotaliFattura,
   formattaNumeroDocumento,
+  intervalloAnnoSolare,
   type RigaFatturaInput,
   type OpzioniCalcoloFattura,
 } from '../services/fatturaEngine.js';
@@ -126,11 +127,21 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
         prisma.$transaction(
           async (tx) =>
             conContestoInTransazione(tx, async () => {
+              // Il canone nasce **emesso**, quindi il progressivo è già quello legale e deve
+              // ripartire da `001` a ogni gennaio: stessa regola e stesso confine d'anno
+              // dell'emissione manuale (`contabilitaFatture.ts`). La data è letta una volta sola,
+              // prima della query, perché numero e data di emissione vengano dallo stesso istante.
+              const dataEmissione = new Date();
               const lastFattura = await tx.fattura.findFirst({
-                where: { tenantId, tipoDocumento: 'fattura', serie: 'FT', stato: { not: 'bozza' } },
+                where: {
+                  tenantId,
+                  tipoDocumento: 'fattura',
+                  serie: 'FT',
+                  stato: { not: 'bozza' },
+                  data: intervalloAnnoSolare(dataEmissione),
+                },
                 orderBy: { numeroProgressivoSerie: 'desc' },
               });
-              const dataEmissione = new Date();
               const prossimoProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;
               const numeroFattura = formattaNumeroDocumento('FT', prossimoProgressivo, dataEmissione);
 

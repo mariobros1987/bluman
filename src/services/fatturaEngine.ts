@@ -353,3 +353,23 @@ export function formattaNumeroDocumento(serie: string, progressivo: number, data
   const padProgressivo = String(progressivo).padStart(3, '0');
   return `${serie}-${anno}/${padProgressivo}`;
 }
+
+/**
+ * L'anno solare in cui cade una data, come intervallo da dare a un `where` di Prisma.
+ *
+ * `formattaNumeroDocumento` **scrive l'anno dentro il numero** (`FT-2026/001`), quindi chi conta i
+ * documenti di una serie deve contare lo stesso anno che il numero dichiara. Senza questo filtro il
+ * contatore attraversava il capodanno: il 1° gennaio 2027 la prima fattura dell'anno sarebbe stata
+ * `FT-2027/043`, cioè una numerazione che riprende da dove finiva il 2026 invece di ripartire da
+ * `001`. L'art. 21 del DPR 633/72 chiede la numerazione «in ordine progressivo per anno solare», e
+ * una serie che non riparte non è una serie annuale.
+ *
+ * L'anno è quello **locale**, non UTC, ed è la stessa scelta che fa `getFullYear()` nel
+ * formattatore: se i due usassero criteri diversi, un documento emesso a cavallo della mezzanotte
+ * di capodanno verrebbe *numerato* 2027 e *contato* nel 2026. Un difetto così non si vedrebbe fino
+ * al primo gennaio successivo, e a quel punto sarebbe già stampato su una fattura.
+ */
+export function intervalloAnnoSolare(data: Date = new Date()): { gte: Date; lt: Date } {
+  const anno = data.getFullYear();
+  return { gte: new Date(anno, 0, 1), lt: new Date(anno + 1, 0, 1) };
+}
