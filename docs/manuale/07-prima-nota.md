@@ -7,7 +7,10 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
   LIPE (§08), il movimento entra qui **da solo**.
 - **Movimenti manuali**: si aggiungono a mano (es. spese, giroconti).
 - **Conti bancari**: si gestiscono i conti dello studio (IBAN) su cui si appoggiano i movimenti.
-- **Riconciliazione CSV**: si importa l'estratto conto e si riconciliano i movimenti.
+- **Riconciliazione CSV**: si incolla l'estratto conto (una riga per movimento,
+  `Data;Causale;Importo;CRO`), si sceglie il conto di destinazione e si importa. Le righe che non si
+  riescono a leggere **non** diventano movimenti: restano elencate nel modale, con il numero di riga
+  e il motivo, così si corregge il file e si reimportano solo quelle.
 
 ## 📐 Calcoli & logica
 - Ogni movimento ha **segno** (entrata/uscita), importo in centesimi, categoria (`incasso_fattura`,
@@ -16,6 +19,9 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
   registrati.
 - Cancellando una fattura collegata, il movimento **non** sparisce: la FK va a `null` (SetNull), il
   movimento resta come riga di prima nota.
+- **Forme accettate nell'import**: la data come `2026-10-15` (ISO) o `15/10/2026`; l'importo con la
+  virgola o con il punto decimale (`1.234,56` e `1234.56`), con il simbolo di valuta tollerato. Una
+  data che **non esiste** — `31/02/2026` — viene rifiutata, non fatta rotolare al mese successivo.
 
 ## 🔗 Collegamenti
 - **Scadenzario/Fatture** (§05–06): l'incasso di una rata genera il movimento.
@@ -23,7 +29,11 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - **Fornitori / Ciclo passivo**: le fatture ricevute alimentano le uscite.
 
 ## ⚠️ Stati limite & errori
-- Import CSV malformato: si segnala l'errore, non si inventano movimenti.
+- Import CSV: una riga con un importo o una data che non si legge **non entra** in Prima Nota e viene
+  elencata nel modale (numero di riga, motivo, testo della riga). Non si ripiega su un valore
+  plausibile — né un importo né la data di oggi — perché un movimento inventato è indistinguibile da
+  uno vero. Il messaggio di esito dice sempre quante righe sono entrate **e** quante sono state
+  scartate.
 - Empty state sincero se non ci sono movimenti.
 
 ## 🔧 Nota tecnica

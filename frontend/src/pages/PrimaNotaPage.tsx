@@ -20,6 +20,20 @@ interface RiepilogoPrimaNota {
   totaleUsciteCentesimi: number;
   saldoCentesimi: number;
 }
+
+/**
+ * Una riga che l'import dell'estratto conto **non** ha registrato, e perché.
+ *
+ * Il tipo esiste perché il modale la mostra: prima queste righe sparivano in silenzio, quindi
+ * una riga scartata e una riga mai letta erano la stessa cosa sullo schermo — e chi importava 40
+ * movimenti su 45 leggeva «importati con successo».
+ */
+interface RigaScartata {
+  riga: number;
+  motivo: string;
+  contenuto: string;
+}
+
 const META_INIZIALE: MetaPaginazione = { page: 1, limit: 50, totale: 0, pagine: 0 };
 
 export function PrimaNotaPage() {
@@ -43,6 +57,10 @@ export function PrimaNotaPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCsvModal, setShowCsvModal] = useState(false);
   const [csvContent, setCsvContent] = useState('');
+  // Le righe scartate dall'ultimo import. Si mostrano **dentro il modale**, non in un toast: un
+  // avviso che sparisce dopo cinque secondi non è il posto dove si legge un elenco di righe da
+  // correggere, e chi lo perde non sa più quali movimenti mancano.
+  const [csvScartate, setCsvScartate] = useState<RigaScartata[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   // Form Fields
@@ -108,10 +126,22 @@ export function PrimaNotaPage() {
     setSubmitting(true);
     try {
       const res = await importCsvPrimaNotaApi(csvContent, newContoId || undefined);
-      setShowCsvModal(false);
-      setCsvContent('');
+      const scartate: RigaScartata[] = Array.isArray(res.scartate) ? res.scartate : [];
+
       await loadData();
-      toast.successo(`${res.importati || 'Tutti i'} movimenti bancari importati e riconciliati con successo nel database!`);
+
+      if (scartate.length > 0) {
+        // Il modale **resta aperto**: è l'unico posto dove l'elenco si può leggere davvero, e
+        // chiuderlo direbbe «è andato tutto bene» mentre parte delle righe non è entrata. Il
+        // testo viene dal server, che è l'unico a sapere quante ne ha scritte e quante no.
+        setCsvScartate(scartate);
+        toast.attenzione(res.message || `${scartate.length} righe scartate: non sono state registrate.`);
+      } else {
+        setShowCsvModal(false);
+        setCsvContent('');
+        setCsvScartate([]);
+        toast.successo(res.message || `${res.importati} movimenti bancari importati e riconciliati con successo nel database!`);
+      }
     } catch (err: any) {
       toast.errore(`Errore importazione CSV: ${err.message}`);
     } finally {
@@ -179,7 +209,7 @@ export function PrimaNotaPage() {
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            onClick={() => setShowCsvModal(true)}
+            onClick={() => { setCsvScartate([]); setShowCsvModal(true); }}
             style={{
               padding: '10px 16px',
               borderRadius: 8,
@@ -533,6 +563,36 @@ export function PrimaNotaPage() {
             <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1rem 0' }}>
               Incolla il testo del tracciato CSV bancario. Formato supportato: <code>Data;Descrizione/Causale;Importo;CRO/TRN</code>.
             </p>
+
+            {csvScartate.length > 0 && (
+              <div
+                role="alert"
+                style={{
+                  margin: '0 0 1rem 0', padding: '12px 14px', borderRadius: 10,
+                  border: '1px solid var(--warning, #b8860b)', background: 'rgba(184,134,11,0.10)',
+                }}
+              >
+                <strong style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>
+                  {csvScartate.length} {csvScartate.length === 1 ? 'riga non è stata registrata' : 'righe non sono state registrate'}
+                </strong>
+                <p style={{ fontSize: 12, color: 'var(--muted)', margin: '0 0 8px 0' }}>
+                  Le righe qui sotto <strong>non</strong> sono entrate in Prima Nota: il movimento non è stato creato.
+                  Correggi il CSV e reimporta solo quelle.
+                </p>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {csvScartate.map((s) => (
+                    <li key={`${s.riga}-${s.contenuto}`} style={{ fontSize: 12, lineHeight: 1.5 }}>
+                      <span style={{ fontFamily: 'monospace', color: 'var(--muted)' }}>riga {s.riga}</span>{' '}
+                      — {s.motivo}
+                      <br />
+                      <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted)', overflowWrap: 'anywhere' }}>
+                        {s.contenuto}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <form onSubmit={handleImportCsv} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
