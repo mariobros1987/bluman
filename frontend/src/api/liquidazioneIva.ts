@@ -33,6 +33,14 @@ export interface ProspettoF24 {
   saldoFinaleCent: number;
 }
 
+/** Vedi `DifferitaTrattataComeImmediata` in `src/services/lipeEngine.ts` per il perché. */
+export interface DifferitaTrattataComeImmediata {
+  count: number;
+  imponibileCent: number;
+  ivaDebitoCent: number;
+  documenti: string[];
+}
+
 export interface CalcoloLipeResponse {
   periodo: {
     tipo: 'mensile' | 'trimestrale';
@@ -51,6 +59,12 @@ export interface CalcoloLipeResponse {
   stato: 'debito' | 'credito' | 'a_pareggio';
   importoDaVersareCent: number;
   creditoRiportabileCent: number;
+  /**
+   * Facoltativo di proposito: durante un deploy la pagina nuova può girare contro il backend
+   * ancora vecchio, che questo campo non lo manda. Assente vale «non lo so», e la pagina non
+   * disegna l'avviso — non lo inventa a zero, che direbbe «nessuna differita» senza saperlo.
+   */
+  differitaTrattataComeImmediata?: DifferitaTrattataComeImmediata;
   prospettoF24: ProspettoF24;
   registrazioneEsistente?: LiquidazioneIvaRecord | null;
 }

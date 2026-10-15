@@ -108,6 +108,11 @@ export const LiquidazioneIvaPage: React.FC = () => {
     }
   };
 
+  // Assente quando risponde un backend di una versione precedente: in quel caso non si disegna
+  // l'avviso, ma non si scrive nemmeno «nessuna differita» — che sarebbe un'affermazione su un
+  // dato che non è arrivato.
+  const differita = calcolo?.differitaTrattataComeImmediata;
+
   return (
     <div style={{ padding: '24px 32px', maxWidth: '1400px', margin: '0 auto' }}>
       {/* Header */}
@@ -395,6 +400,51 @@ export const LiquidazioneIvaPage: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* La parte di debito IVA che ha una data di esigibilità **diversa** da quella che il
+          prospetto le attribuisce. Non è un errore di calcolo da correggere qui: è una regola
+          fiscale che l'app non applica, e che non ha il diritto di applicare in silenzio. Il
+          perché per esteso è in `src/services/lipeEngine.ts`: il totale non cambia — cambia che
+          adesso si sa. */}
+      {calcolo && differita && differita.count > 0 && (
+        <div
+          className="card"
+          style={{
+            marginBottom: '28px',
+            padding: '16px 20px',
+            borderLeft: '4px solid var(--amber)',
+            background: 'rgba(245, 158, 11, 0.08)',
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--amber)' }}>
+            ⚠️{' '}
+            {differita.count === 1
+              ? '1 documento a esigibilità differita è contato in questo periodo'
+              : `${differita.count} documenti a esigibilità differita sono contati in questo periodo`}
+          </div>
+          <div style={{ fontSize: '0.9rem', lineHeight: 1.5 }}>
+            IVA{' '}
+            <strong>
+              €{(differita.ivaDebitoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+            </strong>{' '}
+            su €{(differita.imponibileCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })} di
+            imponibile. Per l'<strong>art. 6, comma 4, del DPR 633/72</strong> l'IVA di queste operazioni
+            diventa esigibile <strong>al pagamento</strong>, quindi il periodo giusto può essere un altro —
+            e sono fatture già trasmesse allo SdI con <code>EsigibilitaIVA = D</code>, cioè dichiarando
+            esattamente questo.
+          </div>
+          <div style={{ fontSize: '0.9rem', lineHeight: 1.5, marginTop: '8px', color: 'var(--text-muted)' }}>
+            Il totale qui sopra <strong>non cambia</strong>: l'anno chiude in pari, perché è la stessa IVA
+            che entrerà più avanti. Cambia il periodo, e cambia che adesso lo si sa. L'app non sposta da
+            sola l'IVA al momento dell'incasso perché dovrebbe fidarsi che <em>ogni</em> incasso sia
+            registrato qui dentro: una differita mai incassata a sistema uscirebbe da <em>tutte</em> le
+            liquidazioni, in silenzio. Come trattarle è una decisione fiscale ancora aperta.
+          </div>
+          <div style={{ fontSize: '0.85rem', marginTop: '10px', color: 'var(--text-muted)' }}>
+            Documenti: {differita.documenti.join(' · ')}
           </div>
         </div>
       )}

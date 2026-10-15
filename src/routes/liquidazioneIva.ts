@@ -54,6 +54,8 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
           tipoDocumento: { in: ['fattura', 'nota_credito'] },
         },
         select: {
+          id: true,
+          numero: true,
           totaleImponibileCentesimi: true,
           totaleIvaCentesimi: true,
           esigibilitaIva: true,
@@ -122,6 +124,8 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
           tipoDocumento: { in: ['fattura', 'nota_credito'] },
         },
         select: {
+          id: true,
+          numero: true,
           totaleImponibileCentesimi: true,
           totaleIvaCentesimi: true,
           esigibilitaIva: true,

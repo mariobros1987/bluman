@@ -74,3 +74,98 @@ describe('calcolaLiquidazioneIvaPeriodo — note di credito e stati', () => {
     expect(determinaPeriodoFiscale('2026-Q3').codicePeriodo).toBe('2026-Q3');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// L'esigibilità differita
+// ─────────────────────────────────────────────────────────────────────
+//
+// Art. 6, comma 4, del DPR 633/72: per queste operazioni l'IVA è esigibile **al pagamento**, non
+// alla data del documento. Il motore la conta nel periodo della fattura, cioè in anticipo — e fino
+// al 15/10/2026 lo faceva **in silenzio**, mentre la stessa fattura partiva verso lo SdI con
+// `<EsigibilitaIVA>D</EsigibilitaIVA>`. Le due metà dell'app dicevano cose diverse della stessa
+// fattura, e solo una delle due arrivava al commercialista.
+//
+// Questi test tengono ferme due cose insieme: che il totale **non** cambi — spostare l'IVA
+// all'incasso, senza garanzia che gli incassi siano registrati a sistema, farebbe sparire l'IVA da
+// tutte le liquidazioni — e che il prospetto **lo dica**, nominando i documenti. Se un giorno si
+// deciderà di spostare l'esigibilità al pagamento, è il primo test qui sotto che dovrà cambiare.
+
+describe('calcolaLiquidazioneIvaPeriodo — esigibilità differita', () => {
+  it('conta la differita nel debito (in anticipo, non mai) e la dichiara a parte', () => {
+    const r = calcolaLiquidazioneIvaPeriodo(
+      '2026-09',
+      [F(100000, 22000, { esigibilitaIva: 'differita', numero: 'FT-2026/012' })],
+      [],
+      0,
+    );
+    expect(r.ivaDebitoCent).toBe(22000);
+    expect(r.differitaTrattataComeImmediata).toEqual({
+      count: 1,
+      imponibileCent: 100000,
+      ivaDebitoCent: 22000,
+      documenti: ['FT-2026/012'],
+    });
+  });
+
+  it('senza differite il blocco c\'è ed è vuoto — «nessuna», non «non lo so»', () => {
+    // La distinzione è il punto: `count: 0` è un'affermazione, un campo assente è una domanda senza
+    // risposta. Il motore risponde sempre; semmai è il filo — o un backend di una versione
+    // precedente — a non portare il campo, e infatti lì il frontend non disegna niente invece di
+    // disegnare zero.
+    const r = calcolaLiquidazioneIvaPeriodo('2026-09', [F(100000, 22000)], [], 0);
+    expect(r.differitaTrattataComeImmediata).toEqual({
+      count: 0,
+      imponibileCent: 0,
+      ivaDebitoCent: 0,
+      documenti: [],
+    });
+  });
+
+  it('la differita non è lo split: la prima entra nel debito, il secondo no', () => {
+    // Si assomigliano solo nel nome. Nello split l'IVA non è mai dello studio — la versa il
+    // committente — quindi escluderla è completo; nella differita è dello studio, solo più tardi.
+    // Trattarle allo stesso modo vorrebbe dire non dichiarare IVA dovuta.
+    const r = calcolaLiquidazioneIvaPeriodo(
+      '2026-09',
+      [
+        F(100000, 22000, { esigibilitaIva: 'differita', numero: 'FT-2026/012' }),
+        F(30000, 6600, { esigibilitaIva: 'split', numero: 'FT-2026/013' }),
+      ],
+      [],
+      0,
+    );
+    expect(r.ivaDebitoCent).toBe(22000);
+    expect(r.differitaTrattataComeImmediata.count).toBe(1);
+    expect(r.differitaTrattataComeImmediata.documenti).toEqual(['FT-2026/012']);
+  });
+
+  it('la nota di credito su una differita storna anche nella segnalazione', () => {
+    // Il segnalato è un importo, non un conteggio: una NC che storna una differita deve abbassarlo,
+    // o il prospetto direbbe «hai IVA differita per 220 €» su un'operazione che non esiste più.
+    const r = calcolaLiquidazioneIvaPeriodo(
+      '2026-09',
+      [
+        F(100000, 22000, { esigibilitaIva: 'differita', numero: 'FT-2026/012' }),
+        NC(100000, 22000, { esigibilitaIva: 'differita', numero: 'NC-2026/003' }),
+      ],
+      [],
+      0,
+    );
+    expect(r.ivaDebitoCent).toBe(0);
+    expect(r.differitaTrattataComeImmediata.ivaDebitoCent).toBe(0);
+    expect(r.differitaTrattataComeImmediata.count).toBe(2);
+    expect(r.differitaTrattataComeImmediata.documenti).toEqual(['FT-2026/012', 'NC-2026/003']);
+  });
+
+  it('ripiega sull\'id quando il numero non c\'è, invece di non nominare il documento', () => {
+    // Un documento che non si può nominare non si può andare a controllare, e questa segnalazione
+    // esiste esattamente perché qualcuno ci vada a guardare.
+    const r = calcolaLiquidazioneIvaPeriodo(
+      '2026-09',
+      [F(100000, 22000, { esigibilitaIva: 'differita', id: 'f-abc' })],
+      [],
+      0,
+    );
+    expect(r.differitaTrattataComeImmediata.documenti).toEqual(['f-abc']);
+  });
+});

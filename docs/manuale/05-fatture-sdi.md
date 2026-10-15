@@ -37,6 +37,9 @@ tracciato **XML SdI** (FatturaPA).
 - **Scadenzario** (§06): la fattura genera le **rate** di incasso.
 - **Prima Nota** (§07): l'incasso registra il movimento.
 - **Clienti** (§02): P.IVA/CF/SDI/IBAN per l'XML.
+- **Liquidazione IVA** (§08): una fattura a **esigibilità differita** entra nella liquidazione del
+  periodo della fattura, e il prospetto la segnala a parte nominandola — perché per legge la sua IVA
+  sarebbe esigibile al pagamento.
 - **Impostazioni** (§16): l'anagrafica dello studio — senza i sei dati obbligatori l'XML non si compone.
 
 ## ⚠️ Stati limite & errori
