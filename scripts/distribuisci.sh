@@ -378,10 +378,11 @@ if [ "$VPS" -eq 1 ]; then
     exit 1
   fi
 
-  # e) Verifica. Quattro controlli, ognuno coglie un guasto diverso: l'health dice se l'API è
+  # e) Verifica. Cinque controlli, ognuno coglie un guasto diverso: l'health dice se l'API è
   #    viva, il 200 sulla radice se nginx serve il frontend, la sonda rotta se l'immagine in
   #    esecuzione è quella appena costruita (un 404 significa che il container è rimasto
-  #    indietro), e la sonda sulle PAGINE se il proxy si sta mangiando il frontend.
+  #    indietro), la sonda sulle PAGINE se il proxy si sta mangiando il frontend, e le due sonde
+  #    sul manuale se l'aiuto in-app ha la rotta e i file che gli servono.
   titolo "7. Verifica post-deploy su $VPS_BASE"
   echo "• In attesa dell'health (max 2 minuti)..."
   VPS_OK=0
@@ -436,18 +437,59 @@ if [ "$VPS" -eq 1 ]; then
   #    prendeva: chi ricaricava una di quelle pagine riceveva un 404 in JSON o un 401 al posto
   #    dell'applicazione. Il deploy era verde, perché ogni sonda guardava l'API e nessuna
   #    guardava le pagine. Ora le API stanno sotto /api e queste devono tornare HTML.
+  #
+  #    Le ultime due voci non collidono con nessuna rotta dell'API e stanno qui per l'altra
+  #    ragione: `/aiuto` è una pagina, e `/aiuto/<scheda>` è un **indirizzo profondo** — quello
+  #    che si ricarica o si incolla in chat. Un fallback della SPA che non regge i percorsi
+  #    annidati lascerebbe funzionare l'indice e romperebbe ogni singola scheda linkata, che è
+  #    esattamente il genere di guasto che si vede solo quando serve.
   echo "• Pagine della SPA: devono tornare HTML, non il JSON dell'API..."
-  for PAGINA in /portal /invoices /fornitori /timesheet /liquidazione-iva /reports /admin/tenants; do
+  for PAGINA in /portal /invoices /fornitori /timesheet /liquidazione-iva /reports /admin/tenants /aiuto /aiuto/05-fatture-sdi; do
     TIPO=$(curl -s -o /dev/null -w '%{content_type}' --max-time 10 "$VPS_BASE$PAGINA" || echo "000")
     case "$TIPO" in
       text/html*) ;;
       *)
-        echo "ERRORE: $VPS_BASE$PAGINA ha risposto «$TIPO» invece di HTML: la richiesta è finita all'API invece che al frontend. Il location /api/ di nginx/bluman_app.inc è quello giusto?" >&2
+        echo "ERRORE: $VPS_BASE$PAGINA ha risposto «$TIPO» invece di HTML: la richiesta non ha raggiunto il frontend. Se il percorso si chiama come una rotta dell'API, è il location /api/ di nginx/bluman_app.inc a essere sbagliato; altrimenti è il fallback della SPA." >&2
         exit 1
         ;;
     esac
   done
   successo "Pagine della SPA: tutte HTML."
+
+  #    /aiuto legge i `.md` da `docs/manuale/` **a runtime**, e due cose possono mancare in
+  #    silenzio. Nessuna delle due si vede dall'esterno, ed è la ragione per cui stanno qui.
+  #
+  #    La prima è la rotta: un'immagine senza `registraRotteManuale` risponde 404 su
+  #    `/api/manuale`, e la pagina mostra «l'aiuto non è disponibile in questa installazione» —
+  #    vero, ma non è la causa. Il 401 la distingue: l'autenticazione precede la lettura del
+  #    file, quindi una rotta *presente* risponde 401 anche quando i `.md` non ci sono. Il 404
+  #    dice «rotta assente», il 401 dice «rotta presente, il resto lo guarda la sonda dopo».
+  #
+  #    La seconda è la cartella, e la vede solo un conteggio fatto dentro il container. Un
+  #    `docs/` fuori dall'immagine — o un `.dockerignore` cambiato, che è il modo in cui succede
+  #    senza che nessuno tocchi niente — dà un indice **vuoto**: a schermo è identico a «non c'è
+  #    aiuto da leggere», che è la bugia silenziosa che l'aiuto in-app esiste per non raccontare.
+  #    Sono 19 schede più il README.
+  echo "• Manuale: la rotta risponde e i .md sono dentro l'immagine..."
+  CODICE_MAN=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$VPS_BASE/api/manuale" || echo "000")
+  if [ "$CODICE_MAN" = "401" ]; then
+    successo "Rotta /api/manuale: 401 senza token, come atteso."
+  else
+    echo "ERRORE: /api/manuale ha risposto $CODICE_MAN (atteso 401)." >&2
+    echo "  Se 404, l'immagine in esecuzione non porta la rotta: /aiuto direbbe «aiuto non" >&2
+    echo "  disponibile», che manda a cercare un problema nei file invece che nel deploy." >&2
+    exit 1
+  fi
+  SCHEDE=$(ssh_vps "cd $VPS_DIR && $COMPOSE_PROD exec -T api ls /app/docs/manuale 2>/dev/null | wc -l" | tr -d '[:space:]')
+  if [ "$SCHEDE" = "20" ]; then
+    successo "Manuale: 20 file dentro l'immagine."
+  else
+    echo "ERRORE: /app/docs/manuale contiene $SCHEDE file invece di 20." >&2
+    echo "  Senza i .md l'aiuto in-app si presenta VUOTO. Il codice distingue «non c'è niente da" >&2
+    echo "  leggere» da «non ho potuto leggere», ma la distinzione la decide il container: se la" >&2
+    echo "  cartella non c'è, la pagina dice la prima cosa mentre è vera la seconda." >&2
+    exit 1
+  fi
 
   echo "• Sonda rotta: POST /api/documenti/genera senza token deve dare 401, non 404..."
   CODICE_VPS=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$VPS_BASE/api/documenti/genera" -H 'Content-Type: application/json' -d '{}' || echo "000")

@@ -202,6 +202,25 @@ describe('🚀 distribuisci.sh — la build del VPS e il frontend devono concord
     // contiene nessuna delle sette passerebbe senza provare niente.
     expect(script).toMatch(/for PAGINA in [^\n]*\/portal/);
   });
+
+  it('sonda /aiuto, che è una pagina e ha anche un indirizzo profondo', () => {
+    expect(script).toMatch(/for PAGINA in [^\n]*\/aiuto\b/);
+    // `/aiuto/<scheda>` è il percorso che si ricarica o si incolla in chat: un fallback della SPA
+    // che non regge i percorsi annidati lascerebbe funzionare l'indice e romperebbe ogni singola
+    // scheda linkata — un guasto che si vede solo quando serve.
+    expect(script).toMatch(/for PAGINA in [^\n]*\/aiuto\/[a-z0-9-]+/);
+  });
+
+  it("sonda che il manuale abbia la rotta E i file: un indice vuoto sarebbe la bugia da evitare", () => {
+    // 401 e non 404: l'autenticazione precede la lettura del file, quindi una rotta *presente*
+    // risponde 401 anche quando i `.md` non ci sono. Il 404 direbbe «rotta assente», che è un
+    // guasto diverso e si aggiusta altrove.
+    expect(script).toContain('/api/manuale');
+    expect(script).toMatch(/CODICE_MAN.*401/s);
+    // Il conteggio fatto dentro il container è l'unica sonda che vede un `docs/` fuori
+    // dall'immagine: da fuori, un indice vuoto è indistinguibile da «non c'è aiuto da leggere».
+    expect(script).toMatch(/\/app\/docs\/manuale/);
+  });
 });
 
 describe('🔐 docker-compose.prod.yml — segreti', () => {
