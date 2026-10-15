@@ -2,6 +2,19 @@
 
 Questo documento definisce l'architettura completa, il modello dati e la scaletta operativa per riformare e integrare il modulo Fatturazione, Scadenzario e Prima Nota di BluMan, traendo ispirazione diretta dai moduli contabili di **OpenSTAManager** (`openstamanager_source/modules/fatture/`).
 
+> ### ⚠️ Documento storico: il progetto fu eseguito, le caselle no
+>
+> Fermo al **31/08/2026** con 41 caselle su 41 vuote, quindi sembra una lista di cose ancora da
+> fare. Non lo è: **è già costruito**. I campi che questo piano propone — `prezzoUnitarioCent`,
+> `scontoPercentuale`, `aliquotaIva`, `naturaEsenzione`, `tipoCassa`, `aliquotaRitenuta`,
+> `totaleBolloCentesimi` — sono nello schema (`prisma/schema.prisma`), e il primo obiettivo («zero
+> `localStorage`») è chiuso per i due file che nomina: né `InvoicesPage.tsx` né
+> `FatturazioneTab.tsx` ne fanno più uso.
+>
+> Nessuno è tornato indietro a spuntare niente, ed è tutto ciò che dicono quelle caselle. Qui
+> dentro resta il **ragionamento** — perché la riga fattura ha quella struttura e non un'altra — ed
+> è per questo che il `README.md` del manuale lo cita come spec di dominio della contabilità.
+
 ---
 
 ## 🎯 1. Obiettivi & Visione Architetturale

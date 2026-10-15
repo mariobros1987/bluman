@@ -2,6 +2,21 @@
 
 **Fonte:** `BluMan_specifica_di_sviluppo_v2.3.docx` (34 sezioni).
 
+> ### ⚠️ Documento storico: le caselle non sono lo stato del progetto
+>
+> Fermo al **18/09/2026**. Da allora il repository è andato avanti e questo file no: non nomina
+> nemmeno l'aiuto in-app (`/aiuto`), che è arrivato dopo.
+>
+> Le caselle sono compilate a mano e non sono mai state verificate contro il codice, quindi
+> sbagliano in tutte e due le direzioni. Un esempio per ciascuna: la voce su
+> `numeroProgressivoSerie` è spuntata ✅ mentre la serie **non** si azzera a fine anno
+> (`src/routes/contabilitaFatture.ts`) — una casella verde sopra un difetto aperto; e tutto il
+> lavoro spedito dopo settembre qui non c'è, perché nessuno è più tornato a spuntare niente.
+>
+> Per sapere cosa manca davvero si legge il codice. La fotografia di un momento sta in
+> `AUDIT_2026-09-27/` e `AUDIT_2026-10-11/`, la mappa tecnica in `.agents/AGENTS.md`. Resta qui
+> come promemoria di cosa si era pianificato, non come elenco di cosa resta da fare.
+
 ---
 
 ## 🎯 Stato di Avanzamento Fasi (Aggiornato)

@@ -5,6 +5,18 @@
 > **Stato Codebase**: 750/750 test Vitest verdi (66 file) • Build TypeScript backend, typecheck/build frontend riusciti
 > **Autore**: Mario Dibenedetto & Team di Ingegneria AI
 
+> ### ⚠️ Documento storico: i numeri qui sopra sono di settembre
+>
+> Fermo al **18/09/2026**. La riga «750/750 test Vitest verdi (66 file)» è la datazione più rapida:
+> oggi i file di test sono **167** (134 nel backend, 33 nel frontend), quindi il conteggio è
+> vecchio di un centinaio di file — e con lui le 40 caselle spuntate e le 12 aperte, che nessuno
+> aggiorna dal settembre 2026.
+>
+> Il piano che si tiene davvero in vita è **`PIANO_DI_MIGLIORAMENTO.md`**, aggiornato di continuo e
+> con una sezione (§1bis) che è dichiaratamente il posto dove si scrive cosa manca. Questo qui
+> resta per la **visione d'insieme** — come si pensava la piattaforma intera — non per lo stato dei
+> lavori, che si legge nel codice.
+
 ---
 
 ## 📑 Indice del Piano

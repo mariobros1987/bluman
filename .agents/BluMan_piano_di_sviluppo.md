@@ -1,7 +1,18 @@
 # BluMan — Piano di sviluppo
 
 **Fonte:** `BluMan_specifica_di_sviluppo_v2.1.docx` (30 sezioni) — ogni voce qui sotto referenzia la sezione di origine (§N) per tracciabilità.
-**Come leggerlo:** ordine di esecuzione consigliato, non ordine narrativo del documento. Ogni fase è pensata per essere completabile e testabile prima di passare alla successiva. Checkbox per spuntare mano a mano.
+**Come leggerlo:** ordine di esecuzione consigliato, non ordine narrativo del documento. Ogni fase è pensata per essere completabile e testabile prima di passare alla successiva.
+
+> ### ⚠️ Documento storico: la specifica di partenza, non la lista delle cose da fare
+>
+> È la v2.1 così com'era il **03/09/2026**, conservata come traccia di *da dove si è partiti*. Le
+> sue 90 caselle non sono mai state spuntate, e **non significano «novanta cose ancora da fare»**:
+> molte sono state costruite, e parecchie in forme diverse da quelle scritte qui.
+>
+> Il file omonimo nella radice è la versione successiva, la v2.3 — con 95 caselle spuntate su 95.
+> I due si contraddicono, e **nessuno dei due ha ragione**: quello dice che è tutto finito, questo
+> che non si è cominciato niente. Serve a rispondere a «perché è stato fatto così», non a «cosa
+> resta da fare». Per quello si legge il codice.
 
 ---
 

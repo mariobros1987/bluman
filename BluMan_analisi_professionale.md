@@ -3,6 +3,16 @@
 > Consulenza Patrimoniale • Corporate Structuring • Trust • Banking • Legal • IP
 > **Documento:** Analisi pre-sviluppo — produzione codice condizionata all'approvazione.
 
+> ### ⚠️ Documento storico: è l'analisi *prima* del codice
+>
+> Redatto il **17/08/2026**, quando la piattaforma non esisteva ancora: le sue 42 caselle vuote sono
+> il perimetro che si intendeva coprire, non un elenco di cose ancora da fare. Nel frattempo buona
+> parte di quel perimetro è stata costruita — e alcune cose sono state decise diversamente.
+>
+> Si legge per capire **perché** la piattaforma copre queste aree (consulenza patrimoniale,
+> corporate structuring, trust, banking, legal, IP) e a chi si rivolge. Per lo stato del lavoro si
+> legge il codice; per i lavori aperti, `PIANO_DI_MIGLIORAMENTO.md`.
+
 ---
 
 ## 1. Contesto e Perimetro
