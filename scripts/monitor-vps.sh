@@ -39,7 +39,8 @@
 # BLUMAN_MONITOR_RIEPILOGO_ORA (8), BLUMAN_MONITOR_APT_MAX_ORE (168),
 # BLUMAN_MONITOR_COPIA_MAX_ORE (30), BLUMAN_MONITOR_STATO, BLUMAN_MONITOR_CONF,
 # BLUMAN_BACKUP_DIR, BLUMAN_BACKUP_CONFIG_DIR, BLUMAN_BACKUP_STATO_DIR,
-# BLUMAN_BACKUP_RCLONE_REMOTE, BLUMAN_MONITOR_HEALTH_URL.
+# BLUMAN_BACKUP_RCLONE_REMOTE, BLUMAN_MONITOR_HEALTH_URL,
+# BLUMAN_MONITOR_PING_URL (healthchecks.io: se il monitor muore, se ne accorge lui).
 #
 # ── USO ──────────────────────────────────────────────────────────────────────
 #   bash ./scripts/monitor-vps.sh                 # un giro completo
@@ -89,6 +90,8 @@ SOGLIA_SWAP="${BLUMAN_MONITOR_SWAP_PCT:-50}"
 ORA_RIEPILOGO="$((10#${BLUMAN_MONITOR_RIEPILOGO_ORA:-8}))"
 MAX_ORE_LISTE_APT="${BLUMAN_MONITOR_APT_MAX_ORE:-168}"
 HEALTH_URL="${BLUMAN_MONITOR_HEALTH_URL:-http://127.0.0.1/health}"
+# URL di ping di healthchecks.io, opzionale. Vuoto = nessun battito esterno (comportamento di prima).
+PING_URL="${BLUMAN_MONITOR_PING_URL:-}"
 DIR_BACKUP="${BLUMAN_BACKUP_DIR:-/var/backups/bluman}"
 
 # ── COPIA OFF-SITE (voce 8-bis) ──────────────────────────────────────────────
@@ -499,6 +502,26 @@ invia_telegram() {
   return 1
 }
 
+# ── BATTITO ESTERNO (healthchecks.io) ────────────────────────────────────────
+# Un monitor che gira sulla macchina che sorveglia non può dire «sono morto». Se il VPS si
+# spegne, se il cron si rompe o se lo script va in errore prima di arrivare qui, il silenzio è
+# indistinguibile da «tutto bene». healthchecks.io è l'unico che se ne accorge: aspetta un ping
+# ogni N minuti e avvisa quando non arriva.
+# Ping all'URL normale quando il giro è verde, `/fail` quando almeno un controllo è rosso.
+# `unknown` **non** è rosso: un permesso mancante non deve far scattare l'allarme esterno (la
+# stessa regola degli avvisi Telegram).
+# L'URL è un segreto: stderr soppresso e si registra solo il codice HTTP, come per il token.
+battito() {
+  local guasto="$1" url codice
+  [ -n "$PING_URL" ] || return 0
+  url="$PING_URL"
+  [ "$guasto" = "1" ] && url="${PING_URL%/}/fail"
+  codice="$(curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null)" || codice="000"
+  [ "$codice" = "200" ] && return 0
+  riga "BATTITO ESTERNO NON INVIATO (http $codice)."
+  return 1
+}
+
 # ── RIEPILOGO ────────────────────────────────────────────────────────────────
 riepilogo() {
   local sintesi="$1" corpo
@@ -518,7 +541,7 @@ Uptime: $(uptime -p 2>/dev/null | sed 's/^up //')"
 giro() {
   local ignora_stato="${1:-}" forza_riepilogo="${2:-}"
   local nuovi=() rientri=() righe=() sintesi=""
-  local chiave esito stato dettaglio precedente cadenza voce
+  local chiave esito stato dettaglio precedente cadenza voce qualche_fail=0
 
   riga "── giro $(adesso) ──"
 
@@ -531,7 +554,7 @@ giro() {
       righe+=("  ${chiave}: ${precedente:-?} (non rieseguito)")
       case "$precedente" in
         ok)      sintesi="${sintesi}✅ ${voce}"$'\n' ;;
-        fail)    sintesi="${sintesi}🔴 ${voce}"$'\n' ;;
+        fail)    sintesi="${sintesi}🔴 ${voce}"$'\n'; qualche_fail=1 ;;
         unknown) sintesi="${sintesi}⚠️ ${voce}"$'\n' ;;
         *)       sintesi="${sintesi}❔ ${voce}"$'\n' ;;
       esac
@@ -547,6 +570,7 @@ giro() {
       ok|fail|unknown) ;;
       *) stato="unknown"; dettaglio="stato non riconosciuto: $esito" ;;
     esac
+    [ "$stato" = "fail" ] && qualche_fail=1
 
     if [ "$cadenza" -gt 0 ] && [ -n "$STATO_DIR" ]; then
       touch "$STATO_DIR/$chiave.ultima" 2>/dev/null
@@ -610,6 +634,10 @@ $(elenco "${rientri[@]}")"
     riepilogo "$sintesi"
     [ -n "$STATO_DIR" ] && touch "$STATO_DIR/.ultimo-riepilogo" 2>/dev/null
   fi
+
+  # Il battito esce dal giro per ultimo: se lo script muore prima, healthchecks.io non riceve
+  # niente e lo segnala — che è esattamente il caso che questo ping esiste per coprire.
+  battito "$qualche_fail"
 }
 
 # ── AVVIO ────────────────────────────────────────────────────────────────────

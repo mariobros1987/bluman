@@ -280,9 +280,17 @@ miglioramento: senza, il backup che c'è non è un backup.
       resta è il riepilogo delle 08:00 che **non arriva**, e «non arriva» è indistinguibile da «non
       c'era niente da dire» per chi non lo sta aspettando. È l'ultimo buco di una sorveglianza che si
       fida di sé stessa.
-      **Come si chiude:** ⚠️ primo passo a carico del titolare — creare l'account e passare l'URL di
-      ping; poi il monitor lo chiama in coda a ogni giro e chiama `/fail` quando un controllo è rosso,
-      così il servizio esterno avvisa quando i ping **smettono** di arrivare.
+      **Il codice è pronto dal 17/10/2026** (`scripts/monitor-vps.sh`): a ogni giro fa un ping
+      all'URL in `BLUMAN_MONITOR_PING_URL` e chiama `/fail` quando almeno un controllo è rosso;
+      `unknown` non fa scattare l'allarme esterno. L'URL è un segreto e non va nel log.
+      **Come si chiude:** creare l'account, aggiungere un check con periodo ~30 minuti / grace ~15,
+      e mettere l'URL in `/etc/bluman/monitor.env` (600, di `bluman`):
+      ```bash
+      sudo -u bluman nano /etc/bluman/monitor.env
+      # BLUMAN_MONITOR_PING_URL=https://hc-ping.com/xxxxxxxx-...
+      ```
+      Poi una prova: `bash ./scripts/monitor-vps.sh` e il check deve passare da «new» a «up» (o a
+      «down» se in quel momento c'è un controllo rosso).
 
 - [ ] **Cancellare i `.env` con le password vecchie.** Sul server restano
       `.env.pre-rotazione-20261002_132246`, `.env.pre-rotazione-owner-20261002_133350` (più il `.env`
