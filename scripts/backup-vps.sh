@@ -263,21 +263,42 @@ scrivi_stato_backup
 #   D=/var/backups/bluman
 #
 #   # 1) DATABASE
-#   openssl enc -d -aes-256-cbc -pbkdf2 -in $D/bluman_XXXX.dump.enc -pass "pass:$BACKUP_ENCRYPTION_KEY" -out /tmp/t.dump
-#   docker run --rm -e POSTGRES_PASSWORD=test -d --name pgtest postgres:17-alpine
-#   sleep 5
+#   # `-pass stdin` e non `-pass "pass:$BACKUP_ENCRYPTION_KEY"`: così la chiave non compare
+#   # nella riga di comando, cioè in `ps` per chiunque sia sulla macchina in quel momento.
+#   printf '%s' "$BACKUP_ENCRYPTION_KEY" | openssl enc -d -aes-256-cbc -pbkdf2 \
+#     -in $D/bluman_XXXX.dump.enc -pass stdin -out /tmp/t.dump
+#   # `-d --rm` con i dati in tmpfs: se il test si interrompe non resta un cluster da svuotare.
+#   docker run -d --rm --name pgtest -e POSTGRES_PASSWORD=test \
+#     --tmpfs /var/lib/postgresql/data:rw,size=512m postgres:17-alpine
+#   for i in $(seq 1 40); do docker exec pgtest pg_isready -U postgres -q && break; sleep 1; done
+#   # I RUOLI VENGONO PRIMA DEL RESTORE. Il dump contiene le policy di isolamento dei tenant
+#   # (`CREATE POLICY ... TO bluman_app`): senza il ruolo la policy non si crea e un dump sano
+#   # produce 293 errori. I nomi veri si leggono con `\du` — qui sono quelli di produzione.
+#   docker exec pgtest psql -U postgres -qc "CREATE ROLE bluman_owner NOLOGIN; CREATE ROLE bluman_app NOLOGIN;"
+#   docker exec pgtest createdb -U postgres t
+#   # `pg_trgm` va creata a mano: su un cluster nuovo non c'è, e la migrazione dei trigram
+#   # ingoia l'errore invece di fermarsi (vedi la nota sul VPS nuovo).
+#   docker exec pgtest psql -U postgres -d t -qc 'CREATE EXTENSION IF NOT EXISTS pg_trgm;'
 #   docker cp /tmp/t.dump pgtest:/t.dump
-#   docker exec pgtest sh -c 'createdb -U postgres t && pg_restore --no-owner -U postgres -d t /t.dump'
-#   # i conteggi devono COINCIDERE con la produzione, non solo essere > 0:
+#   docker exec pgtest pg_restore --no-owner --no-acl -U postgres -d t /t.dump
+#   # Deve uscire 0 e non stampare NIENTE: un restore con errori non è riuscito, anche se le
+#   # tabelle ci sono. Poi i conteggi devono COINCIDERE con la produzione, non solo essere > 0:
 #   docker exec pgtest psql -U postgres -d t -c "select count(*) from cliente;"
 #   docker exec bluman_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "select count(*) from cliente;"
+#   # Un conteggio che non torna va spiegato con ciò che è cambiato DOPO il backup (righe
+#   # cancellate, migrazioni applicate), non ignorato: è lì che si nasconde il dump sbagliato.
 #   docker rm -f pgtest
 #
 #   # 2) DOCUMENTI — i file devono essere tanti quanti ne dichiara il database
-#   openssl enc -d -aes-256-cbc -pbkdf2 -in $D/bluman_XXXX_uploads.tar.gz.enc -pass "pass:$BACKUP_ENCRYPTION_KEY" | tar -tzf - | wc -l
-#   # e il confronto che conta davvero: documenti in tabella SENZA il loro file
+#   printf '%s' "$BACKUP_ENCRYPTION_KEY" | openssl enc -d -aes-256-cbc -pbkdf2 \
+#     -in $D/bluman_XXXX_uploads.tar.gz.enc -pass stdin | tar -tzf - | wc -l
+#   # e il confronto che conta davvero: documenti in tabella SENZA il loro file.
+#   # La colonna del percorso è `file_url`, non `percorso` (`file_pdf_url`/`file_docx_url`
+#   # sono le copie nei due formati e vanno guardate solo se valorizzate).
 #   docker exec bluman_postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
-#     "select count(*) from documento where percorso like '/uploads/%'"
+#     "select count(*) from documento where file_url like '/uploads/%'"
 #
 #   # 3) SEGRETI — il .env deve riaprirsi e contenere le chiavi attese
-#   openssl enc -d -aes-256-cbc -pbkdf2 -in $D/bluman_XXXX_env.tar.gz.enc -pass "pass:$BACKUP_ENCRYPTION_KEY" | tar -xzO .env | grep -cE '^(JWT_SECRET|SIGILLO_HMAC_SECRET|BACKUP_ENCRYPTION_KEY)='
+#   printf '%s' "$BACKUP_ENCRYPTION_KEY" | openssl enc -d -aes-256-cbc -pbkdf2 \
+#     -in $D/bluman_XXXX_env.tar.gz.enc -pass stdin | tar -xzO .env \
+#     | grep -cE '^(JWT_SECRET|SIGILLO_HMAC_SECRET|BACKUP_ENCRYPTION_KEY)='
