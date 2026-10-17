@@ -1,16 +1,23 @@
 import { useEffect, useState } from 'react';
 import { fetchKycFascicoloApi, fetchModuliTenant, sbloccaKycApi, type FascicoloKyc } from '../../api/kyc';
+import { fetchComplianceSettings } from '../../api/compliance';
 
 /**
  * Gate KYC lato progetto (K4, §8.1): il KYC si gestisce sul CLIENTE, il progetto lo CONSUMA come
  * banner. Legge il fascicolo del cliente e avvisa se la fatturazione è bloccata (pratica esistente
  * ma non approvata). Non mostra nulla se il modulo Compliance non è attivo per lo studio.
  * Il blocco vero lo applica il backend (409 su POST /invoices); questo è l'avviso a monte.
+ *
+ * Dal 17/10/2026 il backend ha degradato il profilo regolatorio da blocco ad **avviso** (decisione
+ * del titolare): senza profilo lo studio non resta fermo. Il banner deve dire la stessa cosa, con
+ * lo stesso peso: un avviso ambra, non un divieto rosso.
  */
 export function GateKycProgetto({ clienteId }: { clienteId?: string | null }) {
   const [attivo, setAttivo] = useState(false);
   const [fasc, setFasc] = useState<FascicoloKyc | null>(null);
   const [noto, setNoto] = useState(false);
+  // `undefined` = non ancora noto (nessun avviso), `null` = lo studio non ha dichiarato il profilo.
+  const [profilo, setProfilo] = useState<string | null | undefined>(undefined);
   // Sblocco motivato (override) locale: dopo un override riuscito il gate passa, anche se lo stato
   // della pratica resta non approvato — il banner lo riflette.
   const [sbloccato, setSbloccato] = useState(false);
@@ -24,6 +31,16 @@ export function GateKycProgetto({ clienteId }: { clienteId?: string | null }) {
     fetchModuliTenant().then((m) => { if (!annullato) setAttivo((m.attivi || []).includes('kyc')); }).catch(() => { /* fail-open: nessun banner */ });
     return () => { annullato = true; };
   }, []);
+
+  // Le impostazioni si leggono solo col modulo attivo: prima il backend risponde 403.
+  useEffect(() => {
+    if (!attivo) return;
+    let annullato = false;
+    fetchComplianceSettings()
+      .then((r) => { if (!annullato) setProfilo(r.settings.regulatoryProfile ?? null); })
+      .catch(() => { /* non noto: nessun avviso, il blocco resta quello del backend */ });
+    return () => { annullato = true; };
+  }, [attivo]);
 
   useEffect(() => {
     let annullato = false;
@@ -53,6 +70,17 @@ export function GateKycProgetto({ clienteId }: { clienteId?: string | null }) {
     }
   };
 
+  // Il profilo regolatorio mancante è un AVVISO, non un blocco (decisione del 17/10/2026): il
+  // backend lascia passare e lo segnala, quindi il banner non deve dire «bloccato».
+  if (profilo === null) {
+    return (
+      <div style={{ ...box, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', border: '1px solid var(--pill-amber-bg)' }}>
+        🛡 <strong>Profilo regolatorio non dichiarato</strong> — l'operatività non è bloccata, ma finché
+        manca non è stabilito quali regole antiriciclaggio si applicano. Impostalo in
+        <strong> Impostazioni → Compliance &amp; AML</strong>.
+      </div>
+    );
+  }
   if (fasc && !consente && sbloccato) {
     return (
       <div style={{ ...box, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', border: '1px solid var(--pill-green-bg)' }}>

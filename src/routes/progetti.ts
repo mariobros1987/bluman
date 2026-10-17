@@ -18,7 +18,7 @@ import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
 import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
-import { operativitaBloccataDaKyc } from '../services/kycGate.js';
+import { messaggioBloccoKyc, operativitaBloccataDaKyc } from '../services/kycGate.js';
 import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
@@ -1671,19 +1671,21 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     // §15.3 — qui avviene l'istanziazione completa: modulo_progetto, microvoce_progetto,
     // passaggio_progetto, dipendenze, il tutto dentro la transazione già testata.
     // K4 (§8.1) — «non può passare in esecuzione senza KYC approvato»: col modulo Compliance attivo,
-    // se il cliente del preventivo ha una pratica KYC che non consente l'operatività, l'accettazione
-    // (che avvia l'incarico) è bloccata. Nessun fascicolo → nessun blocco. Fail-open su errore di lettura.
+    // l'accettazione (che avvia l'incarico) passa dal gate. Il gate guarda prima lo studio (profilo
+    // regolatorio dichiarato) e poi il cliente, e **fallisce chiuso**: se non riesce a leggere, blocca.
     if (await moduloKycAttivo(req.tenantId)) {
-      const prev = await prisma.preventivo
-        .findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } })
-        .catch(() => null);
+      // Niente `catch`: se non si riesce a leggere il preventivo, l'errore deve arrivare
+      // all'errorHandler (500) invece di essere scambiato per «preventivo inesistente» — che è
+      // l'unico caso in cui salta il gate. Un `catch` qui trasformava un guasto di lettura in un
+      // incarico avviato senza verifica.
+      const prev = await prisma.preventivo.findFirst({
+        where: { id: req.params.id, tenantId: req.tenantId },
+        select: { clienteId: true },
+      });
       if (prev?.clienteId) {
-        const gate = await operativitaBloccataDaKyc(prisma, req.tenantId, prev.clienteId)
-          .catch(() => ({ bloccato: false, stato: null, sbloccatoDaOverride: false }));
+        const gate = await operativitaBloccataDaKyc(prisma, req.tenantId, prev.clienteId);
         if (gate.bloccato) {
-          return reply.code(409).send({
-            errore: `Impossibile avviare l'incarico: la pratica KYC del cliente è in stato «${gate.stato}», non approvata. Approvala (scheda cliente → «Compliance KYC») o registra uno sblocco motivato prima di accettare il preventivo.`,
-          });
+          return reply.code(409).send({ errore: messaggioBloccoKyc(gate, "L'avvio dell'incarico") });
         }
       }
     }

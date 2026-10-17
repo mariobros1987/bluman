@@ -1,5 +1,40 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+/**
+ * Lo stato del gate KYC, pilotato dai test.
+ *
+ * Il gate ha tre letture (moduli dello studio, profilo regolatorio, fascicolo del cliente) e qui
+ * sono sostituite **solo** quelle: la catena vera — guardia modulo → profilo → fascicolo → sblocco
+ * — gira intera, invece di essere saltata come quando il database non risponde. Serve perché
+ * nessun test attraversava il gate da una rotta vera: era questo il buco per cui la condizione
+ * dichiarata nel manuale poteva restare non applicata senza che niente protestasse.
+ */
+const kyc = vi.hoisted(() => ({
+  moduliConcessi: ['kyc'] as string[],
+  moduliDisattivati: [] as string[],
+  profilo: 'CSP_MFSA' as string | null,
+  fascicolo: null as { id: string; stato: string } | null,
+  override: null as { createdAt: Date } | null,
+  preventivo: { clienteId: 'cli-kyc' } as { clienteId: string } | null,
+  /** Per il caso «la lettura del preventivo fallisce»: il gate non deve poter essere scavalcato. */
+  letturaPreventivoFallisce: false,
+}));
+
+/**
+ * Lo stato va riportato ai valori iniziali prima di **ogni** test del file, non solo di quelli del
+ * gate: i mock sono condivisi, e un `letturaPreventivoFallisce` rimasto `true` dall'ultimo test del
+ * gate faceva fallire le accettazioni dei test successivi — che col gate non c'entravano nulla.
+ */
+beforeEach(() => {
+  kyc.moduliConcessi = ['kyc'];
+  kyc.moduliDisattivati = [];
+  kyc.profilo = 'CSP_MFSA';
+  kyc.fascicolo = null;
+  kyc.override = null;
+  kyc.preventivo = { clienteId: 'cli-kyc' };
+  kyc.letturaPreventivoFallisce = false;
+});
+
 vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
   const delega = (target: any, sostituzioni: Record<string, (...args: any[]) => any>) => new Proxy(target, {
@@ -27,13 +62,59 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       if (args?.select?.sessionVersion === true && Object.keys(args.select).length === 1 && args?.where?.id === 'cliente-1') {
         return { sessionVersion: 0 };
       }
+      // Il cliente usato dai test del gate: la fatturazione lo risolve prima di consultare il KYC.
+      if (args?.where?.tenantId !== undefined && args?.where?.id === 'cli-kyc') {
+        return { id: 'cli-kyc', tenantId: args.where.tenantId, nome: 'Alpha Corp', tipo: 'company' };
+      }
       return (reale.prisma as any).cliente.findFirst(args);
     },
+  });
+  // Ogni sostituzione risponde **solo** alla selezione che le compete e delega il resto: una
+  // sostituzione larga farebbe rispondere 200 a rotte che il test vuole vedere fallire onestamente
+  // senza database (`/progetti`, `/moduli`, `/health`).
+  const tenant = delega((reale.prisma as any).tenant, {
+    findUnique: async (args: any) => {
+      const sel = args?.select ?? {};
+      if (sel.moduliConcessi === true && sel.moduliDisattivati === true) {
+        return { moduliConcessi: kyc.moduliConcessi, moduliDisattivati: kyc.moduliDisattivati };
+      }
+      return (reale.prisma as any).tenant.findUnique(args);
+    },
+  });
+  const preventivo = delega((reale.prisma as any).preventivo, {
+    findFirst: async (args: any) => {
+      if (args?.select?.clienteId === true) {
+        if (kyc.letturaPreventivoFallisce) throw new Error('lettura rifiutata');
+        return kyc.preventivo;
+      }
+      return (reale.prisma as any).preventivo.findFirst(args);
+    },
+  });
+  const tenantComplianceSettings = delega((reale.prisma as any).tenantComplianceSettings, {
+    findUnique: async (args: any) =>
+      args?.select?.regulatoryProfile === true
+        ? { regulatoryProfile: kyc.profilo }
+        : (reale.prisma as any).tenantComplianceSettings.findUnique(args),
+  });
+  const fascicoloKyc = delega((reale.prisma as any).fascicoloKyc, {
+    findFirst: async (args: any) =>
+      args?.select?.id === true && args?.select?.stato === true
+        ? kyc.fascicolo
+        : (reale.prisma as any).fascicoloKyc.findFirst(args),
+  });
+  const overrideKyc = delega((reale.prisma as any).overrideKyc, {
+    findFirst: async (args: any) =>
+      args?.select?.createdAt === true ? kyc.override : (reale.prisma as any).overrideKyc.findFirst(args),
   });
   const prisma = new Proxy(reale.prisma as any, {
     get(target, proprieta) {
       if (proprieta === 'user') return user;
       if (proprieta === 'cliente') return cliente;
+      if (proprieta === 'tenant') return tenant;
+      if (proprieta === 'preventivo') return preventivo;
+      if (proprieta === 'tenantComplianceSettings') return tenantComplianceSettings;
+      if (proprieta === 'fascicoloKyc') return fascicoloKyc;
+      if (proprieta === 'overrideKyc') return overrideKyc;
       const valore = Reflect.get(target, proprieta, target);
       return typeof valore === 'function' ? valore.bind(target) : valore;
     },
@@ -202,6 +283,119 @@ describe('server — flusso completo cliente → progetto → preventivo → acc
       payload: { clienteId: cliente.json().id, progettoId: progetto.id, righe: [{ moduloTemplateId: 'INESISTENTE', moduloTemplateVersione: 1 }] },
     });
     expect(res.statusCode).toBe(404);
+  });
+});
+
+describe('server — gate KYC (§8.1), attraverso le rotte vere', () => {
+  /**
+   * La condizione che l'audit chiamava «modalità bozza» era dichiarata nel manuale e nel docblock di
+   * `complianceService` — «nessun incarico potrà passare in esecuzione» — e **non applicata da nessuna
+   * parte**: le tre rotte che fatturano o avviano un incarico avevano `.catch(() => ({ bloccato:
+   * false }))`, quindi bastava un guasto di lettura. Questi test passano dalle rotte perché il
+   * difetto non stava nella regola: stava nel fatto che nessuno la chiamava, e nessun test lo aveva
+   * mai attraversato.
+   *
+   * Dal 17/10/2026 il profilo regolatorio produce un **avviso**, non un blocco (decisione del
+   * titolare): le due prove qui sotto verificano che l'incarico e la fattura non vengano fermati.
+   * Il blocco sulla pratica del cliente resta e si prova più giù.
+   */
+  async function preventivoDaAccettare({ app, server }: ReturnType<typeof nuovoServer>) {
+    const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Marco Ricci', tipo: 'individual' } });
+    const progetto = app.creaProgetto({ clienteId: cliente.json().id, nome: 'P' });
+    const preventivo = await server.inject({
+      method: 'POST',
+      url: '/preventivi',
+      payload: { clienteId: cliente.json().id, progettoId: progetto.id, righe: [{ moduloTemplateId: 'M01', moduloTemplateVersione: 1 }] },
+    });
+    return { progettoId: progetto.id as string, preventivoId: preventivo.json().id as string };
+  }
+
+  const fattura = { clienteId: 'cli-kyc', righe: [{ descrizione: 'Parcella', prezzoUnitarioCent: 100000 }] };
+
+  it('lo studio senza profilo regolatorio fa partire l\'incarico: avviso, non blocco', async () => {
+    kyc.profilo = null;
+    const { app, server } = nuovoServer();
+    const { progettoId, preventivoId } = await preventivoDaAccettare({ app, server });
+
+    const res = await server.inject({ method: 'POST', url: `/preventivi/${preventivoId}/accetta` });
+
+    expect(res.statusCode).toBe(200);
+    // Il progetto deve essere davvero avanzato: un 200 che non avvia nulla sarebbe un avviso
+    // travestito da successo.
+    const dopo = await server.inject({ method: 'GET', url: `/progetti/${progettoId}` });
+    expect(dopo.json().stato).not.toBe('pre_project');
+  });
+
+  it('lo studio senza profilo regolatorio emette la fattura: avviso, non blocco', async () => {
+    kyc.profilo = null;
+    const { server } = nuovoServer();
+
+    const res = await server.inject({ method: 'POST', url: '/invoices', payload: fattura });
+
+    // Non 409: il gate non ferma. La scrittura poi fallisce perché non c'è database, e va bene —
+    // è la prova che il gate non è ciò che ha fermato la richiesta.
+    expect(res.statusCode).not.toBe(409);
+  });
+
+  it('una pratica non approvata blocca, e il messaggio nomina lo stato', async () => {
+    kyc.fascicolo = { id: 'f-1', stato: 'in_verifica' };
+    const { server } = nuovoServer();
+
+    const res = await server.inject({ method: 'POST', url: '/invoices', payload: fattura });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().errore).toContain('in_verifica');
+    // Non deve rimandare al profilo dello studio: quello c'è, e manderebbe l'operatore a cercare
+    // un'impostazione già fatta invece della pratica che manca.
+    expect(res.json().errore).not.toContain('profilo regolatorio');
+  });
+
+  it('uno sblocco motivato recente lascia emettere la fattura', async () => {
+    kyc.fascicolo = { id: 'f-1', stato: 'sospeso' };
+    kyc.override = { createdAt: new Date() };
+    const { server } = nuovoServer();
+
+    const res = await server.inject({ method: 'POST', url: '/invoices', payload: fattura });
+
+    // Non 409: il gate ha lasciato passare. La scrittura poi fallisce perché non c'è database, e va
+    // bene — è la prova che il gate non è ciò che ha fermato la richiesta.
+    expect(res.statusCode).not.toBe(409);
+  });
+
+  it('con il modulo KYC non concesso allo studio il gate non entra in funzione', async () => {
+    // È la domanda che decide se la regola esiste davvero in produzione: il gate vale sugli studi
+    // che hanno il modulo Compliance. Uno studio senza il modulo non ha obblighi KYC da far
+    // rispettare qui, e l'incarico parte come prima.
+    kyc.moduliConcessi = [];
+    kyc.profilo = null;
+    const { app, server } = nuovoServer();
+    const { preventivoId } = await preventivoDaAccettare({ app, server });
+
+    const res = await server.inject({ method: 'POST', url: `/preventivi/${preventivoId}/accetta` });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('col modulo concesso e spento dall\'admin dello studio il gate non entra in funzione', async () => {
+    kyc.moduliDisattivati = ['kyc'];
+    kyc.profilo = null;
+    const { app, server } = nuovoServer();
+    const { preventivoId } = await preventivoDaAccettare({ app, server });
+
+    expect((await server.inject({ method: 'POST', url: `/preventivi/${preventivoId}/accetta` })).statusCode).toBe(200);
+  });
+
+  it('se la lettura del preventivo fallisce l\'errore si vede, non si scavalca il gate', async () => {
+    // Fino a ieri questa rotta aveva `.catch(() => null)`: un guasto di lettura diventava
+    // «preventivo inesistente», cioè l'unico caso in cui il gate si salta — e l'incarico partiva
+    // senza verifica. Ora l'errore risale all'errorHandler: 500, visibile, nessuna accettazione.
+    kyc.letturaPreventivoFallisce = true;
+    const { app, server } = nuovoServer();
+    const { preventivoId } = await preventivoDaAccettare({ app, server });
+
+    const res = await server.inject({ method: 'POST', url: `/preventivi/${preventivoId}/accetta` });
+
+    expect(res.statusCode).toBe(500);
   });
 });
 

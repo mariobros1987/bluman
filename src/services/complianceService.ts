@@ -1,9 +1,22 @@
 /**
  * KYC/AML Fase K0 (Malta, spec v0.2) — logica di compliance a livello di studio.
  *
- * Puro dove possibile: `modalitaBozza` decide sull'oggetto settings, `calcolaHashEvento` è
- * deterministico. Il primo gate del modulo: finché lo studio non ha scelto il profilo regolatorio
- * e nominato l'MLRO, resta in bozza e nessun incarico potrà passare in esecuzione (fasi successive).
+ * Puro dove possibile: `modalitaBozza` e `profiloRegolatorioMancante` decidono sull'oggetto
+ * settings, `calcolaHashEvento` è deterministico.
+ *
+ * Due cose che sembrano la stessa e non lo sono, e che fino al 16/10/2026 erano confuse:
+ *  - `modalitaBozza` è l'**etichetta** della configurazione dello studio: manca il profilo o
+ *    manca l'MLRO. Dice «questo studio non è ancora configurato per intero».
+ *  - `profiloRegolatorioMancante` è la **condizione che avvisa**: senza profilo regolatorio lo
+ *    studio non ha dichiarato quali regole antiriciclaggio applica. Dal 17/10/2026 produce un
+ *    avviso e **non** un blocco (decisione del titolare, `services/kycGate.ts`): l'operatività
+ *    resta aperta, ma la configurazione incompleta si vede.
+ *
+ * L'MLRO **non** blocca: è la decisione presa col titolare il 27/09/2026 (annotata in
+ * `routes/kyc.ts`), perché advisor e super_admin sono già l'autorità che approva — e lo studio
+ * non deve restare fermo per una nomina che può arrivare dopo. Il commento di questo file
+ * affermava il contrario («e nominato l'MLRO … nessun incarico potrà passare in esecuzione») e
+ * nessun codice lo applicava: erano due affermazioni false invece di una regola.
  */
 import crypto from 'node:crypto';
 
@@ -14,11 +27,21 @@ export interface ComplianceSettingsBozza {
 
 /**
  * Modalità bozza: manca il profilo regolatorio (`CSP_MFSA`/`ALTRO_SOGGETTO_OBBLIGATO`) OPPURE
- * l'MLRO. In bozza il modulo KYC è usabile ma non abilita gli incarichi (spec §8 regola 2).
+ * l'MLRO. È l'etichetta mostrata in Impostazioni, non il criterio dell'avviso: quello è
+ * `profiloRegolatorioMancante`.
  */
 export function modalitaBozza(s: ComplianceSettingsBozza | null | undefined): boolean {
   if (!s) return true;
   return !s.regulatoryProfile || !s.mlroUserId;
+}
+
+/**
+ * Manca il profilo regolatorio (§14): genera un **avviso**, non un blocco (17/10/2026). Una riga
+ * assente vale come profilo assente — «non ho potuto leggere le impostazioni» non è «lo studio ha
+ * dichiarato il profilo».
+ */
+export function profiloRegolatorioMancante(s: ComplianceSettingsBozza | null | undefined): boolean {
+  return !s?.regulatoryProfile;
 }
 
 /**
