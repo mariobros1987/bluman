@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, urlDocumentoAssoluto } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, urlDocumentoAssoluto, apriStreamNotifiche } from '../api/client';
 import {
   abbinaComunicazioneMicrovoceApi,
   fetchMicrovociProgettoApi,
@@ -324,14 +324,34 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
 
   useEffect(() => {
     loadComunicazioni();
-    // Polling portato da 5s a 30s (audit 21/09/2026): ogni giro è una query sulla tabella
-    // comunicazione_progetto — che ora ha un indice, ma con la RLS resta cara — moltiplicata
-    // per ogni chat aperta. 30s riduce di 6× il carico mantenendo l'aggiornamento percepito.
-    // TODO: sostituire il polling con la sottoscrizione all'SSE /stream già esposto dal backend.
+
+    // L'aggiornamento immediato arriva dallo stream SSE: quando il cliente scrive, il backend
+    // crea la notifica `messaggio_cliente` **e** spinge il frame a chi ha lo stream aperto, quindi
+    // la bolla compare senza aspettare un giro di polling. Il frame porta il deep link: si ricarica
+    // solo se riguarda *questa* pratica — un messaggio su un altro fascicolo non deve costare una
+    // query né, tanto meno, far lampeggiare questa chat.
+    //
+    // Resta un giro periodico, ma non è più il meccanismo: è la copertura di due buchi che lo
+    // stream non può chiudere. Il primo è un frame perso (riconnessione, scheda in background,
+    // telefono sospeso). Il secondo è la posta IMAP: quella la scarica il browser, non il backend,
+    // quindi nessun frame SSE può annunciarla — senza questo giro una mail in arrivo resterebbe
+    // invisibile. Il `loadComunicazioni` interno ha già la sua soglia di 60 s per l'IMAP, qui si
+    // passa dallo stesso percorso di prima, solo una volta al minuto invece che ogni 30 secondi.
+    const linkPratica = `/projects/${progettoId}`;
+    const chiudiStream = apriStreamNotifiche((evento) => {
+      if (evento.tipoEvento !== 'messaggio_cliente') return;
+      if (evento.link !== linkPratica) return;
+      loadComunicazioni({ conImap: false });
+    });
+
     const interval = setInterval(() => {
       loadComunicazioni();
-    }, 30000);
-    return () => clearInterval(interval);
+    }, 60_000);
+
+    return () => {
+      clearInterval(interval);
+      chiudiStream();
+    };
   }, [progettoId]);
 
   useEffect(() => {
