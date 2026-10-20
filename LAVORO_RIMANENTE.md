@@ -192,6 +192,14 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
   micro-voci dalla distinta del modulo di libreria con cui il modulo è nato. Serve ai moduli
   istanziati quando il template non aveva ancora articoli: da lì non c'era nessun modo di
   riempirli. Solo su moduli vuoti (409 altrimenti), additivo, con audit.
+- **Deploy verso il progetto giusto**: `distribuisci.sh` passa ora `-p`/`-s`/`-e` espliciti
+  (`RAILWAY_PROJECT`/`RAILWAY_SERVICE`/`RAILWAY_ENVIRONMENT`, default `bluman-backend` →
+  `bluman-api`), invece di fidarsi del link della CLI. La verifica post-deploy aspetta che il
+  deployment attivo **cambi** ed è `RUNNING`: prima bastava `/health`, che risponde anche con
+  l'immagine vecchia e faceva passare per riuscito un deploy fallito.
+- **Da decidere**: il progetto Railway `Bluman` (creato per sbaglio il 20/10 da un `railway up`
+  senza link, servizio `Bluman` in crash per `DIRECT_URL` mancante) è ancora lì. Cancellarlo è
+  distruttivo e serve il via dell'utente.
 
 
 ---
