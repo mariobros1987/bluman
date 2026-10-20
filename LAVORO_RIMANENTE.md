@@ -168,12 +168,9 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 ## P4 — Completamenti (pomeriggi, nessuno blocca)
 
 - **Coda KYC con approvazione massiva**: oggi i pannelli sono per-fascicolo, manca una vista aggregata.
-- **SSE lato client**: il backend espone `/stream` (`src/server.ts:672`);
-  `frontend/src/components/ComunicazioniTab.tsx:330` usa ancora polling ogni 30 s.
-- **Validazione zod**: restano 21 `Record<string, any>` in 6 file di rotte
-  (`kyc.ts` 12, `tenant.ts` 4, `clienti.ts` 2, `progetti.ts`, `notifiche.ts`, `webhooks.ts`).
-- **CORS**: i default con `*.vercel.app` sono sempre fusi in `src/server.ts:257-268` e non si
-  possono restringere da `.env`.
+- **Validazione zod**: restano **39** `Record<string, any>` in **8** file di rotte (ricognizione
+  del 20/10/2026, non più i 21 in 6 del piano): `kyc.ts` 12, `tenant.ts` 9, `clienti.ts` 6,
+  `compliance.ts` 5, `notifiche.ts` 3, `progetti.ts` 2, `webhooks.ts` 1, `portale.ts` 1.
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
   oggi non raccoglie niente.
 - **Accessibilità**: restano casi sparsi di etichette (le tabelle L3 sono già coperte:
@@ -182,6 +179,20 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
   Telegram, SMTP) e le nuove credenziali dei servizi esterni stanno in chiaro nelle rispettive
   tabelle, protette da RLS e dai backup cifrati. Se si vuole una cassaforte con chiave separata,
   è un lavoro a sé (nuova variabile d'ambiente + migrazione dei valori esistenti).
+
+### Chiusi il 20/10/2026
+
+- **SSE lato client**: `ComunicazioniTab` si sottoscrive a `/stream` e si aggiorna sul frame
+  `messaggio_cliente` della *sua* pratica; resta un giro periodico a 60 s che riprende i frame
+  persi e scarica la posta IMAP (quella la tira il browser, non il backend).
+- **CORS**: una `CORS_ORIGINS` dichiarata ora **sostituisce** i default invece di fondersi con
+  loro, quindi `*.vercel.app` si può togliere da `.env`; `/stream` riflette l'`Origin` solo se è
+  in whitelist. Il `.env` del VPS dichiara già le origini vere, quindi lì non cambia niente.
+- **Modulo senza voci**: `POST /progetti/:id/moduli/:moduloId/ripristina-microvoci` ricrea le
+  micro-voci dalla distinta del modulo di libreria con cui il modulo è nato. Serve ai moduli
+  istanziati quando il template non aveva ancora articoli: da lì non c'era nessun modo di
+  riempirli. Solo su moduli vuoti (409 altrimenti), additivo, con audit.
+
 
 ---
 
