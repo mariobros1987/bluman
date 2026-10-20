@@ -340,7 +340,7 @@ function leggiTstInfo(tstInfo: Tlv): DatiTstInfo {
 // ─────────────────────────────────────────────────────────────────
 
 const AVVISO_VERIFICA_PARZIALE =
-  'Il token è stato rilasciato e l’impronta coincide con quella del documento. ' +
+  'Il token è stato rilasciato e l’impronta coincide con quella inviata. ' +
   'La firma crittografica del token, la catena del certificato e la revoca NON sono state ' +
   'validate da questa piattaforma: per la verifica completa serve un servizio eIDAS/DSS o ' +
   '`openssl ts -verify` con i certificati della TSA.';
