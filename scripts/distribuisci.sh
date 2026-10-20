@@ -43,6 +43,16 @@ cd "$(dirname "$0")/.."
 
 RAILWAY="${RAILWAY_BIN:-$(command -v railway 2>/dev/null || echo "$HOME/.railway/bin/railway")}"
 API_BASE="${API_BASE:-https://bluman-api-production.up.railway.app}"
+
+# Il progetto e il servizio Railway sono ESPLICITI, non ereditati dal link della CLI. Il link
+# è stato per macchina e per momento: il 20/10/2026 puntava a un progetto «Bluman» creato per
+# sbaglio (`railway up` senza link auto-crea un progetto col nome della cartella), e lo script
+# ha cercato `bluman-api` lì dentro fermandosi con «Service not found» mentre il backend vero
+# — progetto `bluman-backend` — restava sull'immagine vecchia. Sovrascrivibili per puntare
+# altrove senza toccare lo script.
+RAILWAY_PROJECT="${RAILWAY_PROJECT:-92d43a9a-61d0-4e41-9bce-ca73e79cc097}"
+RAILWAY_SERVICE="${RAILWAY_SERVICE:-bluman-api}"
+RAILWAY_ENVIRONMENT="${RAILWAY_ENVIRONMENT:-production}"
 REQUIRED_GIT_EMAIL="mario.dibenedetto87@gmail.com"
 REQUIRED_GIT_NAME="Mario Dibenedetto"
 
@@ -76,6 +86,28 @@ fi
 titolo() { printf '\n\033[1;34m== %s\033[0m\n' "$1"; }
 successo() { printf '\033[1;32m✔ %s\033[0m\n' "$1"; }
 avviso() { printf '\033[1;33m⚠ %s\033[0m\n' "$1"; }
+
+# Deployment ATTIVO del backend, letto dal progetto esplicito: stampa "<id> <stato>".
+# Serve a distinguere il container vecchio da quello nuovo: /health risponde anche col
+# backend vecchio, quindi da solo non prova che il deploy sia arrivato.
+railway_deploy_attivo() {
+  "$RAILWAY" status --json -p "$RAILWAY_PROJECT" -e "$RAILWAY_ENVIRONMENT" 2>/dev/null | node -e '
+    let s = "";
+    process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      try {
+        const j = JSON.parse(s);
+        for (const e of j.environments?.edges ?? []) {
+          for (const si of e.node?.serviceInstances?.edges ?? []) {
+            const n = si.node ?? {};
+            if (n.serviceName !== process.argv[1]) continue;
+            const d = (n.activeDeployments ?? [])[0];
+            if (d) { console.log(d.id, d.instances?.[0]?.status ?? "?"); process.exit(0); }
+          }
+        }
+      } catch {}
+      process.exit(0);
+    });' "$RAILWAY_SERVICE"
+}
 
 # 1. Identità Git: si CONFIGURA, non si corregge a posteriori. Il config locale vale per i
 # commit FUTURI di questo repo; la verifica sull'ultimo commit (punto 3) è bloccante.
@@ -208,18 +240,46 @@ if [ "$SOLO_PUSH" -eq 0 ]; then
     exit 1
   fi
 
-  # --service bluman-api è OBBLIGATORIO: il servizio linkato alla CLI dipende
-  # dalla macchina (qui è cron-notifiche, residuo della configurazione cron) e
-  # senza il flag il backend finisce sul servizio sbagliato — successo del 16/09/2026.
-  "$RAILWAY" up --service bluman-api --detach
+  # -p/-s/-e espliciti: il link della CLI non fa fede (vedi RAILWAY_PROJECT in testa). Senza
+  # `-p` il comando userebbe il progetto linkato — e il 20/10/2026 ne era linkato uno vuoto,
+  # creato per sbaglio; senza `-s` userebbe il servizio linkato (qui `cron-notifiche`,
+  # residuo della configurazione cron) — successo del 16/09/2026.
+  if ! command -v node >/dev/null 2>&1; then
+    avviso "node non è nel PATH: non posso leggere il deployment attivo, controllerò solo /health."
+  fi
+  DEPLOY_PRIMA="$(railway_deploy_attivo 2>/dev/null | awk '{print $1}')"
+  "$RAILWAY" up -p "$RAILWAY_PROJECT" -s "$RAILWAY_SERVICE" -e "$RAILWAY_ENVIRONMENT" --detach
   successo "Backend inviato a Railway (build avviata in background)."
-  echo "• Puoi monitorare i log con: $RAILWAY logs --service bluman-api"
+  echo "• Puoi monitorare i log con: $RAILWAY logs --service $RAILWAY_SERVICE"
 
-  # 6. Verifica post-deploy: l'health DEVE rispondere sul dominio di produzione. La build
-  #    Railway gira in background (--detach): si attende che il nuovo container risponda,
-  #    con un tetto di ~5 minuti. Il fallimento NON è silenzioso.
+  # 6. Verifica post-deploy: il NUOVO container deve diventare quello attivo. /health da solo
+  #    non basta — risponde anche l'immagine vecchia, quindi un deploy fallito passerebbe per
+  #    riuscito. Si attende che l'id del deployment attivo cambi e che sia RUNNING (~10 min).
   titolo "5. Verifica post-deploy su $API_BASE"
-  echo "• In attesa del nuovo deploy (health check, max 5 minuti)..."
+  if [ -n "$DEPLOY_PRIMA" ]; then
+    echo "• Deployment attivo prima del deploy: $DEPLOY_PRIMA. In attesa del nuovo (max 10 minuti)..."
+    NUOVO=0
+    for i in $(seq 1 60); do
+      LETTO="$(railway_deploy_attivo 2>/dev/null || true)"
+      ID_ATTIVO="${LETTO%% *}"
+      STATO_ATTIVO="${LETTO#* }"
+      if [ -n "$LETTO" ] && [ "$ID_ATTIVO" != "$DEPLOY_PRIMA" ] && [ "$STATO_ATTIVO" = "RUNNING" ]; then
+        NUOVO=1
+        successo "Nuovo deployment attivo: $ID_ATTIVO (RUNNING)."
+        break
+      fi
+      sleep 10
+    done
+    if [ "$NUOVO" -eq 0 ]; then
+      avviso "Dopo 10 minuti è ancora attivo il deployment precedente: la build è fallita o non è partita."
+      echo "  L'ambiente NON è aggiornato. Controlla: $RAILWAY logs --service $RAILWAY_SERVICE" >&2
+      exit 1
+    fi
+  else
+    avviso "Deployment precedente non leggibile: attendo solo che /health risponda (non prova che sia la nuova immagine)."
+  fi
+
+  echo "• In attesa dell'health check (max 5 minuti)..."
   HEALTH_OK=0
   for i in $(seq 1 30); do
     if curl -fsS --max-time 10 "$API_BASE/health" >/dev/null 2>&1; then
