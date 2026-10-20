@@ -18,6 +18,7 @@ const TITLES: Record<string, string> = {
   '/':          'Dashboard',
   '/projects':  'Progetti',
   '/clients':   'Clienti',
+  '/compliance': 'Coda KYC / AML',
   '/calendar':  'Calendario',
   '/library':   'Libreria moduli',
   '/settings':  'Impostazioni',

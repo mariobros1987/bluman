@@ -8,6 +8,8 @@ const NAV = [
   { path: '/',           moduleKey: 'dashboard',   label: 'Dashboard',             icon: '📊' },
   { path: '/projects',   moduleKey: 'projects',    label: 'Progetti',               icon: '📁' },
   { path: '/clients',    moduleKey: 'clients',     label: 'Clienti',                icon: '👥' },
+  // Coda KYC — stessa chiave RBAC di Clienti: sono le pratiche dei clienti viste tutte insieme.
+  { path: '/compliance', moduleKey: 'clients',     label: 'Coda KYC / AML',          icon: '🛡️' },
   { path: '/calendar',   moduleKey: 'calendar',    label: 'Calendario',             icon: '📅' },
   { path: '/invoices',   moduleKey: 'invoices',    label: 'Fatture & SDI',          icon: '💶' },
   { path: '/fornitori',  moduleKey: 'invoices',    label: 'Fornitori & Acquisti',   icon: '🏢' },

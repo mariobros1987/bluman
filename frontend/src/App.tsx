@@ -6,6 +6,7 @@ import { Projects }     from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Library }      from './pages/Library';
 import { ClientsPage }  from './pages/ClientsPage';
+import { CompliancePage } from './pages/CompliancePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ClientPortal } from './pages/ClientPortal';
 import { LoginPage }    from './pages/LoginPage';
@@ -170,6 +171,10 @@ function AppContent() {
           <Route path="/projects"      element={<ProtectedModule user={currentUser} moduleKey="projects" element={<Projects />} />} />
           <Route path="/projects/:id"  element={<ProtectedModule user={currentUser} moduleKey="projects" element={<ProjectDetail />} />} />
           <Route path="/clients"       element={<ProtectedModule user={currentUser} moduleKey="clients" element={<ClientsPage />} />} />
+          {/* Coda KYC: stessa chiave RBAC di Clienti (`clients`) — sono le pratiche dei clienti, e una
+              chiave nuova sarebbe «denied» per chiunque abbia già una matrice salvata. Che il modulo
+              KYC sia attivo per lo studio lo dice la pagina stessa, interrogando `/tenant/moduli`. */}
+          <Route path="/compliance"    element={<ProtectedModule user={currentUser} moduleKey="clients" element={<CompliancePage />} />} />
           <Route path="/calendar"      element={<ProtectedModule user={currentUser} moduleKey="calendar" element={<CalendarPage />} />} />
           <Route path="/invoices"      element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<InvoicesPage />} />} />
           <Route path="/fornitori"     element={<ProtectedModule user={currentUser} moduleKey="invoices" element={<FornitoriPage />} />} />

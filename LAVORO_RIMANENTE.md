@@ -167,7 +167,6 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 
 ## P4 — Completamenti (pomeriggi, nessuno blocca)
 
-- **Coda KYC con approvazione massiva**: oggi i pannelli sono per-fascicolo, manca una vista aggregata.
 - **Validazione zod**: restano **39** `Record<string, any>` in **8** file di rotte (ricognizione
   del 20/10/2026, non più i 21 in 6 del piano): `kyc.ts` 12, `tenant.ts` 9, `clienti.ts` 6,
   `compliance.ts` 5, `notifiche.ts` 3, `progetti.ts` 2, `webhooks.ts` 1, `portale.ts` 1.
@@ -201,6 +200,14 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
   residuo creato per sbaglio da un `railway up` senza link, col servizio `Bluman` in crash per
   `DIRECT_URL` mancante. Non conteneva database né volumi. Railway ne schedula la rimozione
   definitiva (`deletedAt` 22/10/2026); il backend resta `bluman-backend` → `bluman-api`.
+- **Coda KYC con approvazione massiva** (20/10/2026): `GET /kyc/coda` elenca le pratiche aperte
+  con il motivo per cui non sono approvabili, `POST /kyc/coda/approva` approva fino a 100 id per
+  volta riportando **per singolo id** com'è andata (un blocco non ferma gli altri). I gate
+  (§8.2 profilo, §8.3 MLRO, §8.4 screening, K9 conservazione) vivono ora in **una sola porta**
+  (`transizioneKycConGate`), condivisa con la rotta singola: la coda li **annuncia** tramite
+  `valutaApprovazione`, e un test di parità lega il suo verdetto all'esito reale della
+  transizione — la coda non può promettere un'approvazione che il backend rifiuterebbe.
+  Pagina `/compliance` («Coda KYC / AML»), stessa chiave RBAC `clients`.
 
 
 ---

@@ -2,9 +2,11 @@
 // è un processo INTERNO allo studio: il ruolo `cliente` non vi accede (come l'archivio §37). Il
 // livello di verifica lo decide il motore puro `kycEngine`, non l'operatore.
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { StatoKyc } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
-import { calcolaRischioKyc, calcolaScadenzaKyc, type LivelloVerificaKyc } from '../domain/kycEngine.js';
-import { transizioneKyc } from '../services/kycCaseService.js';
+import { calcolaRischioKyc } from '../domain/kycEngine.js';
+import { transizioneKycConGate, puoApprovareRafforzata, valutaApprovazione, motivoRifiutoApprovazione } from '../services/kycCaseService.js';
+import { ApprovazioneMassivaSchema } from '../schemas/kyc.schema.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
@@ -14,7 +16,6 @@ import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
 import { preparaSegnalazione, registraTrasmissione } from '../services/segnalazioneFiauService.js';
 import { generaDossierStrPdf } from '../services/segnalazioneFiauPdf.js';
 import type { DatiFascicoloPerDossier, DossierStr } from '../domain/segnalazioneFiau.js';
-import { dataScadenzaRetention } from '../domain/retentionKyc.js';
 import { registraEsitoRetention, prorogaRetention } from '../services/retentionService.js';
 import { costruisciReportFascicolo } from '../domain/reportFascicolo.js';
 import { generaReportFascicoloPdf } from '../services/fascicoloReportPdf.js';
@@ -168,57 +169,32 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       const fascicolo = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId } });
       if (!fascicolo) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
 
-      // Gate MLRO (§8.3): advisor/super_admin, oppure l'utente nominato MLRO nel tenant (K0).
-      const settings = await prisma.tenantComplianceSettings.findUnique({ where: { tenantId }, select: { mlroUserId: true, retentionYears: true, regulatoryProfile: true } });
+      // Gate §8.2 (profilo regolatorio), §8.3 (MLRO) e §8.4 (screening) vivono in un posto solo:
+      // `transizioneKycConGate`, la stessa porta che usa l'approvazione massiva della coda.
+      const settings = await prisma.tenantComplianceSettings.findUnique({
+        where: { tenantId },
+        select: { mlroUserId: true, retentionYears: true, regulatoryProfile: true },
+      });
 
-      // §8.2/§14 — per approvare una pratica serve almeno il PROFILO REGOLATORIO configurato (quali
-      // regole si applicano). L'MLRO NON è bloccante (scelta del titolare 27/09): l'advisor/super_admin
-      // è già l'autorità che approva (§8.3), quindi lo studio non resta bloccato per il solo fatto di
-      // non aver ancora nominato l'MLRO. Prima non c'era alcun blocco (modalità bozza solo badge).
-      if (stato === 'approvato' && !settings?.regulatoryProfile) {
-        return reply.code(409).send({
-          errore: 'Per approvare una pratica KYC configura almeno il profilo regolatorio in Impostazioni → Compliance & AML (§8.2). La nomina dell’MLRO è consigliata ma non blocca.',
-        });
-      }
-
-      const puoApprovareRafforzata = req.ruolo === 'advisor' || req.ruolo === 'super_admin'
-        || (!!req.userId && req.userId === settings?.mlroUserId);
-
-      const ora = new Date();
-      const campiApprovazione = {
-        dataVerifica: ora,
-        dataScadenza: calcolaScadenzaKyc(fascicolo.livelloVerifica as LivelloVerificaKyc, ora),
-        approvatoDa: req.userId ?? null,
-        approvatoIl: ora,
-      };
-
-      // K9 (§5.4) — alla chiusura parte la conservazione: chiusoAt = fine del rapporto, retentionScadenza
-      // = chiusoAt + retentionYears (config tenant). Additivo: se non si chiude, non si tocca nulla.
-      const campiChiusura = {
-        chiusoAt: ora,
-        retentionScadenza: dataScadenzaRetention(ora, settings?.retentionYears ?? 5),
-      };
-
-      // §8.4 — leggo gli screening solo quando si approva (come il gate MLRO legge le settings):
-      // un match non risolto blocca l'approvazione, con motivo esplicito (regola 12).
-      const screenings = stato === 'approvato'
-        ? await prisma.screeningKyc.findMany({
-            where: { fascicoloId: id, tenantId },
-            select: { tipo: true, esito: true, dataScreening: true, createdAt: true },
-          })
-        : [];
-      const screeningBloccante = screeningBloccaApprovazione(screenings);
-
-      const esito = await transizioneKyc(prisma, {
-        tenantId, fascicoloId: id, nuovoStato: stato,
-        attoreUserId: req.userId, motivazione, puoApprovareRafforzata, screeningBloccante, campiApprovazione, campiChiusura,
+      const esito = await transizioneKycConGate(prisma, {
+        tenantId, fascicoloId: id, nuovoStato: stato, attoreUserId: req.userId, ruolo: req.ruolo, motivazione,
+        settings: {
+          regulatoryProfile: settings?.regulatoryProfile ?? null,
+          mlroUserId: settings?.mlroUserId ?? null,
+          retentionYears: settings?.retentionYears ?? 5,
+        },
       });
 
       if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
       if (esito.esito === 'stato_ignoto') return reply.code(400).send({ errore: `Stato non riconosciuto: ${esito.valore}` });
       if (esito.esito === 'transizione_non_valida') return reply.code(409).send({ errore: `Transizione non ammessa: ${esito.da} → ${esito.a}` });
+      if (esito.esito === 'profilo_mancante') {
+        return reply.code(409).send({
+          errore: 'Per approvare una pratica KYC configura almeno il profilo regolatorio in Impostazioni → Compliance & AML (§8.2). La nomina dell’MLRO è consigliata ma non blocca.',
+        });
+      }
       if (esito.esito === 'serve_mlro') return reply.code(403).send({ errore: 'Approvazione di una pratica ad alto rischio riservata all’MLRO o a un ruolo superiore.' });
-      if (esito.esito === 'screening_bloccante') return reply.code(409).send({ errore: motivoBloccoScreening(screenings) });
+      if (esito.esito === 'screening_bloccante') return reply.code(409).send({ errore: esito.motivo || 'Approvazione bloccata: screening con un match non risolto.' });
 
       await recordAudit({
         tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STATO_AGGIORNATO',
@@ -229,6 +205,132 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       return reply.send({ ok: true, fascicolo: esito.fascicolo });
     },
   );
+
+  // Coda KYC — la vista aggregata che mancava: i pannelli erano per-fascicolo, quindi approvare
+  // dieci pratiche voleva dire aprire dieci schede cliente. Qui si vede cosa attende, PERCHÉ non è
+  // ancora approvabile (gli stessi motivi dei gate: `valutaApprovazione`) e si approva in blocco.
+  //
+  // Gli stati sono quelli aperti: una pratica approvata, respinta o chiusa non attende nulla.
+  // Restano dentro anche i due stati legacy v0.1 (`in_attesa_revisione`, `scaduto`) per i
+  // vecchi record, che la macchina a stati normalizza.
+  const STATI_IN_CODA: StatoKyc[] = [
+    'bozza', 'in_raccolta', 'in_verifica', 'in_attesa_approvazione',
+    'in_revisione', 'sospeso', 'in_attesa_revisione', 'scaduto',
+  ];
+
+  server.get('/kyc/coda', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+
+    const settings = await prisma.tenantComplianceSettings.findUnique({
+      where: { tenantId },
+      select: { mlroUserId: true, regulatoryProfile: true },
+    });
+    const profiloConfigurato = !!settings?.regulatoryProfile;
+    const puoRafforzata = puoApprovareRafforzata(req.ruolo, req.userId, settings?.mlroUserId);
+
+    // Tetto esplicito: la coda è una lista di lavoro, non un'esportazione. 300 pratiche aperte
+    // sono già un caso da guardare, non da scorrere in una tabella.
+    const fascicoli = await prisma.fascicoloKyc.findMany({
+      where: { tenantId, stato: { in: STATI_IN_CODA } },
+      orderBy: [{ punteggioRischio: 'desc' }, { createdAt: 'asc' }],
+      take: 300,
+      select: {
+        id: true, stato: true, livelloVerifica: true, rischioCalcolato: true, punteggioRischio: true,
+        dataScadenza: true, createdAt: true, updatedAt: true,
+        cliente: { select: { id: true, nome: true, tipo: true } },
+        soggetto: { select: { denominazione: true } },
+        screenings: { select: { tipo: true, esito: true, dataScreening: true, createdAt: true } },
+        anomalie: { where: { stato: 'aperta' }, select: { id: true } },
+      },
+    });
+
+    const righe = fascicoli.map((f) => {
+      const screeningBloccante = screeningBloccaApprovazione(f.screenings);
+      const { approvabile, motivi } = valutaApprovazione({
+        stato: f.stato,
+        rischio: f.rischioCalcolato,
+        profiloConfigurato,
+        puoApprovareRafforzata: puoRafforzata,
+        screeningNonRisolto: screeningBloccante,
+      });
+      return {
+        id: f.id,
+        stato: f.stato,
+        livelloVerifica: f.livelloVerifica,
+        rischio: f.rischioCalcolato,
+        punteggioRischio: f.punteggioRischio,
+        dataScadenza: f.dataScadenza,
+        aggiornatoIl: f.updatedAt,
+        cliente: f.cliente,
+        soggetto: f.soggetto?.denominazione ?? null,
+        screeningBloccante,
+        anomalieAperte: f.anomalie.length,
+        approvabile,
+        motivi,
+      };
+    });
+
+    // Le approvabili in cima: sono quelle su cui si può agire oggi; il resto resta visibile
+    // con il motivo, che è l'informazione che serve per sbloccarle.
+    righe.sort((a, b) => Number(b.approvabile) - Number(a.approvabile) || b.punteggioRischio - a.punteggioRischio);
+
+    return reply.send({
+      fascicoli: righe,
+      totale: righe.length,
+      profiloConfigurato,
+      puoApprovareRafforzata: puoRafforzata,
+    });
+  });
+
+  // Approvazione massiva. Una pratica alla volta, di proposito: ogni transizione scrive storico e
+  // ComplianceEvent, e un rifiuto su una non deve annullare le altre. La risposta dice, per ogni
+  // id, se è passata o perché no — un esito parziale mai silenzioso.
+  server.post<{ Body: Record<string, any> }>('/kyc/coda/approva', async (req, reply) => {
+    if (vietatoAlCliente(req, reply)) return;
+    if (await moduloSpento(req, reply)) return;
+    const tenantId = req.tenantId;
+
+    const parse = ApprovazioneMassivaSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Richiesta non valida.' });
+    }
+    const { ids, motivazione } = parse.data;
+
+    const settings = await prisma.tenantComplianceSettings.findUnique({
+      where: { tenantId },
+      select: { mlroUserId: true, retentionYears: true, regulatoryProfile: true },
+    });
+    const gate = {
+      regulatoryProfile: settings?.regulatoryProfile ?? null,
+      mlroUserId: settings?.mlroUserId ?? null,
+      retentionYears: settings?.retentionYears ?? 5,
+    };
+
+    const approvati: string[] = [];
+    const rifiutati: Array<{ id: string; motivo: string }> = [];
+
+    for (const id of ids) {
+      const esito = await transizioneKycConGate(prisma, {
+        tenantId, fascicoloId: id, nuovoStato: 'approvato',
+        attoreUserId: req.userId, ruolo: req.ruolo, motivazione, settings: gate,
+      });
+      if (esito.esito === 'ok') {
+        approvati.push(id);
+        await recordAudit({
+          tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_STATO_AGGIORNATO',
+          entita: `Fascicolo ${id}`,
+          dettagli: `Approvazione dalla coda${motivazione ? ` (${motivazione})` : ''}`,
+          ipAddress: req.ip,
+        });
+      } else {
+        rifiutati.push({ id, motivo: motivoRifiutoApprovazione(esito) });
+      }
+    }
+
+    return reply.send({ ok: true, approvati: approvati.length, rifiutati });
+  });
 
   // Sblocco motivato (§8, OverrideKyc): l'admin dello studio forza l'operatività a valle nonostante
   // il KYC non approvato, lasciando una motivazione. Vale GIORNI_VALIDITA_OVERRIDE giorni (kycGate).

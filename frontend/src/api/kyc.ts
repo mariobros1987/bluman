@@ -354,3 +354,53 @@ export async function salvaSoggettoKyc(fascicoloId: string, body: {
   if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore salvataggio soggetto KYC'));
   return await res.json();
 }
+
+// Coda KYC — la vista aggregata delle pratiche aperte. Il server calcola `approvabile` e i
+// `motivi` con la stessa porta dei gate (`valutaApprovazione`): il browser non decide nulla,
+// mostra solo ciò che il backend applicherebbe davvero.
+export type StatoCodaKyc = FascicoloKyc['stato'];
+
+export interface RigaCodaKyc {
+  id: string;
+  stato: StatoCodaKyc;
+  livelloVerifica: 'semplificata' | 'ordinaria' | 'rafforzata';
+  rischio: 'basso' | 'medio' | 'alto';
+  punteggioRischio: number;
+  dataScadenza: string | null;
+  aggiornatoIl: string;
+  cliente: { id: string; nome: string; tipo: string };
+  soggetto: string | null;
+  screeningBloccante: boolean;
+  anomalieAperte: number;
+  approvabile: boolean;
+  motivi: string[];
+}
+
+export interface CodaKyc {
+  fascicoli: RigaCodaKyc[];
+  totale: number;
+  profiloConfigurato: boolean;
+  puoApprovareRafforzata: boolean;
+}
+
+export async function fetchCodaKycApi(): Promise<CodaKyc> {
+  const res = await apiFetch(`${API_BASE}/kyc/coda`, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore lettura coda KYC'));
+  return await res.json();
+}
+
+export interface EsitoApprovazioneMassiva {
+  ok: boolean;
+  approvati: number;
+  rifiutati: Array<{ id: string; motivo: string }>;
+}
+
+export async function approvaMassivaKycApi(ids: string[], motivazione?: string): Promise<EsitoApprovazioneMassiva> {
+  const res = await apiFetch(`${API_BASE}/kyc/coda/approva`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ ids, ...(motivazione ? { motivazione } : {}) }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore approvazione massiva'));
+  return await res.json();
+}
