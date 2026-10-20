@@ -287,7 +287,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   // Approvazione massiva. Una pratica alla volta, di proposito: ogni transizione scrive storico e
   // ComplianceEvent, e un rifiuto su una non deve annullare le altre. La risposta dice, per ogni
   // id, se è passata o perché no — un esito parziale mai silenzioso.
-  server.post<{ Body: Record<string, any> }>('/kyc/coda/approva', async (req, reply) => {
+  server.post('/kyc/coda/approva', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
     const tenantId = req.tenantId;

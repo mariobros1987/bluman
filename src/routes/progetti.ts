@@ -159,7 +159,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
    */
   const RUOLI_ABBINAMENTO = ['super_admin', 'advisor', 'collaboratore_interno', 'operator'];
 
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/progetti/:id/comunicazioni', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req, reply) => {
     const tenantId = req.tenantId;
     if (req.ruolo === 'cliente') {
       const clienteId = clienteDellaRichiesta(req);
@@ -168,16 +168,16 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: 'Progetto non trovato' });
       }
     }
-    const body = (req.body || {}) as Record<string, any>;
     // Tetti di lunghezza al bordo (il `testo` era illimitato); i controlli di presenza e di ruolo
     // restano sotto, invariati.
-    const parseComm = NuovaComunicazioneSchema.safeParse(body);
+    const parseComm = NuovaComunicazioneSchema.safeParse(req.body || {});
     if (!parseComm.success) {
       return reply.code(400).send({ errore: parseComm.error.issues[0]?.message || 'Dati comunicazione non validi' });
     }
+    const body = parseComm.data;
     const clienteId = req.ruolo === 'cliente' ? clienteDellaRichiesta(req) : null;
-    const canale = typeof body.canale === 'string' ? body.canale.trim().slice(0, 50) : '';
-    const testo = typeof body.testo === 'string' ? body.testo.trim() : '';
+    const canale = (body.canale ?? '').trim().slice(0, 50);
+    const testo = (body.testo ?? '').trim();
     if (!canale || !testo) {
       return reply.code(400).send({ errore: 'Canale e testo sono obbligatori.' });
     }
@@ -188,7 +188,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     // La voce dev'essere di **questa** pratica, e `microvoceDiProgetto` filtra anche sul tenant:
     // senza quel controllo l'id di una voce altrui basterebbe ad appendere un messaggio al fascicolo
     // di un altro studio — lo stesso ragionamento già scritto nella `where` di `scollegaPerId`.
-    const microvoceProgettoId = typeof body.microvoceProgettoId === 'string' ? body.microvoceProgettoId.trim() : '';
+    const microvoceProgettoId = (body.microvoceProgettoId ?? '').trim();
     if (microvoceProgettoId) {
       if (!RUOLI_ABBINAMENTO.includes(req.ruolo ?? '')) {
         return reply.code(403).send({ errore: 'Non autorizzato a scrivere da dentro una micro-voce.' });
@@ -201,8 +201,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     try {
       // Per il portale identità e direzione vengono imposte dal server: un cliente non può
       // presentarsi come advisor né creare una falsa comunicazione in uscita dallo studio.
-      let mittente = typeof body.mittente === 'string' ? body.mittente : '';
-      let destinatario = typeof body.destinatario === 'string' ? body.destinatario : '';
+      let mittente = body.mittente ?? '';
+      let destinatario = body.destinatario ?? '';
       let direzione = body.direzione || 'uscita';
       if (clienteId) {
         const cliente = await prisma.cliente.findFirst({

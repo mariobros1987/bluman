@@ -167,9 +167,11 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 
 ## P4 — Completamenti (pomeriggi, nessuno blocca)
 
-- **Validazione zod**: restano **39** `Record<string, any>` in **8** file di rotte (ricognizione
-  del 20/10/2026, non più i 21 in 6 del piano): `kyc.ts` 12, `tenant.ts` 9, `clienti.ts` 6,
-  `compliance.ts` 5, `notifiche.ts` 3, `progetti.ts` 2, `webhooks.ts` 1, `portale.ts` 1.
+- **Validazione zod**: restano **34** `Record<string, any>` in **6** file di rotte (dai 39 in 8
+  del 20/10/2026; `notifiche.ts` e `progetti.ts` sono chiusi): `kyc.ts` 12, `tenant.ts` 9,
+  `clienti.ts` 6, `compliance.ts` 5, `webhooks.ts` 1, `portale.ts` 1. Gli ultimi due non sono
+  corpi non validati: il webhook WhatsApp è JSON esterno (autenticato via HMAC, la forma la detta
+  Meta) e in `portale.ts` è un helper, non una richiesta.
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
   oggi non raccoglie niente.
 - **Accessibilità**: restano casi sparsi di etichette (le tabelle L3 sono già coperte:

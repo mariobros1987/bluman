@@ -31,5 +31,17 @@ export const NuovaComunicazioneSchema = z.object({
   canale: z.string().max(50).optional().nullable(),
   testo: z.string().max(20000).optional().nullable(),
   microvoceProgettoId: z.string().max(100).optional().nullable(),
+  // Identità del messaggio: l'handler le impone per il portale, ma per lo studio le legge dal
+  // corpo. Star qui le tiene tipate (prima erano `Record<string, any>` e un numero al posto del
+  // nome passava fino alla colonna).
+  mittente: z.string().max(200).optional().nullable(),
+  destinatario: z.string().max(200).optional().nullable(),
+  direzione: z.string().max(20).optional().nullable(),
+  // Gli allegati arrivano già serializzati dai client nuovi e come oggetto dai vecchi: entrambe le
+  // forme sono ammesse e la normalizzazione resta nell'handler.
+  allegatiJson: z
+    .union([z.string().max(100_000), z.record(z.string(), z.unknown()), z.array(z.unknown())])
+    .optional()
+    .nullable(),
 }).passthrough();
 

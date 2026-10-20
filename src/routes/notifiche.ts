@@ -19,8 +19,11 @@ export async function registraRotteNotifiche(server: FastifyInstance): Promise<v
   // ─── NOTIFICHE (Blocco 3) ─────────────────────────────────────────
   // Le notifiche sono per destinatario, non per tenant: la campanella dello
   // studio mostra le righe dell'utente loggato, quella del portale quelle del
-  // cliente. L'identità cliente arriva dal JWT come `client-<clienteId>`.
-  const destinatarioCorrente = (req: any): { tenantId: string; where: Record<string, any> } | null => {
+  // cliente. Il `where` ha quindi due forme (destinatario utente o destinatario cliente) e il
+  // tipo le tiene entrambe, senza `any`.
+  const destinatarioCorrente = (
+    req: any,
+  ): { tenantId: string; where: { tenantId: string; destinatarioId?: string; destinatarioClienteId?: string } } | null => {
     const tenantId = req.tenantId as string;
     const userId = req.userId as string | undefined;
     if (!userId) return null;
@@ -44,25 +47,25 @@ export async function registraRotteNotifiche(server: FastifyInstance): Promise<v
     }
   });
 
-  server.post<{ Body: Record<string, any> }>('/notifiche', async (req, reply) => {
+  server.post('/notifiche', async (req, reply) => {
     const tenantId = req.tenantId as string;
     const parse = CreaNotificaSchema.safeParse(req.body || {});
     if (!parse.success) {
       return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati notifica non validi' });
     }
-    const body = parse.data as Record<string, any>;
+    const body = parse.data;
     // Nessuna scorciatoia tipo `destinatarioId || 'usr-01'`: una notifica senza
     // destinatario reale è solo rumore che nessuno leggerà mai.
-    const destinatarioId = body.destinatarioId as string | undefined;
-    const destinatarioClienteId = body.destinatarioClienteId as string | undefined;
+    const destinatarioId = body.destinatarioId ?? null;
+    const destinatarioClienteId = body.destinatarioClienteId ?? null;
     if (!destinatarioId && !destinatarioClienteId) {
       return reply.code(400).send({ errore: 'destinatarioId o destinatarioClienteId è obbligatorio' });
     }
     const notif = await prisma.notifica.create({
       data: {
         tenantId,
-        destinatarioId: destinatarioId ?? null,
-        destinatarioClienteId: destinatarioClienteId ?? null,
+        destinatarioId,
+        destinatarioClienteId,
         destinatarioTipo: destinatarioClienteId ? 'cliente' : 'user',
         tipoEvento: body.tipoEvento ?? null,
         link: body.link ?? null,
