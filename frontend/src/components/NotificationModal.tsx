@@ -157,7 +157,7 @@ export function NotificationModal({ notifications, onClose, onMarkAllRead, onSel
               ✓ Segna lette
             </button>
           )}
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>
+          <button onClick={onClose} aria-label="Chiudi le notifiche" style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 16, cursor: 'pointer' }}>
             ✕
           </button>
         </div>

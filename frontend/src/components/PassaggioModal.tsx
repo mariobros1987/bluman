@@ -734,7 +734,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
                 📁 {mod.n} ({mod.cat}) · Pratica: <strong>{project.n}</strong> — Cliente: {project.cl}
               </div>
             </div>
-            <button onClick={onClose} style={closeBtnStyle}>✕</button>
+            <button onClick={onClose} style={closeBtnStyle} aria-label="Chiudi la finestra">✕</button>
           </div>
 
           {/* Sub Navigation */}
@@ -912,6 +912,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
               </div>
               <button
                 onClick={() => setSelectedDocPreview(null)}
+                aria-label="Chiudi l’anteprima del documento"
                 style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 20, cursor: 'pointer', padding: '4px 8px' }}
               >
                 ✕

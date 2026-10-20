@@ -35,7 +35,7 @@ export function HeaderProgetto({
 }) {
   return (
     <div className={styles.header}>
-      <button className={styles.backBtn} onClick={onBack}>←</button>
+      <button className={styles.backBtn} onClick={onBack} aria-label="Torna ai progetti">←</button>
       <div className={styles.headerInfo}>
         <h1 className={styles.title} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{project.n}</span>

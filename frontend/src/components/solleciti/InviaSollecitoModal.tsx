@@ -100,7 +100,7 @@ export function InviaSollecitoModal({
               Cliente: <b>{clienteNome}</b> · Calcolo mora e spese forfettarie D.Lgs. 231/2002
             </p>
           </div>
-          <button type="button" className="btn-close" onClick={onClose}>
+          <button type="button" className="btn-close" onClick={onClose} aria-label="Chiudi la finestra">
             ✕
           </button>
         </div>

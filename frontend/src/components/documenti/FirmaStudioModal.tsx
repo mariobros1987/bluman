@@ -250,6 +250,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
           <button
             type="button"
             onClick={onClose}
+            aria-label="Chiudi la finestra"
             style={{
               background: 'transparent',
               border: 'none',

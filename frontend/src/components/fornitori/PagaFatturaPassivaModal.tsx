@@ -52,7 +52,7 @@ export const PagaFatturaPassivaModal: React.FC<PagaFatturaPassivaModalProps> = (
             <span style={{ fontSize: '1.4rem' }}>💳</span>
             <h3 style={{ margin: 0, fontWeight: 700 }}>Salda Fattura Fornitore</h3>
           </div>
-          <button className="btn-close" onClick={onClose} disabled={loading}>
+          <button className="btn-close" onClick={onClose} disabled={loading} aria-label="Chiudi la finestra">
             ✕
           </button>
         </div>

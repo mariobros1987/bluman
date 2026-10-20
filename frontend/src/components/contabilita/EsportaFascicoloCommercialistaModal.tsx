@@ -94,7 +94,7 @@ export function EsportaFascicoloCommercialistaModal({ isOpen, onClose }: Props) 
               Generazione archivio ZIP unificato con XML SDI, LIPE, F24 e Prima Nota
             </p>
           </div>
-          <button type="button" className="btn-close" onClick={onClose}>
+          <button type="button" className="btn-close" onClick={onClose} aria-label="Chiudi la finestra">
             ✕
           </button>
         </div>

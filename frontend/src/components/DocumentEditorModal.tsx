@@ -36,6 +36,7 @@ export function DocumentEditorModal({ onClose }: DocumentEditorModalProps) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Chiudi la finestra"
             style={{
               background: 'var(--card2)',
               border: '1px solid var(--border)',

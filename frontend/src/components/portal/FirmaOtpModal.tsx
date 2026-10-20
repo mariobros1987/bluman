@@ -120,6 +120,7 @@ export function FirmaOtpModal({
           </div>
           <button
             onClick={onClose}
+            aria-label="Chiudi la finestra"
             style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', padding: 4 }}
           >
             ✕

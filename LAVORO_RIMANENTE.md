@@ -174,8 +174,10 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
   Meta) e in `portale.ts` è un helper, non una richiesta.
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
   oggi non raccoglie niente.
-- **Accessibilità**: restano casi sparsi di etichette (le tabelle L3 sono già coperte:
-  30 wrapper di scroll in 25 file).
+- **Accessibilità**: i pulsanti che mostrano solo un simbolo (✕ di chiusura, ← indietro) hanno ora
+  un nome accessibile in tutti i file del frontend (12 corretti il 20/10/2026). Resta da fare il
+  controllo dei campi modulo: l'etichetta è spesso solo visiva accanto all'input, e in jsdom i test
+  non lo vedono. Le tabelle L3 sono già coperte (30 wrapper di scroll in 25 file).
 - **Cifratura a riposo dei segreti nel database**: oggi le credenziali dei canali (WhatsApp,
   Telegram, SMTP) e le nuove credenziali dei servizi esterni stanno in chiaro nelle rispettive
   tabelle, protette da RLS e dai backup cifrati. Se si vuole una cassaforte con chiave separata,

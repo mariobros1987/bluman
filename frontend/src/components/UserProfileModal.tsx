@@ -209,6 +209,7 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
           </div>
           <button
             onClick={onClose}
+            aria-label="Chiudi il profilo"
             style={{
               background: 'transparent',
               border: 'none',

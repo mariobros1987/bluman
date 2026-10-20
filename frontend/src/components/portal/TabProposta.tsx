@@ -157,7 +157,7 @@ export function TabProposta({
                     const isBC = getCurrentTenantId() === BLUECODE_TENANT_ID;
                     const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? `${window.location.origin}/logo.png` : '');
                     const logoHtml = rawLogo
-                      ? `<img src="${rawLogo}" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
+                      ? `<img src="${rawLogo}" alt="Logo dello studio" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
                       : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
                     const htmlContent = `
                       <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">

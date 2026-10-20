@@ -127,6 +127,7 @@ export function ArchiviaOperatoreModal({ persona, verso, onClose, onFatto }: Arc
           </div>
           <button
             onClick={onClose}
+            aria-label="Chiudi la finestra"
             style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer' }}
           >
             ✕
