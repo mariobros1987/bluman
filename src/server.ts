@@ -255,8 +255,13 @@ export function buildServer(app: AppPort): FastifyInstance {
   // quindi qualsiasi sito poteva chiamare l'API dal browser di un operatore loggato.
   // Le origini ammesse si elencano in CORS_ORIGINS (separate da virgola; una voce che
   // inizia con `*.` fa suffix-match sull'hostname, utile per i deploy Vercel).
-  // In sviluppo la whitelist di default è localhost; in produzione senza CORS_ORIGINS
-  // nessuna origine browser è ammessa (fail-closed) e resta solo l'accesso senza Origin.
+  //
+  // Un elenco **dichiarato** vince sui default, non ci si somma. Prima non era così: i default
+  // erano sempre fusi con CORS_ORIGINS, quindi un'installazione che elencava le sue origini non
+  // riusciva a togliere né localhost né `*.vercel.app` — e quest'ultimo non è «i nostri deploy
+  // Vercel», è **qualunque** sito ospitato da Vercel, che chiunque può creare. Ora il `.env` è
+  // l'unica parola quando parla; i default restano per chi non ha ancora configurato niente
+  // (sviluppo, ambiente di prove) e non possono riaprire una whitelist già ristretta.
   const originiDaEnv = (process.env.CORS_ORIGINS || '')
     .split(',')
     .map(v => v.trim())
@@ -269,7 +274,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     'https://bluman.vercel.app',
     '*.vercel.app',
   ];
-  const originiConsentite = Array.from(new Set([...DEFAULT_ORIGINS, ...originiDaEnv]));
+  const originiConsentite = Array.from(new Set(originiDaEnv.length > 0 ? originiDaEnv : DEFAULT_ORIGINS));
 
   function origineInWhitelist(origine: string): boolean {
     return originiConsentite.some(voce => {
@@ -678,15 +683,22 @@ export function buildServer(app: AppPort): FastifyInstance {
     const isCliente = req.ruolo === 'cliente' || (userId || '').startsWith('client-');
 
     const requestOrigin = (req.headers.origin as string) || '';
-    const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : (requestOrigin || 'https://bluman.vercel.app');
+    // Si riflette l'origine solo se è in whitelist. Prima il ramo di ripiego la rifletteva
+    // comunque (`requestOrigin || 'https://bluman.vercel.app'`): chi non era in elenco riceveva
+    // comunque l'`Access-Control-Allow-Origin` col proprio nome, cioè il contrario di quello che
+    // la whitelist dice. Senza header il browser blocca la lettura; l'`Origin` assente (curl,
+    // server-to-server) non è un browser e non ha bisogno di CORS.
+    const allowOrigin = requestOrigin && origineInWhitelist(requestOrigin) ? requestOrigin : null;
 
     reply.hijack();
     reply.raw.setHeader('Content-Type', 'text/event-stream');
     reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
     reply.raw.setHeader('Connection', 'keep-alive');
     reply.raw.setHeader('X-Accel-Buffering', 'no');
-    reply.raw.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    if (allowOrigin) {
+      reply.raw.setHeader('Access-Control-Allow-Origin', allowOrigin);
+      reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    }
     reply.raw.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-tenant-id, Accept, Origin, X-Requested-With');
     reply.raw.writeHead(200);
     reply.raw.write(': connesso\n\n');
