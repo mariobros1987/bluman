@@ -1,16 +1,38 @@
 // KYC/AML Fase K0 (Malta, spec v0.2) — rotte delle impostazioni di compliance dello studio.
 // Lettura riservata ai ruoli interni (mai `cliente`); scrittura solo advisor/super_admin.
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { modalitaBozza, calcolaHashEvento, verificaCatena } from '../services/complianceService.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { livelloComplessivo, prossimaRevisione, assessmentCompleto, type LivelloRischioK3 } from '../domain/calcoloRischio.js';
 import { generaReportStudioPdf } from '../services/reportStudioPdf.js';
+import {
+  ImpostazioniComplianceSchema,
+  ValutazioneRischioStudioSchema,
+  RegistraFormazioneSchema,
+  QuestionarioFiauSchema,
+} from '../schemas/compliance.schema.js';
 
 const PACCHETTI = ['MT', 'IT'];
 const PROFILI = ['CSP_MFSA', 'ALTRO_SOGGETTO_OBBLIGATO'];
 const LIVELLI_RISCHIO = ['basso', 'medio', 'alto'];
+
+/** I campi che `PUT /tenant/compliance-settings` scrive davvero (tutti opzionali: update parziale). */
+interface AggiornamentoImpostazioniCompliance {
+  jurisdictionPack?: string;
+  regulatoryProfile?: string | null;
+  otherSubjectCategory?: string | null;
+  retentionYears?: number;
+  mlroUserId?: string | null;
+  reportingChannel?: string;
+  screeningProvider?: string;
+  featureFlags?: Prisma.InputJsonValue;
+  sogliaTitolareEffettivo?: number;
+  allarmeVariazioniTe?: boolean;
+  gestioneRegistroTe?: boolean;
+}
 
 export async function registraRotteCompliance(server: FastifyInstance): Promise<void> {
   const vietatoAlCliente = (req: FastifyRequest, reply: FastifyReply): boolean => {
@@ -44,17 +66,21 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     }
     if (await moduloSpento(req, reply)) return;
     const tenantId = req.tenantId;
-    const b = (req.body || {}) as Record<string, any>;
+    const parse = ImpostazioniComplianceSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Impostazioni di compliance non valide.' });
+    }
+    const b = parse.data;
 
-    const dati: Record<string, any> = {};
-    if (b.jurisdictionPack !== undefined) dati.jurisdictionPack = PACCHETTI.includes(b.jurisdictionPack) ? b.jurisdictionPack : 'MT';
+    const dati: AggiornamentoImpostazioniCompliance = {};
+    if (b.jurisdictionPack !== undefined) dati.jurisdictionPack = b.jurisdictionPack && PACCHETTI.includes(b.jurisdictionPack) ? b.jurisdictionPack : 'MT';
     if (b.regulatoryProfile !== undefined) dati.regulatoryProfile = b.regulatoryProfile == null ? null : (PROFILI.includes(b.regulatoryProfile) ? b.regulatoryProfile : null);
-    if (b.otherSubjectCategory !== undefined) dati.otherSubjectCategory = b.otherSubjectCategory ? String(b.otherSubjectCategory).slice(0, 200) : null;
+    if (b.otherSubjectCategory !== undefined) dati.otherSubjectCategory = b.otherSubjectCategory ? b.otherSubjectCategory.slice(0, 200) : null;
     if (b.retentionYears !== undefined) dati.retentionYears = Number.isFinite(Number(b.retentionYears)) ? Math.max(1, Math.min(30, Math.round(Number(b.retentionYears)))) : 5;
     if (b.mlroUserId !== undefined) dati.mlroUserId = b.mlroUserId || null;
-    if (b.reportingChannel !== undefined) dati.reportingChannel = String(b.reportingChannel || 'goAML').slice(0, 40);
-    if (b.screeningProvider !== undefined) dati.screeningProvider = String(b.screeningProvider || 'MANUALE').slice(0, 60);
-    if (b.featureFlags !== undefined && b.featureFlags && typeof b.featureFlags === 'object') dati.featureFlags = b.featureFlags;
+    if (b.reportingChannel !== undefined) dati.reportingChannel = (b.reportingChannel || 'goAML').slice(0, 40);
+    if (b.screeningProvider !== undefined) dati.screeningProvider = (b.screeningProvider || 'MANUALE').slice(0, 60);
+    if (b.featureFlags !== undefined && b.featureFlags) dati.featureFlags = b.featureFlags as Prisma.InputJsonValue;
     // K2 — configurazione titolare effettivo (regole per configurazione, §3.2).
     if (b.sogliaTitolareEffettivo !== undefined) dati.sogliaTitolareEffettivo = Number.isFinite(Number(b.sogliaTitolareEffettivo)) ? Math.max(0, Math.min(100, Math.round(Number(b.sogliaTitolareEffettivo)))) : 25;
     if (b.allarmeVariazioniTe !== undefined) dati.allarmeVariazioniTe = Boolean(b.allarmeVariazioniTe);
@@ -132,8 +158,12 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
     if (!puo) return reply.code(403).send({ errore: 'La valutazione del rischio dello studio è riservata al responsabile o all’MLRO.' });
 
-    const b = (req.body || {}) as Record<string, any>;
-    const liv = (v: any): LivelloRischioK3 => (LIVELLI_RISCHIO.includes(v) ? v : 'basso');
+    const parse = ValutazioneRischioStudioSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Valutazione del rischio non valida.' });
+    }
+    const b = parse.data;
+    const liv = (v: string | null | undefined): LivelloRischioK3 => (v && LIVELLI_RISCHIO.includes(v) ? (v as LivelloRischioK3) : 'basso');
     const fattori = {
       clientela: liv(b.clientelaLivello), servizi: liv(b.serviziLivello),
       geografia: liv(b.geografiaLivello), canali: liv(b.canaliLivello),
@@ -158,7 +188,7 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
         geografiaLivello: fattori.geografia, geografiaMotivazione: String(motiv.geografia).trim(),
         canaliLivello: fattori.canali, canaliMotivazione: String(motiv.canale).trim(),
         livelloComplessivo: complessivo,
-        motivazioneComplessiva: b.motivazioneComplessiva ? String(b.motivazioneComplessiva).trim() : null,
+        motivazioneComplessiva: b.motivazioneComplessiva ? b.motivazioneComplessiva.trim() : null,
         prossimaRevisione: prossimaRevisione(ora, complessivo),
         redattoDa: req.userId ?? null,
       },
@@ -189,22 +219,26 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
     if (!puo) return reply.code(403).send({ errore: 'Il registro formazione è riservato al responsabile o all’MLRO.' });
 
-    const b = (req.body || {}) as Record<string, any>;
-    if (!b.titolo || String(b.titolo).trim().length < 2) return reply.code(400).send({ errore: 'Titolo obbligatorio.' });
-    const data = b.data ? new Date(String(b.data)) : null;
+    const parse = RegistraFormazioneSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati della formazione non validi.' });
+    }
+    const b = parse.data;
+    if (b.titolo.trim().length < 2) return reply.code(400).send({ errore: 'Titolo obbligatorio.' });
+    const data = b.data ? new Date(b.data) : null;
     if (!data || Number.isNaN(data.getTime())) return reply.code(400).send({ errore: 'Data della formazione non valida.' });
     const TIPI = ['mlro', 'personale', 'amministratori', 'aggiornamento', 'altro'];
 
     const record = await prisma.trainingRecord.create({
       data: {
         tenantId,
-        titolo: String(b.titolo).trim().slice(0, 200),
-        tipo: TIPI.includes(b.tipo) ? b.tipo : 'personale',
+        titolo: b.titolo.trim().slice(0, 200),
+        tipo: b.tipo && TIPI.includes(b.tipo) ? b.tipo : 'personale',
         data,
-        partecipanti: b.partecipanti ? String(b.partecipanti).trim().slice(0, 1000) : null,
+        partecipanti: b.partecipanti ? b.partecipanti.trim().slice(0, 1000) : null,
         oreFormazione: Number.isFinite(Number(b.oreFormazione)) ? Number(b.oreFormazione) : null,
-        ente: b.ente ? String(b.ente).trim().slice(0, 200) : null,
-        note: b.note ? String(b.note).trim().slice(0, 1000) : null,
+        ente: b.ente ? b.ente.trim().slice(0, 200) : null,
+        note: b.note ? b.note.trim().slice(0, 1000) : null,
         registratoDa: req.userId ?? null,
       },
     });
@@ -235,21 +269,25 @@ export async function registraRotteCompliance(server: FastifyInstance): Promise<
     const puo = req.ruolo === 'advisor' || req.ruolo === 'super_admin' || (!!req.userId && req.userId === settings?.mlroUserId);
     if (!puo) return reply.code(403).send({ errore: 'Il questionario FIAU è riservato al responsabile o all’MLRO.' });
 
-    const b = (req.body || {}) as Record<string, any>;
-    const anno = Number(b.anno);
+    const parse = QuestionarioFiauSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Questionario non valido.' });
+    }
+    const b = parse.data;
+    const anno = b.anno;
     if (!Number.isInteger(anno) || anno < 2020 || anno > 2100) return reply.code(400).send({ errore: 'Anno non valido.' });
     const STATI = ['bozza', 'completato', 'trasmesso'];
-    const stato = STATI.includes(b.stato) ? b.stato : 'bozza';
+    const stato = b.stato && STATI.includes(b.stato) ? b.stato : 'bozza';
     // Se si dichiara trasmesso, serve il riferimento rilasciato dal portale (regola 7: non si marca
     // «trasmesso» senza la prova dell'invio).
-    if (stato === 'trasmesso' && (!b.riferimento || String(b.riferimento).trim().length < 3)) {
+    if (stato === 'trasmesso' && (!b.riferimento || b.riferimento.trim().length < 3)) {
       return reply.code(400).send({ errore: 'Per marcare «trasmesso» serve il riferimento FIAU dell’invio.' });
     }
     const datiComuni = {
       stato,
-      contenutoJson: b.contenuto && typeof b.contenuto === 'object' ? b.contenuto : undefined,
-      note: b.note !== undefined ? (b.note ? String(b.note).trim().slice(0, 2000) : null) : undefined,
-      riferimento: stato === 'trasmesso' ? String(b.riferimento).trim() : (b.riferimento !== undefined ? (b.riferimento ? String(b.riferimento).trim() : null) : undefined),
+      contenutoJson: (b.contenuto ?? undefined) as Prisma.InputJsonValue | undefined,
+      note: b.note !== undefined ? (b.note ? b.note.trim().slice(0, 2000) : null) : undefined,
+      riferimento: stato === 'trasmesso' ? (b.riferimento ?? '').trim() : (b.riferimento !== undefined ? (b.riferimento ? b.riferimento.trim() : null) : undefined),
       trasmessoAt: stato === 'trasmesso' ? new Date() : undefined,
       compilatoDa: req.userId ?? null,
     };

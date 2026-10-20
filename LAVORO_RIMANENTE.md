@@ -167,9 +167,9 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 
 ## P4 — Completamenti (pomeriggi, nessuno blocca)
 
-- **Validazione zod**: restano **34** `Record<string, any>` in **6** file di rotte (dai 39 in 8
-  del 20/10/2026; `notifiche.ts` e `progetti.ts` sono chiusi): `kyc.ts` 12, `tenant.ts` 9,
-  `clienti.ts` 6, `compliance.ts` 5, `webhooks.ts` 1, `portale.ts` 1. Gli ultimi due non sono
+- **Validazione zod**: restano **29** `Record<string, any>` in **5** file di rotte (dai 39 in 8
+  del 20/10/2026; `notifiche.ts`, `progetti.ts` e `compliance.ts` sono chiusi): `kyc.ts` 12,
+  `tenant.ts` 9, `clienti.ts` 6, `webhooks.ts` 1, `portale.ts` 1. Gli ultimi due non sono
   corpi non validati: il webhook WhatsApp è JSON esterno (autenticato via HMAC, la forma la detta
   Meta) e in `portale.ts` è un helper, non una richiesta.
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
