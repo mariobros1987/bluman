@@ -197,9 +197,10 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
   `bluman-api`), invece di fidarsi del link della CLI. La verifica post-deploy aspetta che il
   deployment attivo **cambi** ed è `RUNNING`: prima bastava `/health`, che risponde anche con
   l'immagine vecchia e faceva passare per riuscito un deploy fallito.
-- **Da decidere**: il progetto Railway `Bluman` (creato per sbaglio il 20/10 da un `railway up`
-  senza link, servizio `Bluman` in crash per `DIRECT_URL` mancante) è ancora lì. Cancellarlo è
-  distruttivo e serve il via dell'utente.
+- **Progetto Railway `Bluman` cancellato** (20/10/2026, su richiesta dell'utente): era il
+  residuo creato per sbaglio da un `railway up` senza link, col servizio `Bluman` in crash per
+  `DIRECT_URL` mancante. Non conteneva database né volumi. Railway ne schedula la rimozione
+  definitiva (`deletedAt` 22/10/2026); il backend resta `bluman-backend` → `bluman-api`.
 
 
 ---
