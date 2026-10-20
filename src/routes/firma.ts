@@ -42,6 +42,7 @@ import { scanFileBuffer } from '../services/securityScanner.js';
 import { fileContieneFirmaDigitale } from '../services/firmaFileValidazione.js';
 import { generaCopiaFirmata, type EsitoCopiaFirmata } from '../services/copiaFirmata.js';
 import { segnaDocumentoFirmato, generaVerbaleDiFirma } from '../services/effettiFirma.js';
+import { marcaTemporaleFirma } from '../services/marcaTemporaleService.js';
 import { LETTERA_INCARICO_TESTO_SHA256 } from '../services/letteraIncarico.js';
 import {
   verificaLivelloFirma,
@@ -183,6 +184,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       const firme = await prisma.firmaElettronica.findMany({
         where: { tenantId, clienteId, ambito: 'documento_vault' },
         select: {
+          id: true,
           signatureId: true,
           riferimentoId: true,
           documentoTitolo: true,
@@ -202,6 +204,14 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           standard: true,
           // Piano §3.1 — il valore legale effettivo della firma (scritto dal server).
           valoreLegale: true,
+          // P1.2 — marca temporale: data attestata, TSA e motivo dell'eventuale assenza.
+          // Il token base64 non entra nell'elenco: si scarica da /firme/:id/marca-temporale.
+          marcaTemporaleGenTime: true,
+          marcaTemporaleTsa: true,
+          marcaTemporalePolicy: true,
+          marcaTemporaleSerial: true,
+          marcaTemporaleTokenHash: true,
+          marcaTemporaleErrore: true,
           // Il file ricaricato firmato (canale manuale_scansionata / qualificata_esterna):
           // è l'atto sottoscritto vero. Senza questo campo il portale può offrire solo il
           // master pre-firma anche a firma avvenuta.
@@ -383,6 +393,20 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           // documento non è firmato (le firme storiche precedenti alla migrazione restano
           // 'ses', che è il comportamento che hanno sempre avuto).
           valoreLegale: firma?.valoreLegale ?? null,
+          // P1.2 — il certificato del portale cita la marca e può scaricare il token.
+          firmaId: firma?.id ?? null,
+          marcaTemporale:
+            firma && (firma.marcaTemporaleGenTime || firma.marcaTemporaleErrore)
+              ? {
+                  ok: Boolean(firma.marcaTemporaleGenTime),
+                  genTime: firma.marcaTemporaleGenTime ? firma.marcaTemporaleGenTime.toISOString() : null,
+                  tsa: firma.marcaTemporaleTsa,
+                  policy: firma.marcaTemporalePolicy,
+                  serialNumber: firma.marcaTemporaleSerial,
+                  tokenHash: firma.marcaTemporaleTokenHash,
+                  errore: firma.marcaTemporaleErrore,
+                }
+              : null,
         };
       });
 
@@ -432,6 +456,19 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           // in download anche quando il file originale non c'è più.
           fileFirmatoUrl: f.fileFirmatoUrl ? (rifirmaUrlUpload(f.fileFirmatoUrl) as string) : null,
           valoreLegale: f.valoreLegale ?? null,
+          firmaId: f.id,
+          marcaTemporale:
+            f.marcaTemporaleGenTime || f.marcaTemporaleErrore
+              ? {
+                  ok: Boolean(f.marcaTemporaleGenTime),
+                  genTime: f.marcaTemporaleGenTime ? f.marcaTemporaleGenTime.toISOString() : null,
+                  tsa: f.marcaTemporaleTsa,
+                  policy: f.marcaTemporalePolicy,
+                  serialNumber: f.marcaTemporaleSerial,
+                  tokenHash: f.marcaTemporaleTokenHash,
+                  errore: f.marcaTemporaleErrore,
+                }
+              : null,
           documentoNonPiuDisponibile: true,
         }));
 
@@ -1605,6 +1642,12 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         },
       });
 
+      // P1.2 — la firma è registrata: ora si chiede alla TSA di marcarne il sigillo. Il
+      // token viene conservato nella riga e il verbale lo cita. La marca non può far
+      // fallire la firma (l'helper non solleva): un guasto della TSA diventa un fatto
+      // dichiarato in `marcaTemporale.errore`, non una firma persa.
+      const marcaTemporale = await marcaTemporaleFirma(tenantId, firma);
+
       // L'esito della copia §36 serve al sigillo di risposta («scarica il PDF firmato»):
       // sta fuori dal blocco perché il seal si costruisce più avanti, dopo il verbale.
       let esitoCopia: EsitoCopiaFirmata | null = null;
@@ -1701,6 +1744,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         sigilloDigest: sigillo.sha256Digest,
         ambito,
         riferimentoId: riferimentoId ?? null,
+        marcaTemporale,
       });
 
       return reply.send({
@@ -1709,6 +1753,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           ...sigillo,
           id: firma.id,
           tipoFirma: 'fea_otp',
+          marcaTemporale,
           // Il PDF con la firma DENTRO (copia §36): il cliente scarica l'atto sottoscritto,
           // non solo la certificazione. Null se la copia non è uscita (documento pre-§36,
           // template senza segnaposto): la ricevuta non offre ciò che non esiste.
@@ -1950,6 +1995,9 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         },
       });
 
+      // P1.2 — stessa marca della firma OTP: il token attesta il sigillo del file caricato.
+      const marcaTemporale = await marcaTemporaleFirma(tenantId, firma);
+
       if (vault && riferimentoId) await segnaDocumentoFirmato(tenantId, riferimentoId);
 
       await recordAudit({
@@ -1989,6 +2037,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
         sigilloDigest: sigillo.sha256Digest,
         ambito,
         riferimentoId: riferimentoId ?? null,
+        marcaTemporale,
       });
 
       return reply.send({
@@ -1997,6 +2046,7 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           ...sigillo,
           id: firma.id,
           tipoFirma,
+          marcaTemporale,
           // Il file con la firma dentro è quello appena caricato dal cliente: oltre
           // all'URL nudo (uso interno), il seal espone `fileUrl` rinnovato perché la
           // ricevuta lo offra in download come atto sottoscritto.
@@ -2050,6 +2100,15 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           standard: true,
           // Piano §3.1 — il valore legale effettivo della firma, scritto dal server.
           valoreLegale: true,
+          // P1.2 — la marca temporale in elenco, senza il token (che si scarica dal
+          // dettaglio): data attestata, TSA e motivo dell'eventuale assenza.
+          marcaTemporaleGenTime: true,
+          marcaTemporaleTsa: true,
+          marcaTemporalePolicy: true,
+          marcaTemporaleSerial: true,
+          marcaTemporaleTokenHash: true,
+          marcaTemporaleErrore: true,
+          marcaTemporaleRichiestaAt: true,
           firmatoAt: true,
           // La grafometrica è un'immagine e pesa: si scarica dal dettaglio, non in elenco.
           cliente: { select: { id: true, nome: true } },
@@ -2058,6 +2117,67 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
       return reply.send({ ok: true, firme });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura firme' });
+    }
+  });
+
+  server.get<{ Params: { id: string } }>('/firme/:id/marca-temporale', async (req, reply) => {
+    const tenantId = req.tenantId;
+    try {
+      const firma = await prisma.firmaElettronica.findFirst({
+        where: { id: req.params.id, tenantId },
+        select: {
+          id: true,
+          signatureId: true,
+          clienteId: true,
+          documentoTitolo: true,
+          sigilloDigest: true,
+          marcaTemporaleToken: true,
+          marcaTemporaleImpronta: true,
+          marcaTemporaleTsa: true,
+          marcaTemporaleGenTime: true,
+          marcaTemporalePolicy: true,
+          marcaTemporaleSerial: true,
+          marcaTemporaleTokenHash: true,
+          marcaTemporaleErrore: true,
+          marcaTemporaleRichiestaAt: true,
+        },
+      });
+      if (!firma) return reply.code(404).send({ errore: 'Firma non trovata.' });
+
+      // RLS isola il tenant, non i clienti fra loro: un cliente non deve poter scaricare
+      // la marca di un altro cliente dello stesso studio.
+      if (req.ruolo === 'cliente' && clienteDellaRichiesta(req) !== firma.clienteId) {
+        return reply.code(403).send({ errore: 'Firma non accessibile.' });
+      }
+      if (!firma.marcaTemporaleToken) {
+        return reply.code(404).send({
+          errore: 'Nessuna marca temporale conservata per questa firma.',
+          motivo: firma.marcaTemporaleErrore ?? 'Marca temporale non richiesta.',
+        });
+      }
+
+      return reply.send({
+        ok: true,
+        firma: {
+          id: firma.id,
+          signatureId: firma.signatureId,
+          documentoTitolo: firma.documentoTitolo,
+          sigilloDigest: firma.sigilloDigest,
+          impronta: firma.marcaTemporaleImpronta,
+          tsa: firma.marcaTemporaleTsa,
+          genTime: firma.marcaTemporaleGenTime,
+          policy: firma.marcaTemporalePolicy,
+          serialNumber: firma.marcaTemporaleSerial,
+          tokenHash: firma.marcaTemporaleTokenHash,
+          richiestaAt: firma.marcaTemporaleRichiestaAt,
+        },
+        // Token RFC 3161 in base64 (DER). Il browser lo salva come `.tsr` e si verifica con
+        // `openssl ts -verify -token_in -digest <impronta> -in token.tsr -CAfile <catena TSA>`.
+        // `-token_in` perché è il TimeStampToken, non la TimeStampResp che lo conteneva.
+        tokenBase64: firma.marcaTemporaleToken,
+      });
+    } catch (err) {
+      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore lettura marca temporale' });
     }
   });
 

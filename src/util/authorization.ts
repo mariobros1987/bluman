@@ -64,6 +64,7 @@ export const ROTTE_CLIENTE_CONSENTITE = new Set<string>([
   'POST /portal/firma-con-file',
   'GET /firme',
   'GET /firme/:id/grafometrica',
+  'GET /firme/:id/marca-temporale',
   'GET /progetti',
   'GET /progetti/:id',
   'GET /progetti/:id/comunicazioni',

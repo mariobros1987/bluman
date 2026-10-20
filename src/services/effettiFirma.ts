@@ -12,7 +12,7 @@
 
 import { prisma } from '../util/prismaClient.js';
 import { uploadDocumento } from './storageService.js';
-import { generaPdfVerbaleFirma } from './verbaleFirma.js';
+import { generaPdfVerbaleFirma, type DatiMarcaTemporaleVerbale } from './verbaleFirma.js';
 import { blocchiSalvati, haSlotFirma } from './copiaFirmata.js';
 import { notificaCliente } from './notificheService.js';
 import { recordAudit } from '../util/serverHelpers.js';
@@ -62,6 +62,8 @@ export async function segnaDocumentoFirmato(tenantId: string, documentoId: strin
 }
 
 /** La firma come la vede il verbale: i campi probatori del record `FirmaElettronica`. */
+export type MarcaTemporalePerVerbale = DatiMarcaTemporaleVerbale;
+
 export type FirmaPerVerbale = {
   id: string;
   signatureId: string;
@@ -111,8 +113,13 @@ export async function generaVerbaleDiFirma(params: {
   sigilloDigest: string;
   ambito: string;
   riferimentoId: string | null;
+  /**
+   * Marca temporale RFC 3161 ottenuta per questa firma (o il motivo per cui non c'è).
+   * Il verbale la cita com'è: un fallimento dichiarato non è un difetto del verbale.
+   */
+  marcaTemporale?: MarcaTemporalePerVerbale | null;
 }): Promise<void> {
-  const { tenantId, clienteId, clienteNome, firma, sigilloDigest, ambito, riferimentoId } = params;
+  const { tenantId, clienteId, clienteNome, firma, sigilloDigest, ambito, riferimentoId, marcaTemporale } = params;
   try {
     // 1. Collocazione nel fascicolo: il verbale segue il documento che certifica. Per il
     //    Vault copia progetto/microvoce dall'originale; per un modulo risale al progetto;
@@ -206,6 +213,9 @@ export async function generaVerbaleDiFirma(params: {
       loginAt: firma.loginAt ?? null,
       docRiconoscimentoHash: firma.docRiconoscimentoHash ?? null,
       docRiconoscimentoTipo: firma.docRiconoscimentoTipo ?? null,
+      // Marca temporale: il builder cita la sezione solo se una marca esiste o se la
+      // richiesta è fallita (e allora ne dichiara il motivo).
+      marcaTemporale: marcaTemporale ?? null,
     });
 
     // 4. Upload + riga Documento. statoDoc 'pubblicato': il verbale è visibile subito al

@@ -24,6 +24,24 @@ export interface DatiOtpVerbale {
   usatoAt?: Date | string | null;
 }
 
+/**
+ * Marca temporale RFC 3161 legata al sigillo. `ok: false` non è un errore del verbale:
+ * la firma resta valida, e il verbale dichiara perché la marca non c'è. `impronta` è
+ * l'impronta esatta inviata alla TSA (qui: il digest del sigillo), `tokenHash` lo
+ * SHA-256 del token conservato accanto alla firma.
+ */
+export interface DatiMarcaTemporaleVerbale {
+  ok: boolean;
+  impronta: string | null;
+  tsa: string | null;
+  genTime: string | null;
+  policy: string | null;
+  serialNumber: string | null;
+  tokenHash: string | null;
+  avviso: string | null;
+  errore: string | null;
+}
+
 export interface DatiVerbaleFirma {
   signatureId: string;
   tipoFirma: string; // fea_otp | manuale_scansionata | qualificata_esterna
@@ -68,6 +86,8 @@ export interface DatiVerbaleFirma {
   // firmatario: quando presente l'hash è entrato nel digest del sigillo.
   docRiconoscimentoHash?: string | null;
   docRiconoscimentoTipo?: string | null;
+  /** Marca temporale RFC 3161: presente quando la richiesta è stata fatta (riuscita o no). */
+  marcaTemporale?: DatiMarcaTemporaleVerbale | null;
 }
 
 /**
@@ -237,6 +257,42 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
     riga(doc, 'Momento del login del firmatario', formattaData(dati.loginAt));
   }
   riga(doc, 'Impronta SHA-256 del sigillo', dati.sha256Digest.toLowerCase());
+
+  // Marca temporale RFC 3161 — sezione presente solo se la richiesta è stata fatta.
+  // Quando la TSA non ha risposto, il verbale lo dice: un'assenza dichiarata è un
+  // fatto documentato, un'assenza taciuta è una lacuna che sembra una svista.
+  if (dati.marcaTemporale) {
+    sezione(doc, 'Marca temporale RFC 3161');
+    if (dati.marcaTemporale.ok) {
+      riga(doc, 'Ora attestata dalla TSA (UTC)', formattaData(dati.marcaTemporale.genTime));
+      riga(doc, 'Autorità di marca temporale', dati.marcaTemporale.tsa ?? 'non registrata');
+      if (dati.marcaTemporale.policy) riga(doc, 'Policy', dati.marcaTemporale.policy);
+      if (dati.marcaTemporale.serialNumber) {
+        riga(doc, 'Numero di serie del token', dati.marcaTemporale.serialNumber);
+      }
+      if (dati.marcaTemporale.impronta) {
+        riga(doc, 'Impronta marcata (SHA-256)', dati.marcaTemporale.impronta.toLowerCase());
+      }
+      if (dati.marcaTemporale.tokenHash) {
+        riga(doc, 'Impronta SHA-256 del token conservato', dati.marcaTemporale.tokenHash.toLowerCase());
+      }
+      riga(doc, 'Conservazione del token', 'Il token RFC 3161 è conservato nella registrazione della firma.');
+      riga(
+        doc,
+        'Verifica del token',
+        dati.marcaTemporale.avviso ||
+          'La piattaforma non ha validato la firma crittografica del token, la catena del certificato e la revoca.',
+      );
+    } else {
+      riga(
+        doc,
+        'Esito',
+        `Marca temporale non ottenuta${dati.marcaTemporale.tsa ? ` dalla TSA ${dati.marcaTemporale.tsa}` : ''}: ${
+          dati.marcaTemporale.errore || 'motivo non registrato'
+        }. La firma resta valida: la marca temporale non è un requisito della sua apposizione.`,
+      );
+    }
+  }
 
   // Sezione OTP — solo se un codice è stato davvero usato: per manuale_scansionata e
   // qualificata_esterna senza OTP va omessa, non lasciata vuota.

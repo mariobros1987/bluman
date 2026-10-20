@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { livelloDaStandard, SOTTOTITOLO_RICEVUTA, NOTA_LEGALE_RICEVUTA } from './livelloFirma';
 import { Modal } from '../ui/Modal';
+import { scaricaMarcaTemporaleApi } from '../../api/firma';
 
 export interface SuccessSealModalProps {
   successSealModal: any;
@@ -21,6 +23,36 @@ export function SuccessSealModal({
   // Il livello si deriva dallo standard inciso dal server nel sigillo: copre il
   // flusso OTP, la firma con file (FEQ) e la ricevuta riaperta dai documenti.
   const livello = livelloDaStandard(successSealModal.standard);
+  const marca = successSealModal.marcaTemporale;
+  const [scaricandoMarca, setScaricandoMarca] = useState(false);
+  const [erroreMarca, setErroreMarca] = useState<string | null>(null);
+
+  /**
+   * Il token arriva in base64 perché è DER binario. Il file che si scarica è il token
+   * RFC 3161 vero — il TimeStampToken, non la risposta che lo conteneva — e si verifica con
+   * `openssl ts -verify -token_in -digest <impronta> -in <file>.tsr -CAfile <CA della TSA>`.
+   */
+  async function scaricaMarcaTemporale() {
+    if (!marca?.ok || !successSealModal.id) return;
+    setScaricandoMarca(true);
+    setErroreMarca(null);
+    try {
+      const esito = await scaricaMarcaTemporaleApi(successSealModal.id);
+      const byte = Uint8Array.from(atob(esito.tokenBase64), (c) => c.charCodeAt(0));
+      const blob = new Blob([byte], { type: 'application/timestamp-reply' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const nomeBase = (successSealModal.documentoTitolo || 'Documento_Firmato').replace(/[^a-zA-Z0-9_-]/g, '_');
+      link.download = `${nomeBase}_${successSealModal.signatureId}.tsr`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setErroreMarca(err instanceof Error ? err.message : 'Download della marca temporale non riuscito.');
+    } finally {
+      setScaricandoMarca(false);
+    }
+  }
 
   return (
     <Modal onClose={() => setSuccessSealModal(null)} zIndex={12000} overlayBackground="rgba(0,0,0,0.85)" dirty={false} labelledBy="success-seal-titolo">
@@ -97,6 +129,41 @@ export function SuccessSealModal({
               </div>
             )}
 
+            {marca && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+                  Marca Temporale RFC 3161:
+                </span>
+                {marca.ok ? (
+                  <>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>
+                      🕒 {marca.genTime ? new Date(marca.genTime).toLocaleString('it-IT', { dateStyle: 'full', timeStyle: 'medium' }) : 'ora non registrata'}
+                      {marca.tsa ? ` · ${marca.tsa}` : ''}
+                    </span>
+                    {marca.serialNumber && (
+                      <span style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--muted)', wordBreak: 'break-all' }}>
+                        Seriale: {marca.serialNumber}{marca.policy ? ` · Policy ${marca.policy}` : ''}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 10, color: 'var(--muted)' }}>
+                      Il token è conservato con la firma: prova che il sigillo esisteva all'ora attestata.
+                    </span>
+                    {marca.avviso && (
+                      <span style={{ fontSize: 10, color: 'var(--muted)' }}>{marca.avviso}</span>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ fontSize: 11, color: 'var(--amber, #b45309)' }}>
+                    ⚠️ Non ottenuta{marca.tsa ? ` dalla TSA ${marca.tsa}` : ''}
+                    {marca.errore ? `: ${marca.errore}` : ''}. La firma resta valida.
+                  </span>
+                )}
+                {erroreMarca && (
+                  <span style={{ fontSize: 10, color: 'var(--red, #b91c1c)' }}>{erroreMarca}</span>
+                )}
+              </div>
+            )}
+
             {successSealModal.documentoHash && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <span style={{ fontSize: 10.5, color: 'var(--muted)', fontWeight: 600 }}>Impronta Crittografica SHA-256 (Integrità Documento):</span>
@@ -166,6 +233,18 @@ export function SuccessSealModal({
               )}
             </div>
           ) : <div />}
+
+          {marca?.ok && successSealModal.id && (
+            <button
+              type="button"
+              onClick={scaricaMarcaTemporale}
+              disabled={scaricandoMarca}
+              title="Token RFC 3161 (DER): si verifica con openssl ts -verify -token_in"
+              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', padding: '9px 16px', borderRadius: 10, fontSize: 11.5, fontWeight: 700, cursor: scaricandoMarca ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              🕒 {scaricandoMarca ? 'Preparo il token…' : 'Marca temporale (.tsr)'}
+            </button>
+          )}
 
           <button
             type="button"

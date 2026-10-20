@@ -175,6 +175,10 @@ export function DocumentViewerModal({
                       documentoId: selectedViewerDoc.id,
                       fileDocxUrl: selectedViewerDoc.fileDocxUrl,
                       clienteId: clienteId,
+                      // P1.2 — la ricevuta riaperta dal fascicolo mostra la stessa marca
+                      // della schermata di firma, e offre il token con lo stesso id.
+                      id: selectedViewerDoc.firmaId || undefined,
+                      marcaTemporale: selectedViewerDoc.marcaTemporale || null,
                     });
                   }}
                   style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--indigo)', color: 'var(--pill-indigo-fg)', padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}

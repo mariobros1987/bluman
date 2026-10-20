@@ -76,6 +76,7 @@ export async function eliminaTenantCompleto(tenantId: string): Promise<Record<st
       ['magicLink', () => tx.magicLink.deleteMany(w)],
       ['codiceOtp', () => tx.codiceOtp.deleteMany(w)],
       ['webhookInbox', () => tx.webhookInbox.deleteMany(w)],
+      ['credenzialeServizioEsterno', () => tx.credenzialeServizioEsterno.deleteMany(w)],
       // Gerarchia progetto: micro-voci → moduli → progetti (Restrict tra loro).
       ['microvoceProgetto', () => tx.microvoceProgetto.deleteMany(w)],
       ['moduloProgettoDipendenza', () => tx.moduloProgettoDipendenza.deleteMany(w)],

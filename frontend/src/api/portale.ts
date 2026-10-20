@@ -243,6 +243,22 @@ export interface DocumentoPortale {
   standard?: string | null;
   /** Piano firma §3 — valore legale effettivo della firma apposta, scritto dal server. */
   valoreLegale?: 'ses' | 'fea' | 'feq' | null;
+  /** P1.2 — id della riga `FirmaElettronica`: serve a scaricare il token della marca. */
+  firmaId?: string | null;
+  /**
+   * P1.2 — marca temporale RFC 3161. `null` quando non è mai stata richiesta (firme
+   * anteriori); `ok: false` quando è stata richiesta e la TSA non ha risposto, con il
+   * motivo in `errore`. La firma resta valida in entrambi i casi.
+   */
+  marcaTemporale?: {
+    ok: boolean;
+    genTime: string | null;
+    tsa: string | null;
+    policy: string | null;
+    serialNumber: string | null;
+    tokenHash: string | null;
+    errore: string | null;
+  } | null;
   statoDoc?: 'bozza' | 'pubblicato' | 'in_revisione' | 'parzialmente_firmato' | 'firmato';
   pubblicatoAt?: string | null;
   richiesteModifica?: RichiestaModificaDoc[];

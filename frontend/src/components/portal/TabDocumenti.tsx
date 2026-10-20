@@ -290,6 +290,9 @@ export function TabDocumenti({
                         documentoId: doc.id,
                         fileDocxUrl: doc.fileDocxUrl,
                         clienteId: clientObj?.id,
+                        // P1.2 — marca temporale e id della firma per scaricare il token.
+                        id: doc.firmaId || undefined,
+                        marcaTemporale: doc.marcaTemporale || null,
                       });
                     }}
                     style={{ background: 'var(--pill-indigo-bg)', border: '1px solid var(--pill-indigo-bd)', color: 'var(--pill-indigo-fg)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}

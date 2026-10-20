@@ -152,6 +152,8 @@ model Tenant {
   liquidazioniIva     LiquidazioneIva[]
   movimentiPrimaNota  MovimentoPrimaNota[]
   collegamentiChat    CollegamentoChatProgetto[]
+  /// Credenziali dei servizi esterni (visura, screening PEP, marca temporale TSA).
+  credenzialiServiziEsterni CredenzialeServizioEsterno[]
 
   @@map("tenant")
 }
@@ -1865,7 +1867,28 @@ model FirmaElettronica {
   // quell'impronta non è ricostruibile, e inventarla sarebbe peggio che dichiararla assente
   // (`righeAttestazione` scrive «non registrato», come per l'IP mancante).
   sigilloDigest         String?    @map("sigillo_digest")
-  standard              String     @map("standard")
+  // Marca temporale RFC 3161 (P1.2, 17/10/2026) — al momento della firma il server chiede
+  // alla TSA configurata di marcare l'impronta del sigillo e conserva qui il token.
+  // `marcaTemporaleImpronta` è l'impronta SHA-256 ESATTA inviata alla TSA (hex): serve a
+  // verificare il token (`openssl ts -verify -token_in -digest <impronta> -in token.tsr
+  // -CAfile <CA della TSA>`; `-token_in` perché è il token, non la risposta) senza
+  // ricostruire il sigillo. `marcaTemporaleTokenHash` è lo SHA-256 del token stesso,
+  // conservato per accorgersi se il token memorizzato viene alterato.
+  //
+  // Nullable e additive: le firme anteriori non hanno marca temporale, e il fatto che manchi
+  // non è un errore — è la verità di come sono state apposte. `marcaTemporaleErrore` registra
+  // perché la marca non c'è (TSA irraggiungibile, rifiuto, database), senza mai fare fallire
+  // la firma: un disservizio della TSA non deve impedire l'apposizione della firma.
+  marcaTemporaleToken       String?   @map("marca_temporale_token")
+  marcaTemporaleImpronta    String?   @map("marca_temporale_impronta")
+  marcaTemporaleTsa         String?   @map("marca_temporale_tsa")
+  marcaTemporaleGenTime     DateTime? @map("marca_temporale_gen_time")
+  marcaTemporalePolicy      String?   @map("marca_temporale_policy")
+  marcaTemporaleSerial      String?   @map("marca_temporale_serial")
+  marcaTemporaleTokenHash   String?   @map("marca_temporale_token_hash")
+  marcaTemporaleErrore      String?   @map("marca_temporale_errore")
+  marcaTemporaleRichiestaAt DateTime? @map("marca_temporale_richiesta_at")
+  standard                  String    @map("standard")
   firmatoAt             DateTime   @default(now()) @map("firmato_at")
   createdAt             DateTime   @default(now()) @map("created_at")
   // Punto 2 piano gap — il verbale di firma è un Documento (tipo 'verbale_firma') che
@@ -2287,6 +2310,29 @@ model TenantComplianceSettings {
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("tenant_compliance_settings")
+}
+
+/// Credenziali dei servizi esterni usati dallo studio (KYC/AML e firma).
+/// Una riga per servizio (`kyc_visura`, `kyc_screening`, `tsa`). `segreto` è una password o
+/// un'API key: non esce MAI in chiaro dalle API (le rotte la mascherano) e non finisce nel
+/// registro di compliance. I valori sono per-studio: ogni studio ha il proprio contratto.
+model CredenzialeServizioEsterno {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  servizio     String
+  etichetta    String?
+  endpoint     String?
+  username     String?
+  segreto      String?
+  extra        Json?
+  aggiornatoDa String?  @map("aggiornato_da")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, servizio])
+  @@map("credenziale_servizio_esterno")
 }
 
 /// K9/§5.5 — valutazione del rischio dell'ATTIVITÀ (business risk assessment), a livello di studio,

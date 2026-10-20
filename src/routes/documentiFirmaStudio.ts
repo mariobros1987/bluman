@@ -23,6 +23,7 @@ import { notificaCliente } from '../services/notificheService.js';
 import { recordAudit, ipReale, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { generaCopiaFirmata } from '../services/copiaFirmata.js';
 import { segnaDocumentoFirmato, generaVerbaleDiFirma } from '../services/effettiFirma.js';
+import { marcaTemporaleFirma } from '../services/marcaTemporaleService.js';
 import { verificaOtp, sigilloHmac } from '../services/otpService.js';
 
 /** L'admin del tenant (`advisor`) e il `super_admin` possono superare il blocco dei firmati. */
@@ -206,6 +207,10 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           },
         });
 
+        // P1.2 — anche la firma dello studio ha la sua marca temporale: il sigillo è
+        // l'HMAC che lega documento, firmatario e istante, e il token lo attesta.
+        const marcaTemporale = await marcaTemporaleFirma(tenantId, firma);
+
         // Ricomponi il PDF con la firma dello studio nello slot studio
         const copiaFirmata = await generaCopiaFirmata({
           tenantId,
@@ -252,6 +257,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           sigilloDigest,
           ambito: 'documento_vault',
           riferimentoId: id,
+          marcaTemporale,
         });
 
         return reply.send({
@@ -264,6 +270,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
             tipoFirma: 'studio',
             valoreLegale,
           },
+          marcaTemporale,
           fileFirmatoUrl: copiaFirmata?.url ?? doc.fileUrl,
         });
       }
@@ -334,6 +341,9 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         },
       });
 
+      // P1.2 — stessa marca del ramo grafometrico, sul sigillo del file caricato.
+      const marcaTemporale = await marcaTemporaleFirma(tenantId, firma);
+
       // Aggiorna o crea copia firmata
       const copiaEsistente = await prisma.documento.findFirst({
         where: { tenantId, documentoPadreId: id, tipo: 'firmato' },
@@ -385,6 +395,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         sigilloDigest,
         ambito: 'documento_vault',
         riferimentoId: id,
+        marcaTemporale,
       });
 
       return reply.send({
@@ -397,6 +408,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           tipoFirma: modalita,
           valoreLegale,
         },
+        marcaTemporale,
         fileFirmatoUrl: caricato.url,
       });
     } catch (err) {

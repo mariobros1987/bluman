@@ -71,6 +71,26 @@ export async function requestPortalOtpApi(input: {
   return await res.json();
 }
 
+/**
+ * Marca temporale RFC 3161 legata alla firma. `ok: false` non annulla la firma: dice che
+ * la TSA non ha risposto (o che lo studio non l'ha configurata) e ne riporta il motivo.
+ */
+export interface MarcaTemporaleFirma {
+  ok: boolean;
+  /** Impronta inviata alla TSA (hex): qui coincide con il digest del sigillo. */
+  impronta: string | null;
+  tsa: string | null;
+  /** Ora attestata dalla TSA, ISO 8601. */
+  genTime: string | null;
+  policy: string | null;
+  serialNumber: string | null;
+  /** SHA-256 del token conservato: serve a verificarne l'integrità. */
+  tokenHash: string | null;
+  /** Limiti della verifica dichiarati dalla TSA/adapter (CMS, catena, revoca). */
+  avviso: string | null;
+  errore: string | null;
+}
+
 export interface SigilloFirma {
   id: string;
   signatureId: string;
@@ -87,6 +107,8 @@ export interface SigilloFirma {
   canaleVerificato: string;
   standard: string;
   fileFirmatoUrl?: string;
+  /** P1.2 — esito della marca temporale ottenuta al momento della firma. */
+  marcaTemporale?: MarcaTemporaleFirma | null;
 }
 
 export async function verifyPortalOtpAndSignApi(input: {
@@ -120,7 +142,9 @@ export async function verifyPortalOtpAndSignApi(input: {
   const res = await fetchWithTimeout(
     `${API_BASE}/portal/verify-otp-and-sign`,
     { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(input) },
-    15000,
+    // La firma può ora attendere la TSA (fino a 5 s) dopo aver registrato il sigillo:
+    // il margine copre elaborazione, upload e marca senza tagliare una firma valida.
+    25000,
   );
   if (!res.ok) throw await erroreDellaRisposta(res, 'Codice non valido: la firma non è stata apposta.');
   return await res.json();
@@ -177,4 +201,32 @@ export async function grafometricaFirmaApi(firmaId: string): Promise<string | nu
   if (!res.ok) return null;
   const body = await res.json();
   return body?.firmaGrafometricaPng ?? null;
+}
+
+/**
+ * Scarica il token RFC 3161 conservato con la firma. Il token arriva in base64 perché è
+ * binario DER: chi chiama lo converte in `.tsr` e lo verifica con
+ * `openssl ts -verify -token_in -digest <marcaTemporale.impronta> -in token.tsr -CAfile <CA TSA>`
+ * (`-token_in`: il file è il TimeStampToken, non la TimeStampResp).
+ */
+export async function scaricaMarcaTemporaleApi(firmaId: string): Promise<{
+  ok: boolean;
+  firma: {
+    id: string;
+    signatureId: string;
+    documentoTitolo: string;
+    sigilloDigest: string | null;
+    impronta: string | null;
+    tsa: string | null;
+    genTime: string | null;
+    policy: string | null;
+    serialNumber: string | null;
+    tokenHash: string | null;
+    richiestaAt: string | null;
+  };
+  tokenBase64: string;
+}> {
+  const res = await fetchWithTimeout(`${API_BASE}/firme/${firmaId}/marca-temporale`, { headers: getAuthHeaders() });
+  if (!res.ok) throw await erroreDellaRisposta(res, 'Nessuna marca temporale disponibile per questa firma.');
+  return await res.json();
 }

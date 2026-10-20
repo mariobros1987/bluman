@@ -82,6 +82,9 @@ import { registraRotteSolleciti } from './routes/solleciti.js';
 import { registraRotteFascicoloFiscale } from './routes/fascicoloFiscale.js';
 import { registraRotteKyc } from './routes/kyc.js';
 import { registraRotteCompliance } from './routes/compliance.js';
+// Credenziali dei servizi esterni dello studio (visura, screening PEP, marca temporale TSA):
+// le inserisce il responsabile dalle Impostazioni, restano per-tenant e mascherate in lettura.
+import { registraRotteServiziEsterni } from './routes/serviziEsterni.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
@@ -766,6 +769,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   await registraRotteFascicoloFiscale(server);
   await registraRotteKyc(server);
   await registraRotteCompliance(server);
+  await registraRotteServiziEsterni(server);
 
   // ── INCASSI, SCADENZARIO & PRIMA NOTA (STYLE OPENSTAMANAGER) ──────
   // Rotte estratte in src/routes/contabilita.ts, registrata nella sezione contabilità.
