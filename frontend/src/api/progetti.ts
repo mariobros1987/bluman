@@ -81,6 +81,29 @@ export async function eliminaModuloApi(progettoId: string, moduloId: string): Pr
   invalidateCache('progett');
 }
 
+/**
+ * Ripristina le micro-voci di un modulo VUOTO dalla distinta del suo modulo di libreria.
+ *
+ * Serve ai moduli nati quando il template non aveva ancora articoli: senza questo non c'era
+ * modo di riempirli (nessuna rotta crea micro-voci fuori dall'istanziazione). 409 se il modulo
+ * ha già voci, se il template non esiste più o se la sua distinta è vuota.
+ */
+export async function ripristinaMicrovociModuloApi(
+  progettoId: string,
+  moduloId: string,
+): Promise<{ microvociCreate: number; orePreventivate: number }> {
+  const res = await apiFetch(
+    `${API_BASE}/progetti/${encodeURIComponent(progettoId)}/moduli/${encodeURIComponent(moduloId)}/ripristina-microvoci`,
+    { method: 'POST', headers: getAuthHeaders() },
+  );
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as any).errore ?? 'Ripristino delle voci non riuscito.');
+  }
+  invalidateCache('progett');
+  return await res.json();
+}
+
 export async function archiviaProgettoApi(id: string, archiviato: boolean) {
   const res = await apiFetch(`${API_BASE}/progetti/${id}/archivia`, {
     method: 'PUT',

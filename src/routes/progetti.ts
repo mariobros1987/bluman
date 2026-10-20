@@ -24,6 +24,7 @@ import { notificaStudio } from '../services/notificheService.js';
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
+import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
@@ -817,6 +818,149 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       });
 
       return reply.send({ ok: true, moduloId });
+    },
+  );
+
+  /**
+   * POST /progetti/:id/moduli/:moduloId/ripristina-microvoci
+   *
+   * Un modulo nato quando il suo modulo di libreria non aveva ancora articoli in distinta resta
+   * con zero micro-voci per sempre: nessuna rotta crea micro-voci fuori dall'istanziazione, e
+   * modificare il template dopo non tocca i progetti già avviati (la versione è congelata, §15.3).
+   * Da qui la schermata mostrava un modulo vuoto senza alcun modo di riempirlo. Questa rotta
+   * ricrea le voci dalla distinta della versione che il modulo porta con sé.
+   *
+   * Additiva e volutamente ristretta ai moduli VUOTI: così non può duplicare voci esistenti né
+   * sovrascrivere ore scelte a mano. Se il modulo ha già voci risponde 409 e non scrive niente.
+   */
+  server.post<{ Params: { id: string; moduloId: string } }>(
+    '/progetti/:id/moduli/:moduloId/ripristina-microvoci',
+    async (req, reply) => {
+      const { id, moduloId } = req.params;
+      const tenantId = req.tenantId;
+
+      const modulo = await prisma.moduloProgetto.findFirst({
+        where: { id: moduloId, progettoId: id, tenantId },
+        include: {
+          microvoci: { select: { nome: true } },
+          // Serve a decidere lo stato iniziale: se il modulo dipende da un altro modulo non
+          // ancora chiuso, le voci nascono in attesa di dipendenza come nell'istanziazione.
+          dipendenze: {
+            include: { dipendeDaModuloProgetto: { select: { stato: true, nome: true } } },
+          },
+        },
+      });
+      if (!modulo) {
+        return reply.code(404).send({ errore: 'Modulo non trovato in questo progetto.' });
+      }
+      if (modulo.microvoci.length > 0) {
+        return reply.code(409).send({
+          errore:
+            `Il modulo «${modulo.nome}» ha già ${modulo.microvoci.length} micro-voci: ` +
+            'il ripristino si applica solo a un modulo vuoto.',
+        });
+      }
+
+      const template = await prisma.moduloTemplate.findFirst({
+        where: { id: modulo.moduloTemplateId, versione: modulo.moduloTemplateVersione },
+        include: {
+          righeDistinta: {
+            include: { articolo: { include: { passaggiTemplate: true } } },
+            orderBy: { ordine: 'asc' },
+          },
+        },
+      });
+      if (!template) {
+        return reply.code(409).send({
+          errore:
+            `Il modulo di libreria da cui nasce «${modulo.nome}» ` +
+            `(versione ${modulo.moduloTemplateVersione}) non esiste più: non c'è una distinta ` +
+            'da cui ripristinare le voci.',
+        });
+      }
+
+      const righe = risolviRigheDistinta(template.righeDistinta);
+      if (righe.length === 0) {
+        return reply.code(409).send({
+          errore:
+            `Il modulo di libreria «${template.nome}» non ha articoli in distinta: ` +
+            'aggiungili in Libreria, poi riprova.',
+        });
+      }
+
+      const microvoci = microvociDaDistinta(
+        righe,
+        new Set(modulo.microvoci.map((mv) => mv.nome.trim().toLowerCase())),
+      );
+      if (microvoci.length === 0) {
+        return reply.send({ ok: true, microvociCreate: 0, orePreventivate: modulo.orePreventivate });
+      }
+
+      const stato: 'pending' | 'attesa_dipendenza' = modulo.dipendenze.some(
+        (d) => d.dipendeDaModuloProgetto.stato !== 'done',
+      )
+        ? 'attesa_dipendenza'
+        : 'pending';
+      const orePreventivate = microvoci.reduce((tot, mv) => tot + mv.orePreventivate, 0);
+
+      await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          for (const microvoce of microvoci) {
+            const { passaggi, ...datiMicrovoce } = microvoce;
+            const creata = await tx.microvoceProgetto.create({
+              data: {
+                tenantId,
+                moduloProgettoId: moduloId,
+                ...datiMicrovoce,
+                stato,
+              },
+            });
+            for (const passaggio of passaggi) {
+              await tx.passaggioProgetto.create({
+                data: {
+                  tenantId,
+                  microvoceProgettoId: creata.id,
+                  titolo: passaggio.titolo,
+                  tipo: passaggio.tipo,
+                  chi: passaggio.chi,
+                  ordine: passaggio.ordine,
+                  descrizione: passaggio.descrizione,
+                  campiFormJson: passaggio.campiFormJson as never,
+                  stato: 'pending',
+                },
+              });
+            }
+          }
+
+          // Le ore del modulo seguono la distinta appena ripristinata, come farebbe
+          // l'istanziazione. Il modulo era vuoto (voci a zero), quindi non si sovrascrive
+          // alcun lavoro registrato.
+          await tx.moduloProgetto.update({
+            where: { id: moduloId },
+            data: { orePreventivate },
+          });
+        }),
+      );
+
+      await recordAudit({
+        tenantId,
+        userId: req.userId,
+        userEmail: req.user?.email,
+        ruolo: req.ruolo as string | undefined,
+        azione: 'MICROVOCI_RIPRISTINATE',
+        entita: 'ModuloProgetto',
+        dettagli:
+          `Ripristinate ${microvoci.length} micro-voci nel modulo ${moduloId} («${modulo.nome}») ` +
+          `del progetto ${id} dalla distinta di «${template.nome}» v${template.versione}`,
+        ipAddress: req.ip,
+      });
+
+      return reply.send({
+        ok: true,
+        microvociCreate: microvoci.length,
+        orePreventivate,
+        statoIniziale: stato,
+      });
     },
   );
 

@@ -26,6 +26,7 @@ import type {
   StatoMicrovoceIniziale,
   EsecuzionePort,
 } from '../../services/istanziazionePort.js';
+import { risolviRigheDistinta } from '../../services/distintaTemplate.js';
 
 export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePort {
   private readonly tenantIdDefault: string;
@@ -69,26 +70,10 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
             },
           });
 
-          const righe = template.righeDistinta.map((r) => ({
-            id: r.id,
-            articoloId: r.articoloId,
-            articoloVersione: r.articoloVersione,
-            articoloNome: r.articolo.nome,
-            quantita: r.quantita,
-            ordine: r.ordine,
-            oreEffettive: r.overrideOre ?? r.articolo.oreDefault,
-            prezzoEffettivo: r.overridePrezzo ?? r.articolo.prezzoDefault,
-            passaggi: r.articolo.passaggiTemplate
-              .sort((a, b) => a.ordine - b.ordine)
-              .map((p) => ({
-                titolo: p.titolo,
-                tipo: p.tipo,
-                chi: p.chi,
-                ordine: p.ordine,
-                descrizione: p.descrizione,
-                campiFormJson: p.campiFormJson,
-              })),
-          }));
+          // La traduzione riga di distinta → dati risolti (override sui default dell'articolo,
+          // passaggi in ordine) è la stessa che usa il ripristino delle voci di un modulo vuoto:
+          // sta in `distintaTemplate.ts`, non qui.
+          const righe = risolviRigheDistinta(template.righeDistinta);
 
           const result: ModuloTemplateConDistinta = {
             id: template.id,

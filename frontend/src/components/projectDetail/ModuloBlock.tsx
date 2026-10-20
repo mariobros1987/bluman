@@ -5,7 +5,9 @@ import { ProgressBar } from '../ui/ProgressBar';
 import { Modal } from '../ui/Modal';
 import { AvatarGroup, Avatar } from '../ui/Avatar';
 import { fmt } from '../../utils';
-import { consuntivaMicrovoceApi, impostaCondivisioneMicrovoceApi } from '../../api/client';
+import { consuntivaMicrovoceApi, impostaCondivisioneMicrovoceApi, ripristinaMicrovociModuloApi } from '../../api/client';
+import { useToast } from '../ui/ToastProvider';
+import { confirm } from '../ui/ConfirmProvider';
 import type { ModuloProgetto, MicroVoce } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 
@@ -31,6 +33,9 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
   const [oreCons, setOreCons] = useState(2);
   const [completa, setCompleta] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Ripristino delle voci da distinta (modulo vuoto): stato del pulsante, non del modulo.
+  const [ripristinoInCorso, setRipristinoInCorso] = useState(false);
+  const toast = useToast();
   // Pannello «Voci condivise» (Fase 2): gestisce in quali ALTRI moduli le voci di questo modulo
   // sono condivise. Lo stato di selezione è per micro-voce → set di id modulo di destinazione.
   const [condivisioneOpen, setCondivisioneOpen] = useState(false);
@@ -75,6 +80,37 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
   // Famiglia Ricci" (debito noto di Fase 1) risultavano pieni. Un modulo senza micro-voci si
   // dichiara vuoto.
   const displayMicrovoci: MicroVoce[] = mod.v || [];
+
+  // Un modulo esiste a database se `GET /progetti/:id` lo restituisce: `rawDbModulo` arriva da lì.
+  // Senza, il modulo è una copia rimasta in questo browser (ripiego su `bluman_custom_projects`)
+  // e non c'è nessuna riga da riempire.
+  const moduloInDatabase = Boolean(rawDbModulo?.id);
+
+  const ripristinaVoci = async () => {
+    if (!progettoId || !rawDbModulo?.id || ripristinoInCorso) return;
+    const procedi = await confirm({
+      titolo: 'Ripristinare le voci di questo modulo?',
+      messaggio:
+        `Il modulo «${mod.n}» non ha micro-voci a database. Le voci verranno ricreate dalla ` +
+        'distinta del modulo di libreria, con le ore e i passaggi con cui è stato istanziato. ' +
+        'Non viene toccato nient\'altro: se il modulo non è vuoto l\'operazione viene rifiutata.',
+      confermaLabel: 'Ripristina',
+    });
+    if (!procedi) return;
+
+    setRipristinoInCorso(true);
+    try {
+      const esito = await ripristinaMicrovociModuloApi(progettoId, rawDbModulo.id);
+      toast.successo(`${esito.microvociCreate} micro-voci ripristinate · ${esito.orePreventivate}h preventivate.`);
+      onRefresh();
+    } catch (err) {
+      // Il 409 porta il motivo vero (template sparito, distinta vuota, modulo non vuoto): si mostra
+      // quello, non un «errore» generico che manderebbe a cercare un guasto che non c'è.
+      toast.errore(err instanceof Error ? err.message : 'Ripristino delle voci non riuscito.');
+    } finally {
+      setRipristinoInCorso(false);
+    }
+  };
 
   const handleConsuntivaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,8 +220,43 @@ export function ModuloBlock({ mod, open, onToggle, onOpenProc, rawDbModulo, onRe
               {displayMicrovoci.length === 0 && (
                 <tr>
                   <td colSpan={6} style={{ textAlign: 'center', padding: 18, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
-                    Questo modulo non ha micro-voci a database.<br />
-                    Nessuna ora preventivata né consuntivata: non c'è avanzamento da calcolare finché non vengono istanziate.
+                    {moduloInDatabase ? (
+                      <>
+                        Questo modulo non ha micro-voci a database.<br />
+                        Nessuna ora preventivata né consuntivata: non c'è avanzamento da calcolare.
+                        {progettoId && (
+                          <>
+                            <br />
+                            <button
+                              type="button"
+                              onClick={ripristinaVoci}
+                              disabled={ripristinoInCorso}
+                              title="Ricrea le voci dalla distinta del modulo di libreria con cui questo modulo è stato istanziato"
+                              style={{
+                                marginTop: 10,
+                                background: 'var(--indigo)',
+                                color: 'var(--on-accent)',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: 8,
+                                fontSize: 11.5,
+                                fontWeight: 600,
+                                cursor: ripristinoInCorso ? 'default' : 'pointer',
+                                opacity: ripristinoInCorso ? 0.6 : 1,
+                              }}
+                            >
+                              {ripristinoInCorso ? 'Ripristino…' : '↻ Ripristina le voci dal modulo di libreria'}
+                            </button>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Questo modulo non esiste a database.<br />
+                        È una copia rimasta in questo browser: non ha voci perché nessuna riga è
+                        mai stata scritta sul server. I moduli veri si aggiungono dalla Libreria.
+                      </>
+                    )}
                   </td>
                 </tr>
               )}

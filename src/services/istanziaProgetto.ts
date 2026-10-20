@@ -9,6 +9,7 @@ import type {
   NotificationPort,
   StatoMicrovoceIniziale,
 } from './istanziazionePort.js';
+import { microvociDaDistinta } from './distintaTemplate.js';
 
 export interface RigaPreventivoAccettato {
   moduloTemplateId: string;
@@ -112,34 +113,21 @@ export async function istanziaProgetto(
 
       const microvoceIds: string[] = [];
 
-      // Una micro-voce per NOME dentro il modulo (regola titolare): due righe di distinta con lo
-      // stesso `articoloNome` — il caso tipico di un template popolato da due seed diversi, stesso
-      // articolo sotto id diversi — non devono generare due micro-voci gemelle. Si tiene la prima
-      // riga (ordine più basso) e si saltano le successive con lo stesso nome. La quantità > 1 sulla
-      // STESSA riga resta legittima: sono unità dello stesso articolo, non un duplicato di nome.
-      const nomiVisti = new Set<string>();
+      // Le regole della distinta (una voce per nome, una per unità di quantità, passaggi copiati)
+      // vivono in un solo posto: `microvociDaDistinta`, condivisa col ripristino di un modulo
+      // vuoto (POST /progetti/:id/moduli/:moduloId/ripristina-microvoci). Qui si esegue.
+      for (const microvoce of microvociDaDistinta(template.righe)) {
+        const { passaggi, ...datiMicrovoce } = microvoce;
 
-      for (const rigaDistinta of template.righe) {
-        const chiaveNome = rigaDistinta.articoloNome.trim().toLowerCase();
-        if (nomiVisti.has(chiaveNome)) continue;
-        nomiVisti.add(chiaveNome);
+        const microvoceId = await tx.creaMicrovoceProgetto({
+          moduloProgettoId,
+          ...datiMicrovoce,
+          stato: 'pending', // eventualmente corretto a attesa_dipendenza nel passo 5
+        });
+        microvoceIds.push(microvoceId);
 
-        for (let unita = 0; unita < rigaDistinta.quantita; unita++) {
-          const microvoceId = await tx.creaMicrovoceProgetto({
-            moduloProgettoId,
-            articoloId: rigaDistinta.articoloId,
-            articoloVersione: rigaDistinta.articoloVersione,
-            rigaDistintaId: rigaDistinta.id,
-            nome: rigaDistinta.articoloNome,
-            orePreventivate: rigaDistinta.oreEffettive,
-            stato: 'pending', // eventualmente corretto a attesa_dipendenza nel passo 5
-            ordine: rigaDistinta.ordine,
-          });
-          microvoceIds.push(microvoceId);
-
-          for (const passaggio of rigaDistinta.passaggi) {
-            await tx.creaPassaggioProgetto({ microvoceProgettoId: microvoceId, ...passaggio });
-          }
+        for (const passaggio of passaggi) {
+          await tx.creaPassaggioProgetto({ microvoceProgettoId: microvoceId, ...passaggio });
         }
       }
 
