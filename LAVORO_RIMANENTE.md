@@ -167,11 +167,14 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 
 ## P4 — Completamenti (pomeriggi, nessuno blocca)
 
-- **Validazione zod**: restano **29** `Record<string, any>` in **5** file di rotte (dai 39 in 8
-  del 20/10/2026; `notifiche.ts`, `progetti.ts` e `compliance.ts` sono chiusi): `kyc.ts` 12,
-  `tenant.ts` 9, `clienti.ts` 6, `webhooks.ts` 1, `portale.ts` 1. Gli ultimi due non sono
-  corpi non validati: il webhook WhatsApp è JSON esterno (autenticato via HMAC, la forma la detta
-  Meta) e in `portale.ts` è un helper, non una richiesta.
+- **Validazione zod**: restano **11** `Record<string, any>` in **3** file di rotte (dai 39 in 8
+  del 20/10/2026; `notifiche.ts`, `progetti.ts`, `compliance.ts`, `kyc.ts` e `clienti.ts` sono
+  chiusi): `tenant.ts` 9, `webhooks.ts` 1, `portale.ts` 1. In `tenant.ts` non sono corpi non
+  validati da leggere a mano: la PATCH `/tenant/info` è un *dizionario* guidato da un elenco di
+  chiavi ammesse con validatori per campo, e `/admin/tenants`/`/audit-logs` hanno già zod ma
+  conservano il cast per i `data` di Prisma. Gli ultimi due non sono corpi di richiesta: il
+  webhook WhatsApp è JSON esterno (autenticato via HMAC, la forma la detta Meta) e in
+  `portale.ts` è un helper, non una richiesta.
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
   oggi non raccoglie niente.
 - **Accessibilità**: i pulsanti che mostrano solo un simbolo (✕ di chiusura, ← indietro) hanno ora

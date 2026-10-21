@@ -6,7 +6,22 @@ import type { StatoKyc } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
 import { calcolaRischioKyc } from '../domain/kycEngine.js';
 import { transizioneKycConGate, puoApprovareRafforzata, valutaApprovazione, motivoRifiutoApprovazione } from '../services/kycCaseService.js';
-import { ApprovazioneMassivaSchema } from '../schemas/kyc.schema.js';
+import {
+  ApprovazioneMassivaSchema,
+  SoggettoKycSchema,
+  TitolareEffettivoSchema,
+  DepositoRegistroTeSchema,
+  ValutazioneRischioKycSchema,
+  DocumentoIdentitaKycSchema,
+  ScreeningKycSchema,
+  RisoluzioneScreeningSchema,
+  AnomaliaKycSchema,
+  DecisioneAnomaliaSchema,
+  TrasmissioneFiauSchema,
+  EsitoRetentionSchema,
+  ProrogaRetentionSchema,
+} from '../schemas/kyc.schema.js';
+import type { TipoAnomaliaKyc, DecisioneMlro } from '../domain/anomalieKyc.js';
 import { registraComplianceEvent } from '../services/complianceEventLog.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { calcolaTitolariEffettivi, scadenzaVariazioneTe } from '../domain/catenaControllo.js';
@@ -16,7 +31,7 @@ import { apriAnomalia, decidiAnomalia } from '../services/anomalieService.js';
 import { preparaSegnalazione, registraTrasmissione } from '../services/segnalazioneFiauService.js';
 import { generaDossierStrPdf } from '../services/segnalazioneFiauPdf.js';
 import type { DatiFascicoloPerDossier, DossierStr } from '../domain/segnalazioneFiau.js';
-import { registraEsitoRetention, prorogaRetention } from '../services/retentionService.js';
+import { registraEsitoRetention, prorogaRetention, type EsitoRetentionValore } from '../services/retentionService.js';
 import { costruisciReportFascicolo } from '../domain/reportFascicolo.js';
 import { generaReportFascicoloPdf } from '../services/fascicoloReportPdf.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
@@ -60,15 +75,17 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   // si popolava solo se il cliente caricava dal portale (portale.ts): senza, catena TE/screening/
   // dossier/report restavano «n/d» (rilievo audit §02). Ora l'operatore può crearlo/modificarlo.
   const TIPI_SOGGETTO = ['persona_fisica', 'persona_giuridica'];
-  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/soggetto', async (req, reply) => {
+  server.put<{ Params: { id: string } }>('/kyc/:id/soggetto', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = SoggettoKycSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati del soggetto non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true, clienteId: true, soggettoId: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
     if (!b.denominazione || String(b.denominazione).trim().length < 2) return reply.code(400).send({ errore: 'Denominazione del soggetto obbligatoria.' });
     const dati = {
-      tipo: (TIPI_SOGGETTO.includes(b.tipo) ? b.tipo : 'persona_fisica') as 'persona_fisica' | 'persona_giuridica',
+      tipo: (TIPI_SOGGETTO.includes(b.tipo ?? '') ? b.tipo : 'persona_fisica') as 'persona_fisica' | 'persona_giuridica',
       denominazione: String(b.denominazione).trim().slice(0, 200),
       codiceFiscale: b.codiceFiscale ? String(b.codiceFiscale).trim().slice(0, 40) : null,
       partitaIva: b.partitaIva ? String(b.partitaIva).trim().slice(0, 40) : null,
@@ -385,10 +402,12 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ titolari, legami, deposito, catena, soglia });
   });
 
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/titolare-effettivo', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/titolare-effettivo', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = TitolareEffettivoSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati del titolare effettivo non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     if (!b.denominazione || String(b.denominazione).trim().length < 2) return reply.code(400).send({ errore: 'Denominazione del titolare effettivo obbligatoria.' });
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
@@ -396,7 +415,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
       data: { tenantId, tipo: b.tipo === 'persona_giuridica' ? 'persona_giuridica' : 'persona_fisica', denominazione: String(b.denominazione).slice(0, 200), codiceFiscale: b.codiceFiscale || null, paeseResidenza: b.paeseResidenza || null },
     });
     const te = await prisma.titolareEffettivo.create({
-      data: { tenantId, fascicoloId: id, soggettoId: soggetto.id, criterio: ['proprieta', 'controllo', 'altro'].includes(b.criterio) ? b.criterio : 'proprieta', percentuale: b.percentuale != null && Number.isFinite(Number(b.percentuale)) ? Number(b.percentuale) : null, fonte: b.fonte === 'registro_camerale' ? 'registro_camerale' : 'autodichiarazione', note: b.note || null },
+      data: { tenantId, fascicoloId: id, soggettoId: soggetto.id, criterio: ['proprieta', 'controllo', 'altro'].includes(b.criterio ?? '') ? b.criterio as string : 'proprieta', percentuale: b.percentuale != null && Number.isFinite(Number(b.percentuale)) ? Number(b.percentuale) : null, fonte: b.fonte === 'registro_camerale' ? 'registro_camerale' : 'autodichiarazione', note: b.note || null },
       include: { soggetto: true },
     });
     await registraComplianceEvent(prisma, { tenantId, tipo: 'KYC_TE_AGGIUNTO', attoreUserId: req.userId ?? null, payload: { fascicoloId: id, soggettoId: soggetto.id, criterio: te.criterio } });
@@ -420,16 +439,18 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ ok: true, legame });
   });
 
-  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/deposito-registro', async (req, reply) => {
+  server.put<{ Params: { id: string } }>('/kyc/:id/deposito-registro', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = DepositoRegistroTeSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati del deposito non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
     // §5.2 — se lo studio segnala una variazione, la scadenza del deposito è a 14 giorni.
     const scadenza = b.dataVariazione ? scadenzaVariazioneTe(new Date(b.dataVariazione)) : (b.scadenza ? new Date(b.scadenza) : null);
     const dati = {
-      stato: ['da_depositare', 'depositato', 'in_ritardo'].includes(b.stato) ? b.stato : 'da_depositare',
+      stato: ['da_depositare', 'depositato', 'in_ritardo'].includes(b.stato ?? '') ? b.stato as string : 'da_depositare',
       dataDeposito: b.dataDeposito ? new Date(b.dataDeposito) : null,
       scadenza,
       riferimento: b.riferimento || null,
@@ -454,10 +475,12 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ corrente: valutazioni[0] ?? null, storico: valutazioni });
   });
 
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/rischio', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/rischio', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = ValutazioneRischioKycSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Valutazione del rischio non valida.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
     // §6/§14 — ogni pilastro va motivato (dati + giudizio), come per il business risk di studio.
@@ -504,10 +527,12 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ documenti: documenti.map((d) => ({ ...d, urlStorage: rifirmaUrlUpload(d.urlStorage) })) });
   });
 
-  server.post<{ Params: { soggettoId: string }; Body: Record<string, any> }>('/kyc/soggetto/:soggettoId/documento', async (req, reply) => {
+  server.post<{ Params: { soggettoId: string } }>('/kyc/soggetto/:soggettoId/documento', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { soggettoId } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = DocumentoIdentitaKycSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati del documento non validi.' });
+    const { soggettoId } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const sog = await prisma.soggettoKyc.findFirst({ where: { id: soggettoId, tenantId }, select: { id: true } });
     if (!sog) return reply.code(404).send({ errore: 'Soggetto non trovato' });
     if (!b.contentBase64 || !b.filename) return reply.code(400).send({ errore: 'File (contentBase64) e nome file obbligatori.' });
@@ -523,7 +548,7 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     const doc = await prisma.documentoIdentita.create({
       data: {
         tenantId, soggettoId,
-        tipo: ['carta_identita', 'passaporto', 'permesso_soggiorno', 'altro'].includes(b.tipo) ? b.tipo : 'altro',
+        tipo: ['carta_identita', 'passaporto', 'permesso_soggiorno', 'altro'].includes(b.tipo ?? '') ? b.tipo as string : 'altro',
         numero: b.numero || null, emittente: b.emittente || null,
         scadenza: b.scadenza ? new Date(b.scadenza) : null,
         urlStorage: url, hashSha256: hash, esitoVerifica: null,
@@ -535,8 +560,14 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   });
 
   // ── K5 — screening PEP / sanzioni / media negativi (processo MANUALE, spec §5.1.5/§8.4/§10) ──
-  const TIPI_SCREENING = ['sanzioni', 'pep', 'media_negativi'];
-  const ESITI_SCREENING = ['nessun_match', 'match_da_valutare', 'match_confermato', 'falso_positivo'];
+  // Le due liste sono `as const`: il tipo inferito è quello che la colonna Prisma accetta
+  // (enum), e la guardia lo restituisce senza cast sparsi. Un valore fuori elenco non entra.
+  const TIPI_SCREENING = ['sanzioni', 'pep', 'media_negativi'] as const;
+  const ESITI_SCREENING = ['nessun_match', 'match_da_valutare', 'match_confermato', 'falso_positivo'] as const;
+  const isTipoScreening = (v: unknown): v is (typeof TIPI_SCREENING)[number] =>
+    typeof v === 'string' && (TIPI_SCREENING as readonly string[]).includes(v);
+  const isEsitoScreening = (v: unknown): v is (typeof ESITI_SCREENING)[number] =>
+    typeof v === 'string' && (ESITI_SCREENING as readonly string[]).includes(v);
 
   server.get<{ Params: { id: string } }>('/kyc/:id/screening', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
@@ -552,14 +583,16 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     });
   });
 
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/screening', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/screening', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = ScreeningKycSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati dello screening non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true, soggettoId: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
-    if (!TIPI_SCREENING.includes(b.tipo)) return reply.code(400).send({ errore: 'Tipo screening non valido (sanzioni | pep | media_negativi).' });
-    const esito = ESITI_SCREENING.includes(b.esito) ? b.esito : 'nessun_match';
+    if (!isTipoScreening(b.tipo)) return reply.code(400).send({ errore: 'Tipo screening non valido (sanzioni | pep | media_negativi).' });
+    const esito = isEsitoScreening(b.esito) ? b.esito : 'nessun_match';
     // Allegato opzionale dell'esito (spec §10: processo manuale con allegato), cifrato in storage come K6.
     let allegatoUrl: string | null = null;
     if (b.allegatoContentBase64 && b.allegatoFilename) {
@@ -583,10 +616,12 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ ok: true, screening: { ...screening, allegatoUrl: screening.allegatoUrl ? rifirmaUrlUpload(screening.allegatoUrl) : null } });
   });
 
-  server.patch<{ Params: { id: string; sid: string }; Body: Record<string, any> }>('/kyc/:id/screening/:sid/risolvi', async (req, reply) => {
+  server.patch<{ Params: { id: string; sid: string } }>('/kyc/:id/screening/:sid/risolvi', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id, sid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = RisoluzioneScreeningSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati della risoluzione non validi.' });
+    const { id, sid } = req.params; const tenantId = req.tenantId; const b = parse.data;
     // Le due chiusure di un match: falso_positivo (scartato dopo esame) o match_confermato (vero → non si approva).
     if (b.esito !== 'falso_positivo' && b.esito !== 'match_confermato') {
       return reply.code(400).send({ errore: "Esito di risoluzione valido: 'falso_positivo' o 'match_confermato'." });
@@ -631,27 +666,31 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
     return reply.send({ anomalie });
   });
 
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/anomalie', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/anomalie', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = AnomaliaKycSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati dell’anomalia non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const fasc = await prisma.fascicoloKyc.findFirst({ where: { id, tenantId }, select: { id: true } });
     if (!fasc) return reply.code(404).send({ errore: 'Fascicolo non trovato' });
-    if (!TIPI_ANOMALIA.includes(b.tipo)) return reply.code(400).send({ errore: 'Tipo anomalia non valido.' });
+    if (!TIPI_ANOMALIA.includes(b.tipo ?? '')) return reply.code(400).send({ errore: 'Tipo anomalia non valido.' });
     if (!b.descrizione || String(b.descrizione).trim().length < 3) return reply.code(400).send({ errore: 'Descrizione obbligatoria.' });
-    const anomalia = await apriAnomalia(prisma, { tenantId, fascicoloId: id, tipo: b.tipo, descrizione: String(b.descrizione).trim(), rilevataDa: req.userId ?? null });
+    const anomalia = await apriAnomalia(prisma, { tenantId, fascicoloId: id, tipo: b.tipo as TipoAnomaliaKyc, descrizione: String(b.descrizione).trim(), rilevataDa: req.userId ?? null });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_ANOMALIA_APERTA', entita: `Fascicolo ${id}`, dettagli: `Anomalia ${b.tipo}`, ipAddress: req.ip });
     return reply.send({ ok: true, anomalia });
   });
 
-  server.post<{ Params: { aid: string }; Body: Record<string, any> }>('/kyc/anomalie/:aid/decisione', async (req, reply) => {
+  server.post<{ Params: { aid: string } }>('/kyc/anomalie/:aid/decisione', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
-    const { aid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
-    if (!DECISIONI_MLRO.includes(b.decisione)) return reply.code(400).send({ errore: 'Decisione non valida.' });
+    const parse = DecisioneAnomaliaSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati della decisione non validi.' });
+    const { aid } = req.params; const tenantId = req.tenantId; const b = parse.data;
+    if (!DECISIONI_MLRO.includes(b.decisione ?? '')) return reply.code(400).send({ errore: 'Decisione non valida.' });
     if (!b.motivazione || String(b.motivazione).trim().length < 10) return reply.code(400).send({ errore: 'Motivazione obbligatoria (almeno 10 caratteri).' });
     if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La decisione su un’anomalia è riservata all’MLRO o a un ruolo superiore.' });
-    const esito = await decidiAnomalia(prisma, { tenantId, anomaliaId: aid, decisione: b.decisione, motivazione: String(b.motivazione).trim(), decisaDa: req.userId ?? null });
+    const esito = await decidiAnomalia(prisma, { tenantId, anomaliaId: aid, decisione: b.decisione as DecisioneMlro, motivazione: String(b.motivazione).trim(), decisaDa: req.userId ?? null });
     if (esito.esito === 'non_trovata') return reply.code(404).send({ errore: 'Anomalia non trovata' });
     await recordAudit({ tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'KYC_MLRO_DECISIONE', entita: `Anomalia ${aid}`, dettagli: `Decisione ${b.decisione}`, ipAddress: req.ip });
     return reply.send({ ok: true, anomalia: esito.anomalia });
@@ -753,11 +792,13 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   });
 
   // Registra l'invio manuale: riferimento e timestamp goAML rilasciati dal portale FIAU.
-  server.post<{ Params: { sid: string }; Body: Record<string, any> }>('/kyc/segnalazioni/:sid/trasmissione', async (req, reply) => {
+  server.post<{ Params: { sid: string } }>('/kyc/segnalazioni/:sid/trasmissione', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
     if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La registrazione dell’invio FIAU è riservata all’MLRO o a un ruolo superiore.' });
-    const { sid } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = TrasmissioneFiauSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati della trasmissione non validi.' });
+    const { sid } = req.params; const tenantId = req.tenantId; const b = parse.data;
     if (!b.riferimentoGoaml || String(b.riferimentoGoaml).trim().length < 3) return reply.code(400).send({ errore: 'Riferimento goAML obbligatorio (rilasciato dal portale FIAU dopo l’invio).' });
     const esito = await registraTrasmissione(prisma, { tenantId, segnalazioneId: sid, riferimentoGoaml: String(b.riferimentoGoaml), trasmessaDa: req.userId ?? null });
     if (esito.esito === 'non_trovata') return reply.code(404).send({ errore: 'Segnalazione non trovata' });
@@ -772,13 +813,15 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   const ESITI_RETENTION = ['cancellato', 'anonimizzato'];
 
   // Conclude la conservazione: cancellazione (etichetta) o anonimizzazione reale del PII.
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/retention/esito', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/retention/esito', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
     if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La conclusione della conservazione è riservata all’MLRO o a un ruolo superiore.' });
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
-    if (!ESITI_RETENTION.includes(b.esito)) return reply.code(400).send({ errore: 'Esito non valido (cancellato | anonimizzato).' });
-    const esito = await registraEsitoRetention(prisma, { tenantId, fascicoloId: id, esito: b.esito, motivazione: b.motivazione ? String(b.motivazione).trim() : null, decisoDa: req.userId ?? null });
+    const parse = EsitoRetentionSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati dell’esito di conservazione non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
+    if (!ESITI_RETENTION.includes(b.esito ?? '')) return reply.code(400).send({ errore: 'Esito non valido (cancellato | anonimizzato).' });
+    const esito = await registraEsitoRetention(prisma, { tenantId, fascicoloId: id, esito: b.esito as EsitoRetentionValore, motivazione: b.motivazione ? String(b.motivazione).trim() : null, decisoDa: req.userId ?? null });
     if (esito.esito === 'non_trovato') return reply.code(404).send({ errore: 'Fascicolo non trovato' });
     if (esito.esito === 'gia_conclusa') return reply.code(409).send({ errore: 'La conservazione di questo fascicolo è già stata conclusa.' });
     if (esito.esito === 'non_scaduta') return reply.code(409).send({ errore: 'La conservazione non è ancora scaduta: nessuna cancellazione o anonimizzazione prima della scadenza (§8.9).' });
@@ -787,11 +830,13 @@ export async function registraRotteKyc(server: FastifyInstance): Promise<void> {
   });
 
   // Proroga la conservazione (sposta la scadenza più avanti, mai indietro).
-  server.post<{ Params: { id: string }; Body: Record<string, any> }>('/kyc/:id/retention/proroga', async (req, reply) => {
+  server.post<{ Params: { id: string } }>('/kyc/:id/retention/proroga', async (req, reply) => {
     if (vietatoAlCliente(req, reply)) return;
     if (await moduloSpento(req, reply)) return;
     if (!(await puoDecidereMlro(req))) return reply.code(403).send({ errore: 'La proroga della conservazione è riservata all’MLRO o a un ruolo superiore.' });
-    const { id } = req.params; const tenantId = req.tenantId; const b = req.body || {};
+    const parse = ProrogaRetentionSchema.safeParse(req.body || {});
+    if (!parse.success) return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati della proroga non validi.' });
+    const { id } = req.params; const tenantId = req.tenantId; const b = parse.data;
     const prorogaAl = b.prorogaAl ? new Date(String(b.prorogaAl)) : null;
     if (!prorogaAl || Number.isNaN(prorogaAl.getTime())) return reply.code(400).send({ errore: 'Data di proroga non valida.' });
     if (!b.motivo || String(b.motivo).trim().length < 10) return reply.code(400).send({ errore: 'Motivazione della proroga obbligatoria (almeno 10 caratteri).' });
