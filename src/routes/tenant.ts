@@ -318,7 +318,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     // qualcosa (regola 7).
   ]);
 
-  server.patch<{ Body: Record<string, any> }>('/tenant/info', async (req, reply) => {
+  server.patch('/tenant/info', async (req, reply) => {
     const tenantId = req.tenantId;
     // Le impostazioni dello studio (IBAN, dati fiscali, credenziali canali, stato, logo, standby
     // moduli) sono riservate all'amministratore dello studio. Senza questa guardia un qualunque
@@ -327,7 +327,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     if (req.ruolo !== 'advisor' && req.ruolo !== 'super_admin') {
       return reply.code(403).send({ errore: 'Le impostazioni dello studio sono riservate al responsabile (advisor/super_admin).' });
     }
-    const rawBody = (req.body || {}) as Record<string, any>;
+    // Il corpo è un dizionario guidato da `allowedKeys`: qui non c'è uno schema per campo, la
+    // forma la decidono i validatori nel ciclo qui sotto. `unknown` è l'unica cosa onesta da
+    // dichiarare prima di quel controllo; le chiavi fuori elenco vengono ignorate.
+    const rawBody: Record<string, unknown> =
+      req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+        ? (req.body as Record<string, unknown>)
+        : {};
     if (Object.keys(rawBody).some(key => CHIAVI_CANALI.has(key)) && !soloGestoriCanali(req, reply)) return reply;
 
     // Lo standby dei moduli lo decide l'admin dello studio (advisor/super_admin), come i canali.
@@ -406,7 +412,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       'moduliDisattivati'
     ];
 
-    const sanitizedData: Record<string, any> = {};
+    const sanitizedData: Record<string, unknown> = {};
     try {
       for (const key of allowedKeys) {
         if (rawBody[key] === undefined) continue;
@@ -485,7 +491,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         update: sanitizedData,
         create: {
           id: tenantId,
-          ragioneSociale: sanitizedData.ragioneSociale || 'Studio Professionale',
+          // Il ciclo qui sopra lascia i campi testuali così come arrivano (`unknown`): per la
+          // ragione sociale serve una stringa non vuota, o il default del seed.
+          ragioneSociale: typeof sanitizedData.ragioneSociale === 'string' && sanitizedData.ragioneSociale
+            ? sanitizedData.ragioneSociale
+            : 'Studio Professionale',
           piano: 'enterprise',
           stato: 'attivo',
           ...sanitizedData,
@@ -1091,13 +1101,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
    * `lead_advisor_password`. Ora la password è generata dal server, salvata solo come
    * hash scrypt e restituita una volta sola in `passwordTemporanea`.
    */
-  server.post<{ Body: Record<string, any> }>('/admin/tenants', async (req, reply) => {
+  server.post('/admin/tenants', async (req, reply) => {
     if (!soloSuperAdmin(req, reply)) return reply;
     const parse = CreaTenantSchema.safeParse(req.body || {});
     if (!parse.success) {
       return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati studio non validi' });
     }
-    const b = parse.data as Record<string, any>;
+    const b = parse.data;
     const emailResponsabile = (b.leadAdvisorEmail || b.email || '').trim().toLowerCase();
     try {
       const tenant = await prisma.tenant.create({
@@ -1174,14 +1184,14 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     }
   });
 
-  server.patch<{ Params: { id: string }; Body: Record<string, any> }>('/admin/tenants/:id', async (req, reply) => {
+  server.patch<{ Params: { id: string } }>('/admin/tenants/:id', async (req, reply) => {
     if (!soloSuperAdmin(req, reply)) return reply;
     const { id } = req.params;
     const parse = AggiornaTenantSchema.safeParse(req.body || {});
     if (!parse.success) {
       return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati studio non validi' });
     }
-    const b = parse.data as Record<string, any>;
+    const b = parse.data;
     try {
       const updated = await prisma.tenant.update({
         where: { id },
@@ -1717,13 +1727,13 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     }
   });
 
-  server.post<{ Body: Record<string, any> }>('/audit-logs', async (req, reply) => {
+  server.post('/audit-logs', async (req, reply) => {
     const tenantId = req.tenantId;
     const parse = AuditLogSchema.safeParse(req.body || {});
     if (!parse.success) {
       return reply.code(400).send({ errore: parse.error.issues[0]?.message || 'Dati audit non validi' });
     }
-    const body = parse.data as Record<string, any>;
+    const body = parse.data;
     // Chi ha fatto l'operazione lo dice il token, non il corpo della richiesta: qui c'erano
     // `body.userEmail || 'joe@…'` e `body.userNome || 'Joe Disabato'`, cioè il nome di una
     // persona reale attribuito a chiunque chiamasse la rotta senza indicarsi. In un registro
@@ -1743,7 +1753,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           ruolo: req.ruolo || body.ruolo || IGNOTO,
           azione: body.azione,
           entita: body.entita,
-          dettagli: body.dettagli,
+          // Colonna NOT NULL: una riga senza dettagli resta valida (l'azione e l'entità ci
+          // sono), quindi la stringa vuota è il segnaposto — non un errore di Prisma al salvataggio.
+          dettagli: body.dettagli ?? '',
           // Un registro di audit serve a dire da dove è arrivata un'operazione. Qui c'era
           // `req.ip || '83.211.12.94'`: quando il proxy non esponeva l'IP la riga ne
           // riportava uno fisso, sempre lo stesso, con l'aspetto di un dato rilevato.
