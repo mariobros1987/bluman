@@ -30,9 +30,11 @@ import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util
 
 // ─── DETTAGLIO CLIENTE & MAGIC LINK (coda dell'ex blocco ARTICOLI) ──
 export async function registraRotteClienti(server: FastifyInstance, app: AppPort): Promise<void> {
-  const sanitizzaReferenti = (valore: unknown): Record<string, any> => {
+  // Toglie le credenziali dal blob dei referenti e restituisce il resto così com'è: la forma dei
+  // campi non si conosce (arriva dal DB o da un `.passthrough()`), quindi `unknown` e non `any`.
+  const sanitizzaReferenti = (valore: unknown): Record<string, unknown> => {
     if (!valore || typeof valore !== 'object' || Array.isArray(valore)) return {};
-    const { passwordHash: _passwordHash, password: _password, ...referenti } = valore as Record<string, any>;
+    const { passwordHash: _passwordHash, password: _password, ...referenti } = valore as Record<string, unknown>;
     return referenti;
   };
 
@@ -213,13 +215,13 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     }
   });
 
-  server.post<{ Body: Record<string, any> }>('/clienti', async (req, reply) => {
+  server.post('/clienti', async (req, reply) => {
     const tenantId = req.tenantId;
     const parseResult = CreaClienteSchema.safeParse(req.body || {});
     if (!parseResult.success) {
       return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati cliente non validi' });
     }
-    const b = parseResult.data as Record<string, any>;
+    const b = parseResult.data;
 
     const referentiObj = sanitizzaReferenti(b.referentiJson
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
@@ -247,10 +249,13 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     // form salvava uno `@username`, che `sendMessage` rifiuta: il canale risultava configurato
     // in anagrafica e restava per sempre indisponibile all'invio. Qui si tiene solo ciò che
     // `chatIdTelegram` riconosce come chat id; un username non diventa una chat id inventata.
+    // `telegram` è un alias storico di `telegramChatId`, e i campi di `referentiObj` sono
+    // `unknown` (è un blob JSON): `chatIdTelegram` fa comunque `String(valore ?? '')`, quindi i
+    // cast non cambiano il comportamento, solo il tipo — che senza sarebbe `any`.
     const clientTelegramChatId = chatIdTelegram(b.telegramChatId)
-      ?? chatIdTelegram(referentiObj?.telegramChatId)
-      ?? chatIdTelegram(b.telegram)
-      ?? chatIdTelegram(referentiObj?.telegram);
+      ?? chatIdTelegram(referentiObj?.telegramChatId as string | null | undefined)
+      ?? chatIdTelegram(b.telegram as string | null | undefined)
+      ?? chatIdTelegram(referentiObj?.telegram as string | null | undefined);
     const passwordHash = b.password ? hashPassword(b.password) : null;
 
     try {
@@ -308,14 +313,16 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     }
   });
 
-  server.put<{ Params: { id: string }; Body: Record<string, any> }>('/clienti/:id', async (req, reply) => {
+  server.put<{ Params: { id: string } }>('/clienti/:id', async (req, reply) => {
     const tenantId = req.tenantId;
     const { id } = req.params;
-    const b = (req.body || {}) as Record<string, any>;
+    const grezzo = req.body;
     // Le credenziali non fanno parte dell'anagrafica generica: altrimenti un ruolo che può
     // aggiornare i dati del cliente potrebbe anche prenderne il controllo. Il reset passa
-    // esclusivamente dalla rotta dedicata, riservata ad advisor e super_admin.
-    if (Object.prototype.hasOwnProperty.call(b, 'password')) {
+    // esclusivamente dalla rotta dedicata, riservata ad advisor e super_admin. Il controllo
+    // sta sul corpo grezzo, prima dello schema: così il rifiuto ha il suo messaggio dedicato
+    // anche quando la password è più corta di quanto lo schema ammetterebbe.
+    if (grezzo && typeof grezzo === 'object' && Object.prototype.hasOwnProperty.call(grezzo, 'password')) {
       return reply.code(400).send({
         errore: 'La password può essere modificata solo tramite la procedura dedicata.',
       });
@@ -323,10 +330,11 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
 
     // Guardia di forma al bordo: tipi e lunghezze sui campi noti (vedi `AggiornaClienteSchema`).
     // L'handler continua a leggere `b` grezzo per i campi referente — `.passthrough()` li conserva.
-    const parseAgg = AggiornaClienteSchema.safeParse(b);
+    const parseAgg = AggiornaClienteSchema.safeParse(grezzo || {});
     if (!parseAgg.success) {
       return reply.code(400).send({ errore: parseAgg.error.issues[0]?.message || 'Dati cliente non validi' });
     }
+    const b = parseAgg.data;
 
     const referentiObj = sanitizzaReferenti(b.referentiJson !== undefined
       ? (typeof b.referentiJson === 'string' ? JSON.parse(b.referentiJson) : b.referentiJson)
@@ -359,8 +367,10 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
     // numerico diventa `null`, che è il modo di dire «toglila»: lasciare la vecchia
     // significherebbe continuare a spedire a una chat che l'operatore ha appena svuotato.
     const clientTelegramChatId = (b.telegramChatId !== undefined || b.telegram !== undefined)
-      ? chatIdTelegram(b.telegramChatId ?? b.telegram)
-      : (chatIdTelegram(referentiObj?.telegramChatId) ?? chatIdTelegram(referentiObj?.telegram) ?? undefined);
+      ? chatIdTelegram((b.telegramChatId ?? b.telegram) as string | null | undefined)
+      : (chatIdTelegram(referentiObj?.telegramChatId as string | null | undefined)
+        ?? chatIdTelegram(referentiObj?.telegram as string | null | undefined)
+        ?? undefined);
 
     try {
       const updated = await prisma.cliente.update({
