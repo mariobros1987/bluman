@@ -43,24 +43,24 @@ export function PannelloSoggettoKyc({ fascicolo, puoModificare, onAggiornato }: 
       <div style={{ fontSize: 12, fontWeight: 700 }}>👤 Soggetto della pratica (Party)</div>
       {!fascicolo.soggetto && <div style={{ fontSize: 10, color: 'var(--pill-amber-fg)' }}>Nessun soggetto: compilalo, altrimenti titolari effettivi, screening e report restano incompleti.</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={tipo} disabled={!puoModificare} onChange={(e) => setTipo(e.target.value as any)} style={{ fontSize: 11 }}>
+        <select aria-label="Tipo di soggetto" value={tipo} disabled={!puoModificare} onChange={(e) => setTipo(e.target.value as any)} style={{ fontSize: 11 }}>
           <option value="persona_fisica">Persona fisica</option>
           <option value="persona_giuridica">Persona giuridica</option>
         </select>
-        <input value={denominazione} disabled={!puoModificare} onChange={(e) => setDenominazione(e.target.value)} placeholder="Denominazione / Nome e cognome" style={{ ...inputStyle, minWidth: 200 }} />
+        <input aria-label="Denominazione o nome e cognome" value={denominazione} disabled={!puoModificare} onChange={(e) => setDenominazione(e.target.value)} placeholder="Denominazione / Nome e cognome" style={{ ...inputStyle, minWidth: 200 }} />
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <input value={codiceFiscale} disabled={!puoModificare} onChange={(e) => setCodiceFiscale(e.target.value)} placeholder="Codice fiscale" style={inputStyle} />
-        <input value={partitaIva} disabled={!puoModificare} onChange={(e) => setPartitaIva(e.target.value)} placeholder="Partita IVA" style={inputStyle} />
-        <input value={paeseResidenza} disabled={!puoModificare} onChange={(e) => setPaeseResidenza(e.target.value)} placeholder="Paese residenza" style={{ ...inputStyle, minWidth: 90 }} />
+        <input aria-label="Codice fiscale" value={codiceFiscale} disabled={!puoModificare} onChange={(e) => setCodiceFiscale(e.target.value)} placeholder="Codice fiscale" style={inputStyle} />
+        <input aria-label="Partita IVA" value={partitaIva} disabled={!puoModificare} onChange={(e) => setPartitaIva(e.target.value)} placeholder="Partita IVA" style={inputStyle} />
+        <input aria-label="Paese di residenza" value={paeseResidenza} disabled={!puoModificare} onChange={(e) => setPaeseResidenza(e.target.value)} placeholder="Paese residenza" style={{ ...inputStyle, minWidth: 90 }} />
       </div>
       {tipo === 'persona_fisica' && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <input value={luogoNascita} disabled={!puoModificare} onChange={(e) => setLuogoNascita(e.target.value)} placeholder="Luogo di nascita" style={inputStyle} />
-          <input value={dataNascita} disabled={!puoModificare} onChange={(e) => setDataNascita(e.target.value)} placeholder="Data di nascita (AAAA-MM-GG)" style={inputStyle} />
+          <input aria-label="Luogo di nascita" value={luogoNascita} disabled={!puoModificare} onChange={(e) => setLuogoNascita(e.target.value)} placeholder="Luogo di nascita" style={inputStyle} />
+          <input aria-label="Data di nascita" value={dataNascita} disabled={!puoModificare} onChange={(e) => setDataNascita(e.target.value)} placeholder="Data di nascita (AAAA-MM-GG)" style={inputStyle} />
         </div>
       )}
-      <input value={indirizzo} disabled={!puoModificare} onChange={(e) => setIndirizzo(e.target.value)} placeholder="Indirizzo / Sede" style={{ fontSize: 11 }} />
+      <input aria-label="Indirizzo o sede" value={indirizzo} disabled={!puoModificare} onChange={(e) => setIndirizzo(e.target.value)} placeholder="Indirizzo / Sede" style={{ fontSize: 11 }} />
       {puoModificare && (
         <div><button type="button" disabled={busy} onClick={salva} className="btn btn-sm btn-primary">{busy ? '…' : '💾 Salva soggetto'}</button></div>
       )}

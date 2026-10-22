@@ -100,7 +100,7 @@ export function GateKycProgetto({ clienteId }: { clienteId?: string | null }) {
           </div>
         ) : (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder="Motivazione dello sblocco (min. 10 caratteri) — resta a audit" style={{ width: '100%', fontSize: 12, padding: 6, borderRadius: 6, border: '1px solid var(--pill-red-fg)', background: 'var(--card)', color: 'var(--text)' }} />
+            <textarea aria-label="Motivazione dello sblocco" value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder="Motivazione dello sblocco (min. 10 caratteri) — resta a audit" style={{ width: '100%', fontSize: 12, padding: 6, borderRadius: 6, border: '1px solid var(--pill-red-fg)', background: 'var(--card)', color: 'var(--text)' }} />
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" disabled={ovBusy || motivo.trim().length < 10} onClick={sblocca} style={{ background: 'var(--pill-red-fg)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer', opacity: (ovBusy || motivo.trim().length < 10) ? 0.6 : 1 }}>
                 {ovBusy ? 'Sblocco…' : 'Conferma sblocco'}

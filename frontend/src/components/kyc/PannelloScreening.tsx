@@ -132,7 +132,7 @@ export function PannelloScreening({ fascicoloId, puoModificare }: { fascicoloId:
           <label style={{ fontSize: 11, display: 'flex', flexDirection: 'column', gap: 2 }}>Allegato esito
             <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} style={{ fontSize: 10 }} />
           </label>
-          <textarea value={dettagli} onChange={(e) => setDettagli(e.target.value)} rows={2} placeholder="Dettagli del match / note" style={{ fontSize: 11, gridColumn: '1 / -1' }} />
+          <textarea aria-label="Dettagli del match o note" value={dettagli} onChange={(e) => setDettagli(e.target.value)} rows={2} placeholder="Dettagli del match / note" style={{ fontSize: 11, gridColumn: '1 / -1' }} />
           <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 10 }}>
             <button type="button" disabled={busy} onClick={salva} className="btn btn-sm btn-primary">{busy ? '…' : '💾 Registra screening'}</button>
             {msg && <span style={{ fontSize: 11, color: 'var(--muted)' }}>{msg}</span>}

@@ -182,6 +182,17 @@ describe('🚦 nginx — API sotto /api, pagine in radice', () => {
 describe('🚀 distribuisci.sh — la build del VPS e il frontend devono concordare', () => {
   const script = leggi('scripts', 'distribuisci.sh');
 
+  it('esegue entrambe le suite prima del push, senza ignorare errori del frontend', () => {
+    const frontend = script.indexOf('(cd frontend && npm test)');
+    const backend = script.indexOf('npx vitest run');
+    const push = script.indexOf('git push origin main');
+    expect(frontend).toBeGreaterThan(-1);
+    expect(backend).toBeGreaterThan(frontend);
+    expect(push).toBeGreaterThan(backend);
+    expect(script).toMatch(/^set -euo pipefail$/m);
+    expect(script).not.toMatch(/\(cd frontend && npm test\)\s*\|\|/);
+  });
+
   it('compila il frontend dichiarando il prefisso delle API', () => {
     // Se lo script smettesse di passarlo, `getApiBase()` ricadrebbe sull'indirizzo di Railway
     // **in silenzio**: l'app del VPS funzionerebbe parlando con l'altro database, e nessuno se

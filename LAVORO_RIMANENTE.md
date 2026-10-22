@@ -1,6 +1,6 @@
 # Lavoro rimanente — BluMan
 
-**Ultimo aggiornamento:** 20/10/2026. Fonte: verifica diretta nel codice, non nelle caselle dei piani.
+**Ultimo aggiornamento:** 22/10/2026. Fonte: verifica diretta nel codice, non nelle caselle dei piani.
 
 Questo è l'unico elenco da leggere prima di riprendere un lavoro. Se contraddice un altro file
 (`PIANO_DI_MIGLIORAMENTO.md`, `BluMan_analisi_professionale.md`, `.agents/BluMan_piano_di_sviluppo.md`),
@@ -178,13 +178,24 @@ volte) e la voce `SMOKE TEST Articolo Prova` — sono cancellazioni di dati di p
 - **Sentry**: codice pronto, ma `SENTRY_DSN` e `VITE_SENTRY_DSN` non sono nel `.env` del VPS:
   oggi non raccoglie niente.
 - **Accessibilità**: i pulsanti che mostrano solo un simbolo (✕ di chiusura, ← indietro) hanno ora
-  un nome accessibile in tutti i file del frontend (12 corretti il 20/10/2026). Resta da fare il
-  controllo dei campi modulo: l'etichetta è spesso solo visiva accanto all'input, e in jsdom i test
-  non lo vedono. Le tabelle L3 sono già coperte (30 wrapper di scroll in 25 file).
+  un nome accessibile in tutti i file del frontend (12 corretti il 20/10/2026). Il 22/10 corretti
+  **73 campi in 14 file**: KYC, firma studio/portale, configurazione firma, rifiuto proposta,
+  libreria documenti/form e canali. Le 31 etichette dei canali sono collegate con `htmlFor`/`id`;
+  gli altri campi hanno `aria-label`, comprese le motivazioni distinte dei quattro pilastri.
+  **8 test DOM** verificano nomi accessibili, sola lettura e callback (KYC, OTP, canali).
+  La sonda statica segnala ancora **299 punti da esaminare**, non 299 difetti confermati:
+  include falsi positivi su id dinamici e commenti JSX. Resta il controllo delle altre aree.
+  Le tabelle L3 sono già coperte (30 wrapper di scroll in 25 file).
 - **Cifratura a riposo dei segreti nel database**: oggi le credenziali dei canali (WhatsApp,
   Telegram, SMTP) e le nuove credenziali dei servizi esterni stanno in chiaro nelle rispettive
   tabelle, protette da RLS e dai backup cifrati. Se si vuole una cassaforte con chiave separata,
   è un lavoro a sé (nuova variabile d'ambiente + migrazione dei valori esistenti).
+
+### Chiusi il 22/10/2026
+
+- **Test frontend prima della distribuzione**: `scripts/distribuisci.sh` esegue ora `npm test`
+  in `frontend` oltre alla suite backend, prima di push/deploy. Presidio in
+  `src/infrastrutturaDeploy.test.ts` sull'ordine e sull'assenza di ripieghi che ignorino gli errori.
 
 ### Chiusi il 20/10/2026
 

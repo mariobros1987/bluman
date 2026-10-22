@@ -134,7 +134,11 @@ echo "• Build Bundle Frontend..."
 (cd frontend && npm run build)
 successo "Build Frontend completata con successo."
 
-echo "• Esecuzione Suite di Test Vitest..."
+echo "• Esecuzione Suite di Test Frontend..."
+(cd frontend && npm test)
+successo "Test Frontend superati."
+
+echo "• Esecuzione Suite di Test Backend..."
 npx vitest run
 successo "Test Vitest completati al 100% (verdi)."
 

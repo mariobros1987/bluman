@@ -53,7 +53,7 @@ export function DocumentiSoggetto({ soggettoId, puoModificare }: { soggettoId: s
       )}
       {puoModificare && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ fontSize: 11 }}>
+          <select aria-label="Tipo di documento" value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ fontSize: 11 }}>
             {TIPI.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
           </select>
           <label style={{ fontSize: 11, cursor: busy ? 'default' : 'pointer', color: 'var(--indigo-l)' }}>

@@ -289,6 +289,7 @@ export function LibreriaDocumentiEForm() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="file"
+              aria-label="Importa modelli documento"
               ref={libImportFileRef}
               accept=".json,.html,.htm"
               style={{ display: 'none' }}
@@ -406,6 +407,7 @@ export function LibreriaDocumentiEForm() {
 
             <input
               type="text"
+              aria-label="Cerca modello"
               placeholder="🔍 Cerca modello..."
               value={searchDocQuery}
               onChange={e => setSearchDocQuery(e.target.value)}
@@ -576,6 +578,7 @@ export function LibreriaDocumentiEForm() {
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Seleziona File Documento (PDF/Word) *</label>
               <input
                 type="file"
+                aria-label="Seleziona file documento (PDF/Word)"
                 accept=".pdf,.doc,.docx"
                 onChange={e => {
                   if (e.target.files && e.target.files[0]) {
@@ -589,11 +592,11 @@ export function LibreriaDocumentiEForm() {
 
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome File Modello *</label>
-              <input value={docName} onChange={e => setDocName(e.target.value)} placeholder="es. Procura_Legale_MFSA_In_Bianco.pdf" required />
+              <input aria-label="Nome file modello" value={docName} onChange={e => setDocName(e.target.value)} placeholder="es. Procura_Legale_MFSA_In_Bianco.pdf" required />
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Categoria *</label>
-              <select value={docCat} onChange={e => setDocCat(e.target.value)}>
+              <select aria-label="Categoria" value={docCat} onChange={e => setDocCat(e.target.value)}>
                 <option value="Societario">Societario</option>
                 <option value="Compliance">Compliance</option>
                 <option value="Banking">Banking</option>
@@ -602,7 +605,7 @@ export function LibreriaDocumentiEForm() {
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Descrizione / Scopo *</label>
-              <input value={docDesc} onChange={e => setDocDesc(e.target.value)} placeholder="es. Procura per deposito atti societari presso MFSA" />
+              <input aria-label="Descrizione o scopo" value={docDesc} onChange={e => setDocDesc(e.target.value)} placeholder="es. Procura per deposito atti societari presso MFSA" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="chkSignDoc" checked={docSign} onChange={e => setDocSign(e.target.checked)} />
@@ -623,11 +626,12 @@ export function LibreriaDocumentiEForm() {
             <div style={{ fontSize: 15, fontWeight: 600 }}>Crea Nuovo Form Master Dinamico</div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo Form Master *</label>
-              <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="es. Form Adeguata Verifica & Profilo KYC" required />
+              <input aria-label="Titolo form master" value={formName} onChange={e => setFormName(e.target.value)} placeholder="es. Form Adeguata Verifica & Profilo KYC" required />
             </div>
             <div>
               <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Campi del Form (separati da virgola) *</label>
               <textarea
+                aria-label="Campi del form (separati da virgola)"
                 value={formFieldsText}
                 onChange={e => setFormFieldsText(e.target.value)}
                 placeholder="es. Nome Completo, Codice Fiscale, Indirizzo Residenza, Origine Patrimoniale, IBAN"
@@ -665,6 +669,7 @@ export function LibreriaDocumentiEForm() {
                     <label style={{ fontSize: 11, color: 'var(--muted)' }}>Seleziona Cliente ERP Target *</label>
                     <input
                       type="text"
+                      aria-label="Filtra cliente"
                       placeholder="🔍 Filtra cliente..."
                       value={clientModalSearch}
                       onChange={e => setClientModalSearch(e.target.value)}
@@ -672,6 +677,7 @@ export function LibreriaDocumentiEForm() {
                     />
                   </div>
                   <select
+                    aria-label="Seleziona cliente ERP target"
                     value={selectedLinkClientId}
                     onChange={e => setSelectedLinkClientId(e.target.value)}
                     style={{ padding: 10, fontSize: 12, width: '100%' }}
@@ -690,6 +696,7 @@ export function LibreriaDocumentiEForm() {
                 <div>
                   <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Incarico / Progetto Destinazione (Opzionale)</label>
                   <select
+                    aria-label="Incarico o progetto destinazione"
                     value={selectedLinkProjId}
                     onChange={e => setSelectedLinkProjId(e.target.value)}
                     style={{ padding: 10, fontSize: 12 }}

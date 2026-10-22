@@ -73,7 +73,7 @@ export function DocumentiKycPortale({ clienteId }: { clienteId?: string }) {
             </ul>
           ) : <div style={{ fontSize: 13, color: 'var(--muted)' }}>Nessun documento caricato.</div>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ fontSize: 13 }}>
+            <select aria-label="Tipo di documento" value={tipo} onChange={(e) => setTipo(e.target.value)} style={{ fontSize: 13 }}>
               {TIPI.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}
             </select>
             <label style={{ fontSize: 13, cursor: busy ? 'default' : 'pointer', color: 'var(--indigo-l)', fontWeight: 600 }}>

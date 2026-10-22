@@ -391,6 +391,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                     {rifiutoId === p.id && (
                       <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                         <input
+                          aria-label="Motivo del rifiuto"
                           value={notaRifiuto}
                           onChange={(e) => setNotaRifiuto(e.target.value)}
                           placeholder="Motivo del rifiuto (visibile al cliente)…"

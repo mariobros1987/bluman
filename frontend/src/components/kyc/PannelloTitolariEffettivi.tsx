@@ -85,12 +85,12 @@ export function PannelloTitolariEffettivi({ fascicoloId, puoModificare }: { fasc
 
       {puoModificare && (apri ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'flex-end', background: 'var(--bg)', padding: 8, borderRadius: 8 }}>
-          <input value={den} onChange={(e) => setDen(e.target.value)} placeholder="Nome e cognome del TE" style={{ flex: 2, minWidth: 160, fontSize: 12 }} />
-          <select value={criterio} onChange={(e) => setCriterio(e.target.value)} style={{ fontSize: 12 }}>
+          <input aria-label="Nome e cognome del titolare effettivo" value={den} onChange={(e) => setDen(e.target.value)} placeholder="Nome e cognome del TE" style={{ flex: 2, minWidth: 160, fontSize: 12 }} />
+          <select aria-label="Criterio di individuazione" value={criterio} onChange={(e) => setCriterio(e.target.value)} style={{ fontSize: 12 }}>
             <option value="proprieta">Proprietà</option><option value="controllo">Controllo</option><option value="altro">Altro</option>
           </select>
-          <input value={perc} onChange={(e) => setPerc(e.target.value)} type="number" placeholder="%" style={{ width: 70, fontSize: 12 }} />
-          <select value={fonte} onChange={(e) => setFonte(e.target.value)} style={{ fontSize: 12 }}>
+          <input aria-label="Quota percentuale" value={perc} onChange={(e) => setPerc(e.target.value)} type="number" placeholder="%" style={{ width: 70, fontSize: 12 }} />
+          <select aria-label="Fonte della titolarità" value={fonte} onChange={(e) => setFonte(e.target.value)} style={{ fontSize: 12 }}>
             <option value="autodichiarazione">Autodich.</option><option value="registro_camerale">Registro</option>
           </select>
           <button type="button" disabled={busy} onClick={aggiungi} className="btn btn-sm btn-primary">{busy ? '…' : 'Aggiungi'}</button>

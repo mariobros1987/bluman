@@ -66,7 +66,7 @@ export function PannelloRischio({ fascicoloId, puoModificare }: { fascicoloId: s
                 <option value="basso">Basso</option><option value="medio">Medio</option><option value="alto">Alto</option>
               </select>
             </div>
-            <textarea value={mot[p.key]} disabled={!puoModificare} onChange={(e) => setMot((s) => ({ ...s, [p.key]: e.target.value }))} rows={2} placeholder="Motivazione (obbligatoria per chiudere)" style={{ fontSize: 11, width: '100%' }} />
+            <textarea aria-label={`Motivazione — ${p.label}`} value={mot[p.key]} disabled={!puoModificare} onChange={(e) => setMot((s) => ({ ...s, [p.key]: e.target.value }))} rows={2} placeholder="Motivazione (obbligatoria per chiudere)" style={{ fontSize: 11, width: '100%' }} />
           </div>
         ))}
       </div>

@@ -39,6 +39,7 @@ export function ModaleConfigFirma({
                   </label>
                   <input
                     type="text"
+                    aria-label="Titolo o nome del documento"
                     value={configFirmaModal.titolo}
                     onChange={(e) => setConfigFirmaModal({ ...configFirmaModal, titolo: e.target.value })}
                     style={{ width: '100%', padding: '9px 12px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 12, outline: 'none' }}
@@ -274,6 +275,7 @@ export function ModaleConfigFirma({
                   </label>
                   <input
                     type="date"
+                    aria-label="Data di scadenza della firma"
                     value={configFirmaModal.dataScadenzaDoc || ''}
                     onChange={(e) => setConfigFirmaModal({ ...configFirmaModal, dataScadenzaDoc: e.target.value })}
                     style={{ width: '100%', padding: '8px 10px', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 11.5 }}

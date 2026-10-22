@@ -99,7 +99,7 @@ export function PannelloAnomalie({ fascicoloId, puoModificare }: { fascicoloId: 
               {TIPI.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
             </select>
           </label>
-          <input value={descrizione} onChange={(e) => setDescrizione(e.target.value)} placeholder="Descrizione dell'anomalia" style={{ fontSize: 11, flex: 1, minWidth: 180 }} />
+          <input aria-label="Descrizione dell'anomalia" value={descrizione} onChange={(e) => setDescrizione(e.target.value)} placeholder="Descrizione dell'anomalia" style={{ fontSize: 11, flex: 1, minWidth: 180 }} />
           <button type="button" disabled={busy} onClick={apri} className="btn btn-sm btn-primary">{busy ? '…' : '🚩 Apri anomalia'}</button>
         </div>
       )}

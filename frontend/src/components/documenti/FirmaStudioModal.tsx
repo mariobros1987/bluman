@@ -345,6 +345,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
             </label>
             <input
               type="text"
+              aria-label="Titolo o ruolo del firmatario"
               value={ruoloDichiarato}
               onChange={(e) => setRuoloDichiarato(e.target.value)}
               placeholder="Es. Senior Legal & Tax Advisor, Managing Partner..."
@@ -371,6 +372,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                   </div>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                     <select
+                      aria-label="Canale di invio del codice OTP"
                       value={canaleOtp}
                       onChange={(e) => setCanaleOtp(e.target.value as 'email' | 'whatsapp')}
                       style={{ padding: '6px 10px', background: 'var(--surface-2)', border: '1px solid var(--indigo-d)', borderRadius: 6, color: 'var(--text)', fontSize: 12 }}
@@ -382,6 +384,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                     {canaleOtp === 'whatsapp' && (
                       <input
                         type="text"
+                        aria-label="Numero di cellulare WhatsApp"
                         value={cellulareWhatsapp}
                         onChange={(e) => setCellulareWhatsapp(e.target.value)}
                         placeholder="+39 333..."
@@ -416,6 +419,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                       <input
                         type="text"
                         maxLength={6}
+                        aria-label="Codice OTP a 6 cifre"
                         value={codiceOtp}
                         onChange={(e) => setCodiceOtp(e.target.value)}
                         placeholder="Inserisci OTP a 6 cifre"
@@ -514,6 +518,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
                 <div style={{ background: 'var(--pill-slate-bg)', padding: 12, borderRadius: 8 }}>
                   <input
                     type="text"
+                    aria-label="Nome completo del firmatario (firma digitata)"
                     value={typedSignature}
                     onChange={(e) => setTypedSignature(e.target.value)}
                     placeholder="Nome completo..."
@@ -546,6 +551,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
               <input
                 type="file"
                 accept=".p7m,.pdf"
+                aria-label="File firmato esternamente (.p7m o .pdf)"
                 onChange={handleFileUpload}
                 style={{ fontSize: 12, color: 'var(--muted)' }}
               />
@@ -570,6 +576,7 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
+                aria-label="Scansione della firma autografa"
                 onChange={handleFileUpload}
                 style={{ fontSize: 12, color: 'var(--muted)' }}
               />

@@ -290,19 +290,19 @@ export function TabChannels({
 
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Host Server SMTP *:</label>
-                  <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="es. smtp.iltuoprovider.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-host">Host Server SMTP *:</label>
+                  <input id="smtp-host" type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="es. smtp.iltuoprovider.it" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Porta Server SMTP *:</label>
-                  <input type="number" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-port">Porta Server SMTP *:</label>
+                  <input id="smtp-port" type="number" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Nome nel certificato (solo se diverso dall'host):</label>
-                  <input type="text" value={smtpServername} onChange={e => setSmtpServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-servername">Nome nel certificato (solo se diverso dall'host):</label>
+                  <input id="smtp-servername" type="text" value={smtpServername} onChange={e => setSmtpServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Da compilare solo se il provider dice che il certificato è intestato a un nome
                     diverso da quello a cui ci si collega. Il certificato resta verificato: cambia
@@ -310,38 +310,38 @@ export function TabChannels({
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Username / Email Autenticazione *:</label>
-                  <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="comunicazioni@studio.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-user">Username / Email Autenticazione *:</label>
+                  <input id="smtp-user" type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="comunicazioni@studio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Password SMTP / App Key *:</label>
-                  <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="smtp-pass">Password SMTP / App Key *:</label>
+                  <input id="smtp-pass" type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.smtpPass} />
                 </div>
                 <div className={styles.field}>
-                  <label>Email Mittente Visibile *:</label>
-                  <input type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-from-email">Email Mittente Visibile *:</label>
+                  <input id="smtp-from-email" type="email" value={smtpFromEmail} onChange={e => setSmtpFromEmail(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Nome Mittente Visualizzato *:</label>
-                  <input type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="Nome dello Studio, come lo leggono i clienti" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-from-name">Nome Mittente Visualizzato *:</label>
+                  <input id="smtp-from-name" type="text" value={smtpFromName} onChange={e => setSmtpFromName(e.target.value)} placeholder="Nome dello Studio, come lo leggono i clienti" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Indirizzo di Risposta (Reply-To):</label>
-                  <input type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-reply-to">Indirizzo di Risposta (Reply-To):</label>
+                  <input id="smtp-reply-to" type="email" value={smtpReplyTo} onChange={e => setSmtpReplyTo(e.target.value)} placeholder="comunicazioni@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
-                  <input type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@iltuostudio.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="smtp-bcc">Copia Conoscenza Nascosta Studio (BCC Archivio):</label>
+                  <input id="smtp-bcc" type="email" value={smtpBcc} onChange={e => setSmtpBcc(e.target.value)} placeholder="archivio@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
@@ -390,26 +390,26 @@ export function TabChannels({
 
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Protocollo Ricezione:</label>
-                  <select value={imapProtocol} onChange={e => setImapProtocol(e.target.value as any)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                  <label htmlFor="imap-protocol">Protocollo Ricezione:</label>
+                  <select id="imap-protocol" value={imapProtocol} onChange={e => setImapProtocol(e.target.value as any)} style={{ fontSize: 12, padding: '7px 10px' }}>
                     <option value="imap">IMAP4 (Sincronizzazione Bidirezionale Multi-Device - Consigliato)</option>
                     <option value="pop3">POP3 (Download Singolo Posta)</option>
                   </select>
                 </div>
                 <div className={styles.field}>
-                  <label>Host Server Posta in Entrata *:</label>
-                  <input type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="es. imap.iltuoprovider.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="imap-host">Host Server Posta in Entrata *:</label>
+                  <input id="imap-host" type="text" value={imapHost} onChange={e => setImapHost(e.target.value)} placeholder="es. imap.iltuoprovider.it" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Porta Server Ricezione *:</label>
-                  <input type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
+                  <label htmlFor="imap-port">Porta Server Ricezione *:</label>
+                  <input id="imap-port" type="number" value={imapPort} onChange={e => setImapPort(e.target.value)} placeholder="993" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Nome nel certificato (solo se diverso dall'host):</label>
-                  <input type="text" value={imapServername} onChange={e => setImapServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
+                  <label htmlFor="imap-servername">Nome nel certificato (solo se diverso dall'host):</label>
+                  <input id="imap-servername" type="text" value={imapServername} onChange={e => setImapServername(e.target.value)} placeholder="lascia vuoto: si verifica l'host" style={{ fontSize: 12 }} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Serve quando il test risponde «il nome dell'host non è tra quelli del
                     certificato» e il nome corretto non è raggiungibile: qui si dichiara il nome che
@@ -420,27 +420,27 @@ export function TabChannels({
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Cartella Remota da Monitorare:</label>
-                  <input type="text" value={imapFolder} onChange={e => setImapFolder(e.target.value)} placeholder="INBOX" style={{ fontSize: 12 }} />
+                  <label htmlFor="imap-folder">Cartella Remota da Monitorare:</label>
+                  <input id="imap-folder" type="text" value={imapFolder} onChange={e => setImapFolder(e.target.value)} placeholder="INBOX" style={{ fontSize: 12 }} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Username / Email Posta in Entrata *:</label>
-                  <input type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="posta@iltuostudio.it" style={{ fontSize: 12 }} />
+                  <label htmlFor="imap-user">Username / Email Posta in Entrata *:</label>
+                  <input id="imap-user" type="text" value={imapUser} onChange={e => setImapUser(e.target.value)} placeholder="posta@iltuostudio.it" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Password Casella Posta *:</label>
-                  <input type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="imap-pass">Password Casella Posta *:</label>
+                  <input id="imap-pass" type="password" value={imapPass} onChange={e => setImapPass(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.imapPass} />
                 </div>
               </div>
 
               <div className={styles.grid2} style={{ marginTop: 10 }}>
                 <div className={styles.field}>
-                  <label>Frequenza Polling Sincronizzazione:</label>
-                  <select value={imapPollInterval} onChange={e => setImapPollInterval(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }}>
+                  <label htmlFor="imap-poll">Frequenza Polling Sincronizzazione:</label>
+                  <select id="imap-poll" value={imapPollInterval} onChange={e => setImapPollInterval(e.target.value)} style={{ fontSize: 12, padding: '7px 10px' }}>
                     <option value="2m">⚡ Ogni 2 Minuti (Live Ingestion)</option>
                     <option value="5m">⏱ Ogni 5 Minuti (Standard)</option>
                     <option value="15m">⏳ Ogni 15 Minuti</option>
@@ -463,8 +463,9 @@ export function TabChannels({
                 Questa firma e clausola legale verranno allegate automaticamente in calce a tutte le email inviate da BluMan ai clienti.
               </div>
               <div className={styles.field}>
-                <label>Modello Firma & Disclaimer (Supporta tag: &#123;&#123;nome_operatore&#125;&#125;, &#123;&#123;ruolo_operatore&#125;&#125;, &#123;&#123;sito_web&#125;&#125;):</label>
+                <label htmlFor="email-signature">Modello Firma & Disclaimer (Supporta tag: &#123;&#123;nome_operatore&#125;&#125;, &#123;&#123;ruolo_operatore&#125;&#125;, &#123;&#123;sito_web&#125;&#125;):</label>
                 <textarea
+                  id="email-signature"
                   value={emailSignatureHtml}
                   onChange={e => setEmailSignatureHtml(e.target.value)}
                   rows={4}
@@ -506,25 +507,25 @@ export function TabChannels({
               </div>
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>WhatsApp Phone Number ID (Meta *):</label>
-                  <input type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
+                  <label htmlFor="wa-phone-id">WhatsApp Phone Number ID (Meta *):</label>
+                  <input id="wa-phone-id" type="text" value={waPhoneId} onChange={e => setWaPhoneId(e.target.value)} style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Meta System User Access Token (Permanent *):</label>
-                  <input type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="wa-access-token">Meta System User Access Token (Permanent *):</label>
+                  <input id="wa-access-token" type="password" value={waAccessToken} onChange={e => setWaAccessToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.waAccessToken} />
                 </div>
                 <div className={styles.field}>
-                  <label>Template OTP approvato (opzionale):</label>
-                  <input type="text" value={waOtpTemplate} onChange={e => setWaOtpTemplate(e.target.value)} placeholder="es. codice_accesso" style={{ fontSize: 12 }} />
+                  <label htmlFor="wa-otp-template">Template OTP approvato (opzionale):</label>
+                  <input id="wa-otp-template" type="text" value={waOtpTemplate} onChange={e => setWaOtpTemplate(e.target.value)} placeholder="es. codice_accesso" style={{ fontSize: 12 }} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Senza template il codice parte come testo libero, che WhatsApp consegna solo se il cliente
                     ha scritto allo studio nelle ultime 24 ore. Il template va approvato <strong>nella tua app</strong>.
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Lingua del template:</label>
-                  <input type="text" value={waOtpTemplateLang} onChange={e => setWaOtpTemplateLang(e.target.value)} placeholder="it" style={{ fontSize: 12 }} />
+                  <label htmlFor="wa-template-lang">Lingua del template:</label>
+                  <input id="wa-template-lang" type="text" value={waOtpTemplateLang} onChange={e => setWaOtpTemplateLang(e.target.value)} placeholder="it" style={{ fontSize: 12 }} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Il codice della lingua con cui il template è stato approvato (es. <code>it</code>, <code>it_IT</code>, <code>en_US</code>).
                   </div>
@@ -536,12 +537,12 @@ export function TabChannels({
               </div>
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Meta App ID:</label>
-                  <input type="text" value={waAppId} onChange={e => setWaAppId(e.target.value)} placeholder="es. 1234567890123456" style={{ fontSize: 12 }} />
+                  <label htmlFor="wa-app-id">Meta App ID:</label>
+                  <input id="wa-app-id" type="text" value={waAppId} onChange={e => setWaAppId(e.target.value)} placeholder="es. 1234567890123456" style={{ fontSize: 12 }} />
                 </div>
                 <div className={styles.field}>
-                  <label>Meta App Secret *:</label>
-                  <input type="password" value={waAppSecret} onChange={e => setWaAppSecret(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="wa-app-secret">Meta App Secret *:</label>
+                  <input id="wa-app-secret" type="password" value={waAppSecret} onChange={e => setWaAppSecret(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.waAppSecret} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     È la chiave con cui il server verifica che i messaggi arrivino davvero da Meta. Senza, i messaggi
@@ -549,8 +550,8 @@ export function TabChannels({
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Webhook Verify Token (handshake Meta):</label>
-                  <input type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="wa-verify-token">Webhook Verify Token (handshake Meta):</label>
+                  <input id="wa-verify-token" type="password" value={waVerifyToken} onChange={e => setWaVerifyToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.waVerifyToken} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     La stringa che scegli tu e incolli anche in Meta. È il controllo che Meta fa quando salvi la
@@ -560,9 +561,10 @@ export function TabChannels({
               </div>
 
               <div className={styles.field} style={{ marginTop: 12 }}>
-                <label>Callback URL da incollare in Meta (sola lettura):</label>
+                <label htmlFor="wa-callback">Callback URL da incollare in Meta (sola lettura):</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input
+                    id="wa-callback"
                     type="text"
                     readOnly
                     value={waCallbackUrl || 'Verrà generata al primo salvataggio di questa scheda'}
@@ -630,8 +632,8 @@ export function TabChannels({
 
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Bot Username Telegram *:</label>
-                  <input type="text" value={tgBotUsername} onChange={e => setTgBotUsername(e.target.value)} style={{ fontSize: 12 }} />
+                  <label htmlFor="tg-username">Bot Username Telegram *:</label>
+                  <input id="tg-username" type="text" value={tgBotUsername} onChange={e => setTgBotUsername(e.target.value)} style={{ fontSize: 12 }} />
                   {/* Il campo è testo libero, e un numero ci sta dentro senza protestare: il
                       16/09/2026 ci è finito l'id del bot, e il link per collegare la chat di un
                       cliente a una pratica apriva «questo utente non esiste». Qui si dice cosa ci
@@ -643,8 +645,8 @@ export function TabChannels({
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Bot Access Token (@BotFather *):</label>
-                  <input type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="tg-token">Bot Access Token (@BotFather *):</label>
+                  <input id="tg-token" type="password" value={tgBotToken} onChange={e => setTgBotToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.tgBotToken} />
                 </div>
               </div>
@@ -678,8 +680,9 @@ export function TabChannels({
 
               <div className={styles.grid2}>
                 <div className={styles.field}>
-                  <label>Indirizzo del demone Signal *:</label>
+                  <label htmlFor="signal-endpoint">Indirizzo del demone Signal *:</label>
                   <input
+                    id="signal-endpoint"
                     type="text"
                     value={signalEndpoint}
                     onChange={e => setSignalEndpoint(e.target.value)}
@@ -692,8 +695,9 @@ export function TabChannels({
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Numero Signal dello studio *:</label>
+                  <label htmlFor="signal-number">Numero Signal dello studio *:</label>
                   <input
+                    id="signal-number"
                     type="text"
                     value={signalNumber}
                     onChange={e => setSignalNumber(e.target.value)}
@@ -707,8 +711,8 @@ export function TabChannels({
                   </div>
                 </div>
                 <div className={styles.field}>
-                  <label>Token del demone (se il proxy lo richiede):</label>
-                  <input type="password" value={signalToken} onChange={e => setSignalToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
+                  <label htmlFor="signal-token">Token del demone (se il proxy lo richiede):</label>
+                  <input id="signal-token" type="password" value={signalToken} onChange={e => setSignalToken(e.target.value)} placeholder="••••••••••••" style={{ fontSize: 12 }} autoComplete="new-password" />
                   <NotaSegreto impostata={segreti.signalToken} />
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
                     Viaggia nell'intestazione <code>Authorization</code>, mai nell'indirizzo.

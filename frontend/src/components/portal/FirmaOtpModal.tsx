@@ -137,6 +137,7 @@ export function FirmaOtpModal({
               Chi sta firmando (firmatari ammessi dall'anagrafica):
             </label>
             <select
+              aria-label="Chi sta firmando"
               value={firmatarioSelezionato}
               onChange={(e) => setFirmatarioSelezionato(e.target.value)}
               style={{
@@ -190,6 +191,7 @@ export function FirmaOtpModal({
                 <input
                   type="file"
                   accept="application/pdf,image/png,image/jpeg"
+                  aria-label="Documento di riconoscimento"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) onCaricaDocRiconoscimento(file);
@@ -332,6 +334,7 @@ export function FirmaOtpModal({
           <input
             type="text"
             maxLength={6}
+            aria-label="Codice OTP a 6 cifre"
             value={otpCode}
             onChange={(e) => {
               setOtpCode(e.target.value.replace(/\D/g, ''));
