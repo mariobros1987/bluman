@@ -1,4 +1,4 @@
-import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, senzaSegretiTenant } from '../utils/tenant';
+import { getTenantStorageKey, getCurrentTenantId, senzaSegretiTenant } from '../utils/tenant';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 import { cachedQuery, invalidateCache } from './cache';
@@ -217,15 +217,10 @@ export async function fetchTenantInfoApi(tenantIdParam?: string) {
     });
     if (!res.ok) throw new Error('Errore recupero info tenant');
     const data = await res.json();
-    if (data && (!data.ragioneSociale || (data.id && data.id !== currentTenantId))) {
-      const studioInfo = getStudioInfoForTenant(currentTenantId);
-      return {
-        ...data,
-        id: currentTenantId,
-        ragioneSociale: studioInfo.ragioneSociale,
-        sedeLegale: studioInfo.sedeLegale || data.sedeLegale,
-        piva: studioInfo.piva || data.piva,
-      };
+    // 3.8 — la risposta di un altro studio si scarta, non si ripara con i dati dimostrativi; una
+    // ragione sociale vuota resta vuota: il dato mancante si mostra come mancante.
+    if (data && data.id && data.id !== currentTenantId) {
+      throw new Error(`Anagrafica ricevuta per lo studio ${data.id}, attesa ${currentTenantId}`);
     }
     return data;
   } catch (err) {

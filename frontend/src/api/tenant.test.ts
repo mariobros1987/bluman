@@ -74,6 +74,16 @@ describe('fetchTenantInfoApi — senza risposta niente anagrafica di seed (F5)',
     mockApiFetch.mockRejectedValue(new Error('rete giù'));
     await expect(fetchTenantInfoApi()).resolves.toBeNull();
   });
+
+  it('ragione sociale vuota dal server resta vuota, non quella dello studio dimostrativo (3.8)', async () => {
+    mockApiFetch.mockResolvedValue(risposta({ id: BLUECODE_TENANT_ID, ragioneSociale: '', sedeLegale: '', piva: '' }));
+    await expect(fetchTenantInfoApi()).resolves.toEqual({ id: BLUECODE_TENANT_ID, ragioneSociale: '', sedeLegale: '', piva: '' });
+  });
+
+  it('la risposta di un altro studio si scarta come un errore, senza ripararla (3.8)', async () => {
+    mockApiFetch.mockResolvedValue(risposta({ id: 'altro-studio', ragioneSociale: 'Altro Studio Srl' }));
+    await expect(fetchTenantInfoApi()).resolves.toBeNull();
+  });
 });
 
 describe('fetchAdminTenantsApi — niente ripiego silenzioso sulla copia locale', () => {
