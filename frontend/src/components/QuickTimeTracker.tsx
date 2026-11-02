@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchProgetti, salvaProgettoDettaglioApi } from '../api/client';
-import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import type { Progetto } from '../types';
 import { useToast } from './ui/ToastProvider';
 import { Modal } from './ui/Modal';
@@ -20,13 +20,14 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   const [selectedMicrovoceIdx, setSelectedMicrovoceIdx] = useState<number>(0);
   const [showStopModal, setShowStopModal] = useState(false);
   const [sessionNotes, setSessionNotes] = useState('');
+  // 3.7 — il server non ha risposto: niente progetti dimostrativi al loro posto, e niente timer.
+  const [progettiNonCaricati, setProgettiNonCaricati] = useState(false);
 
   const timerRef = useRef<any>(null);
 
   const loadAllProjects = async () => {
     const list: Progetto[] = [];
     // Distingue «il database risponde e non ci sono progetti» da «il database non ha risposto».
-    // Solo il secondo caso è una buona ragione per mostrare i dati dimostrativi (vedi il punto 3).
     let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId(user);
     const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
@@ -121,21 +122,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       }
     } catch {}
 
-    // 3. Se e solo se è il tenant demo Bluecode Ltd, l'API non ha risposto e non c'è nulla né a
-    // database né in locale, carica i progetti di seed.
-    //
-    // La guardia `!apiDisponibile` è la stessa degli altri tre punti che leggono il seed
-    // (Projects, Dashboard, ClientsPage), e qui mancava: bastava il **database vuoto** per far
-    // comparire i due progetti dimostrativi. Il 12/10/2026 la produzione è il VPS e il suo
-    // database è stato azzerato — quindi il caso «vuoto» non è più teorico, e il ripiego ha
-    // cominciato a mostrare «Progetto Structuring Holding Malta» accanto ad «Avvia Time
-    // Tracker» come se fosse un progetto vero (regola 7: il frontend non inventa dati che il
-    // database non ha). Un database che risponde zero progetti è una risposta, non un guasto.
-    if (!apiDisponibile && list.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
-      const seed = getTenantSeedData(currentTenantId);
-      list.push(...seed.projects);
-    }
-
+    setProgettiNonCaricati(!apiDisponibile);
     setProjects(list);
     if (list.length > 0) {
       setSelectedProjectId(prev => (prev && list.some(p => String(p.id) === String(prev))) ? prev : String(list[0].id));
@@ -221,6 +208,10 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
   };
 
   const handleStart = () => {
+    if (progettiNonCaricati) {
+      toast.errore('Progetti non caricati: il server non ha risposto. Riprova prima di avviare il timer.');
+      return;
+    }
     if (projects.length === 0) {
       toast.attenzione('Non hai ancora creato alcuna pratica. Clicca su "+ Nuovo Progetto" nella pagina Progetti per avviare il timer.');
       navigate('/projects');
@@ -331,7 +322,16 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
       </span>
 
       {/* Selettore Progetto Rapido */}
-      {projects.length > 0 ? (
+      {progettiNonCaricati ? (
+        <button
+          type="button"
+          onClick={() => loadAllProjects()}
+          style={{ background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', border: '1px solid var(--pill-red-bd)', borderRadius: 14, padding: '2px 8px', fontSize: 10.5, fontWeight: 600, cursor: 'pointer' }}
+          title="Il server non ha risposto: i progetti non sono stati caricati e il timer non si può avviare. Clicca per riprovare."
+        >
+          ⚠ Progetti non caricati · Riprova
+        </button>
+      ) : projects.length > 0 ? (
         <select
           value={selectedProjectId}
           onChange={(e) => setSelectedProjectId(e.target.value)}
@@ -387,6 +387,7 @@ export function QuickTimeTracker({ user }: TimeTrackerProps) {
         <button
           type="button"
           onClick={handleStart}
+          disabled={progettiNonCaricati}
           style={{ background: 'var(--green)', color: '#fff', border: 'none', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, cursor: 'pointer' }}
           title="Avvia Time Tracker"
         >
