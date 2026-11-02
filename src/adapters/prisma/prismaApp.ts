@@ -726,13 +726,13 @@ export class PrismaApp implements AppPort {
       throw new Error('Nessuna riga da fatturare: seleziona almeno una voce.');
     }
 
-    let prog = await this.prisma.progetto.findUnique({ where: { id: input.progettoId }, include: { cliente: true, moduli: true } });
-    if (!prog) {
-      prog = await this.prisma.progetto.findFirst({
-        where: { tenantId: this.tenantId, OR: [{ id: input.progettoId }, { nome: { contains: input.progettoId, mode: 'insensitive' } }] },
-        include: { cliente: true, moduli: true },
-      });
-    }
+    // Solo id esatto nello studio (N2): la vecchia ricerca per `nome contains` poteva intestare la
+    // fattura al progetto sbagliato quando l'id passato era un pezzo del nome di un altro.
+    const prog = await this.prisma.progetto.findUnique({
+      where: { id: input.progettoId, tenantId: this.tenantId },
+      include: { cliente: true, moduli: true },
+    });
+    if (!prog) throw new Error('Progetto non trovato.');
     // Niente ripiego sul «primo cliente dello studio»: intestava la fattura a una persona a caso
     // quando il progetto non aveva un cliente collegato. Meglio fermarsi con un errore chiaro che
     // emettere un documento fiscale intestato al cliente sbagliato.

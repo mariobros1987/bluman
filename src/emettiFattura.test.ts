@@ -159,6 +159,22 @@ describe('le guardie di emissione: niente fattura sbagliata o vuota', () => {
     await expect(app.emettiFattura(corpo([{ importo: 10000 }]))).rejects.toThrow(/cliente/i);
     expect(findFirstChiamato).toBe(false); // niente ripiego sul primo cliente
   });
+
+  it('N2 — cerca il progetto solo per id esatto nello studio, mai per pezzo di nome', async () => {
+    // Prima, mancato l'id, ripiegava su `nome contains`: «Rossi» trovava «Bilancio Rossi 2026».
+    let whereCercato: any = null;
+    const prisma: any = {
+      progetto: {
+        findUnique: async ({ where }: any) => { whereCercato = where; return null; },
+        findFirst: async () => ({ id: 'prg-altro', nome: 'Bilancio Rossi 2026', clienteId: 'cli-1', cliente: { id: 'cli-1' }, moduli: [] }),
+      },
+      cliente: { findFirst: async () => null, findUnique: async () => ({ id: 'cli-1' }) },
+      fattura: { findFirst: async () => null, create: async () => ({ id: 'x' }) },
+    };
+    const app = new PrismaApp(prisma, TENANT);
+    await expect(app.emettiFattura({ ...corpo([{ importo: 10000 }]), progettoId: 'Rossi' })).rejects.toThrow(/progetto non trovato/i);
+    expect(whereCercato).toEqual({ id: 'Rossi', tenantId: TENANT });
+  });
 });
 
 describe('senza regime registrato, il ripiego dipende dal tipo di documento', () => {

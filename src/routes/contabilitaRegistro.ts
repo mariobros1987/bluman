@@ -39,11 +39,21 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
     // K4 — gate KYC (§8.1) anche sulla fatturazione dalla scheda progetto. La rotta /invoices lo
     // applica già; questa passava da app.emettiFattura senza il blocco (rilievo audit §04): si poteva
     // fatturare un cliente con KYC non approvato. Risolvo il cliente dal progetto e blocco con 409
-    // come /invoices. Le note di credito (rettifica) restano escluse; il gate fallisce chiuso.
-    const bodyGate: any = req.body || {};
-    if (bodyGate.tipoDocumento !== 'nota_credito' && (await moduloKycAttivo(req.tenantId))) {
-      const prog = await prisma.progetto.findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } });
-      if (prog?.clienteId) {
+    // come /invoices; il gate fallisce chiuso.
+    // N1 — `tipoDocumento: 'nota_credito'` saltava il gate ma l'adapter emetteva comunque una FT:
+    // da qui escono solo fatture, le note di credito si fanno dal registro.
+    const tipoDocumento = (req.body as { tipoDocumento?: unknown } | undefined)?.tipoDocumento;
+    if (tipoDocumento !== undefined && tipoDocumento !== 'fattura') {
+      return reply.code(400).send({
+        errore: 'Da questa rotta si emettono solo fatture; le note di credito dal registro.',
+      });
+    }
+    // N2 — il progetto si cerca solo per id esatto nello studio, e prima del gate: un progetto
+    // inesistente saltava il controllo KYC e finiva nell'adapter.
+    const prog = await prisma.progetto.findFirst({ where: { id: req.params.id, tenantId: req.tenantId }, select: { clienteId: true } });
+    if (!prog) return reply.code(404).send({ errore: 'Progetto non trovato' });
+    if (await moduloKycAttivo(req.tenantId)) {
+      if (prog.clienteId) {
         const gate = await operativitaBloccataDaKyc(prisma, req.tenantId, prog.clienteId);
         if (gate.bloccato) {
           return reply.code(409).send({ errore: messaggioBloccoKyc(gate, 'La fatturazione') });
