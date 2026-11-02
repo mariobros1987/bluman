@@ -21,7 +21,11 @@ const { creaMovimento, aggiornaSaldo, trovaPredefinito, creaRegistrazione } = vi
 const db = vi.hoisted(() => ({
   contoAccreditoFattura: null as string | null,
   statoScadenza: 'in_attesa',
+  /** Rate sorelle della stessa fattura, oltre a sc-1. */
+  altreRate: [] as Array<{ id: string; stato: string }>,
 }));
+
+const { aggiornaFattura } = vi.hoisted(() => ({ aggiornaFattura: vi.fn(async () => ({})) }));
 
 vi.mock('./util/prismaClient.js', () => {
   const prisma: any = {
@@ -61,12 +65,12 @@ vi.mock('./util/prismaClient.js', () => {
       }),
       findMany: async (args: any) =>
         args?.where?.fatturaId === 'f-1'
-          ? [{ id: 'sc-1', stato: db.statoScadenza }]
+          ? [{ id: 'sc-1', stato: db.statoScadenza }, ...db.altreRate]
           : [],
       update: async () => ({}),
     },
     registrazioneIncasso: { create: creaRegistrazione },
-    fattura: { update: async () => ({}) },
+    fattura: { update: aggiornaFattura },
     movimentoPrimaNota: { create: creaMovimento },
     contoBancario: { findFirst: trovaPredefinito, update: aggiornaSaldo },
     auditLog: { create: async () => ({}) },
@@ -208,5 +212,32 @@ describe('POST /invoices/scadenze/:id/incassi — la data dell’incasso è quel
     expect(res.statusCode).toBe(400);
     expect(creaRegistrazione).not.toHaveBeenCalled();
     expect(creaMovimento).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /invoices/scadenze/:id/incassi — rate stornate e fattura incassata (A8)', () => {
+  beforeEach(() => {
+    aggiornaFattura.mockClear();
+    db.contoAccreditoFattura = null;
+    db.statoScadenza = 'in_attesa';
+    db.altreRate = [];
+  });
+
+  it('una rata stornata e una incassata → fattura incassata', async () => {
+    db.altreRate = [{ id: 'sc-2', stato: 'stornata' }];
+
+    const res = await incassa({ importoIncassatoCentesimi: 100000 });
+
+    expect(res.statusCode).toBe(201);
+    expect(aggiornaFattura).toHaveBeenCalledWith({ where: { id: 'f-1' }, data: { stato: 'incassata' } });
+  });
+
+  it('una rata stornata e una incassata solo in parte → fattura ancora emessa', async () => {
+    db.altreRate = [{ id: 'sc-2', stato: 'stornata' }];
+
+    const res = await incassa({ importoIncassatoCentesimi: 40000 });
+
+    expect(res.statusCode).toBe(201);
+    expect(aggiornaFattura).toHaveBeenCalledWith({ where: { id: 'f-1' }, data: { stato: 'emessa' } });
   });
 });

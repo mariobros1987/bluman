@@ -150,7 +150,12 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
               const tutteScadenzeFattura = await tx.scadenzaIncasso.findMany({
                 where: { fatturaId: scadenza.fatturaId },
               });
-              const tutteSaldate = tutteScadenzeFattura.every((s) => s.id === id ? nuovoStatoScadenza === 'incassato' : s.stato === 'incassato');
+              // A8 — una rata stornata da Nota di Credito è chiusa, non aperta: prima bastava una
+              // rata stornata perché la fattura non risultasse mai incassata. Saldata = ogni rata
+              // incassata o stornata, e almeno una incassata (tutte stornate non è un incasso).
+              const statiRate = tutteScadenzeFattura.map((s) => (s.id === id ? nuovoStatoScadenza : s.stato));
+              const tutteSaldate =
+                statiRate.every((st) => st === 'incassato' || st === 'stornata') && statiRate.includes('incassato');
 
               await tx.fattura.update({
                 where: { id: scadenza.fatturaId },
