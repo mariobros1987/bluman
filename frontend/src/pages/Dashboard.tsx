@@ -8,7 +8,7 @@ import { fmt, progressColor } from '../utils';
 import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti, isRispostaPaginata } from '../api/client';
 import { usePeriodo } from '../context/PeriodoContext';
-import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId } from '../utils/tenant';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
 
@@ -20,122 +20,103 @@ export function Dashboard() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [projectList, setProjectList] = useState<Progetto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // F5 — se l'API non risponde la Dashboard lo dice («Riprova») e resta vuota: niente copie
+  // locali né progetti di seed mostrati come se venissero dal database.
   const loadProjects = async () => {
+    setLoading(true);
+    setError(null);
     let combined: Progetto[] = [];
-    let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId();
-    const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
 
-    // 1. Progetti salvati localmente per questo specifico Tenant. Valgono solo come ripiego
-    // quando il backend non risponde: se l'API risponde, il suo elenco è l'intero dataset
-    // (vedi passo 2). Era questa la causa del «2 in Dashboard, 1 in Progetti»: una copia
-    // rimasta in localStorage veniva sommata ai progetti del database solo qui.
-    const localStr = localStorage.getItem(storageKey);
-    if (localStr) {
-      try {
-        const localProjs = JSON.parse(localStr);
-        if (Array.isArray(localProjs)) combined.push(...localProjs);
-      } catch (err) {
-        console.warn('Errore parsing custom projects in Dashboard:', err);
-      }
-    }
-
-    // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId e
-    //    per il Periodo globale, come la pagina Progetti)
+    // Progetti dal backend Fastify/DB (filtrati per tenantId e per il Periodo globale, come
+    // la pagina Progetti).
     try {
       const remote = await fetchProgetti({ page: 1, limit: 50, sortBy: 'createdAt', sortOrder: 'desc', dataDa: gDataDa || undefined, dataA: gDataA || undefined });
-      if (isRispostaPaginata<any>(remote)) {
-        apiDisponibile = true;
-        const dbProjs: Progetto[] = remote.data
-          .filter((rp: any) => rp.tenantId === currentTenantId)
-          .map((rp: any) => {
-            // §16 — stato e percentuali arrivano calcolati dal backend (`avanzamento`), che è
-            // l'unico a conoscere le regole del motore. Qui non si deduce nulla: prima queste
-            // righe assegnavano percentuali fisse per stato (45% a ogni progetto in corso,
-            // 50% a ogni modulo), numeri che non avevano alcun rapporto con le ore lavorate.
-            const av = rp.avanzamento;
-            const avModuli = new Map<string, any>(
-              (av?.moduli || []).map((m: any) => [m.id, m]),
-            );
+      if (!isRispostaPaginata<any>(remote)) throw new Error('Risposta progetti non valida');
+      const dbProjs: Progetto[] = remote.data
+        .filter((rp: any) => rp.tenantId === currentTenantId)
+        .map((rp: any) => {
+          // §16 — stato e percentuali arrivano calcolati dal backend (`avanzamento`), che è
+          // l'unico a conoscere le regole del motore. Qui non si deduce nulla: prima queste
+          // righe assegnavano percentuali fisse per stato (45% a ogni progetto in corso,
+          // 50% a ogni modulo), numeri che non avevano alcun rapporto con le ore lavorate.
+          const av = rp.avanzamento;
+          const avModuli = new Map<string, any>(
+            (av?.moduli || []).map((m: any) => [m.id, m]),
+          );
 
-            return {
-              id: rp.id,
-              n: rp.nome,
-              cl: rp.cliente?.nome || 'Cliente',
-              ct: (rp.cliente?.tipo as any) || 'individual',
-              st: av?.stato || rp.stato || 'in_progress',
-              pct: av?.percentuale ?? 0,
-              // Regola 7: le date si mostrano solo se il progetto le ha davvero; 'n/d'
-              // dichiara l'assenza del dato invece di inventare "Oggi" o un'etichetta.
-              start: rp.dataInizio
-                ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
-                : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
-              due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
-              // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
-              // non contribuisce al portafoglio — mai inventare una cifra verosimile.
-              val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
-              // Il progetto è "in allarme" se un suo modulo è in ritardo o bloccato, oppure se
-              // il motore ha alzato un segnale di rischio su una micro-voce (§16.5): ore
-              // consuntivate oltre il preventivo. È ciò che alimenta il contatore `alerts`.
-              delay:
-                (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||
-                Boolean(av?.segnaleRischio),
-              // Regola 7: il regime fiscale non è valorizzato in questa pagina (non serve
-              // alla Dashboard): 'n/d' invece di un valore di comodo.
-              fisc: 'n/d',
-              fatture: [],
-              mods: (rp.moduli || []).map((m: any, mIdx: number) => {
-                const avM = avModuli.get(m.id);
-                return {
-                  id: mIdx + 100,
-                  n: m.nome,
-                  // Regola 7: categoria, ore e prezzo arrivano dal DB (campi obbligatori
-                  // nello schema Prisma). Nessuna cifra o etichetta di ripiego: se un dato
-                  // manca si mostra zero/vuoto, non un valore verosimile inventato.
-                  cat: m.categoria ?? 'Senza categoria',
-                  st: avM?.stato || m.stato || 'pending',
-                  pct: avM?.percentuale ?? 0,
-                  h: m.orePreventivate ?? 0,
-                  a: m.oreConsuntivate ?? 0,
-                  p: m.prezzo != null ? m.prezzo / 100 : 0,
-                  // Le assegnazioni vivono sul server (risorse per micro-voce): il DB non
-                  // espone un "team" numerico del modulo, quindi l'array resta vuoto e la
-                  // UI non mostra avatar inventati (riga con AvatarGroup più sotto).
-                  team: [],
-                  delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
-                  // §16.1 — sforamento ore: distinto dal ritardo di calendario. Il modulo
-                  // avanza, ma sta costando più del preventivo, e il banner lo dice a parte.
-                  rischio: Boolean(avM?.segnaleRischio),
-                  oreExtra: avM?.oreExtra ?? 0,
-                  v: (m.microvoci || []).map((mv: any) => ({
-                    n: mv.nome,
-                    hE: mv.orePreventivate ?? 0,
-                    hA: mv.oreConsuntivate ?? 0,
-                    s: mv.stato || 'pending',
-                    vn: mv.causaNota || undefined,
-                  })),
-                };
-              }),
-            };
-          });
-        // Una risposta paginata valida è l'intero dataset: non va fusa con le copie locali,
-        // altrimenti un progetto rimasto solo in localStorage comparirebbe qui e non in
-        // Progetti. Stessa regola della pagina Progetti.
-        combined = dbProjs;
-      }
+          return {
+            id: rp.id,
+            n: rp.nome,
+            cl: rp.cliente?.nome || 'Cliente',
+            ct: (rp.cliente?.tipo as any) || 'individual',
+            st: av?.stato || rp.stato || 'in_progress',
+            pct: av?.percentuale ?? 0,
+            // Regola 7: le date si mostrano solo se il progetto le ha davvero; 'n/d'
+            // dichiara l'assenza del dato invece di inventare "Oggi" o un'etichetta.
+            start: rp.dataInizio
+              ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
+              : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
+            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
+            // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
+            // non contribuisce al portafoglio — mai inventare una cifra verosimile.
+            val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
+            // Il progetto è "in allarme" se un suo modulo è in ritardo o bloccato, oppure se
+            // il motore ha alzato un segnale di rischio su una micro-voce (§16.5): ore
+            // consuntivate oltre il preventivo. È ciò che alimenta il contatore `alerts`.
+            delay:
+              (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||
+              Boolean(av?.segnaleRischio),
+            // Regola 7: il regime fiscale non è valorizzato in questa pagina (non serve
+            // alla Dashboard): 'n/d' invece di un valore di comodo.
+            fisc: 'n/d',
+            fatture: [],
+            mods: (rp.moduli || []).map((m: any, mIdx: number) => {
+              const avM = avModuli.get(m.id);
+              return {
+                id: mIdx + 100,
+                n: m.nome,
+                // Regola 7: categoria, ore e prezzo arrivano dal DB (campi obbligatori
+                // nello schema Prisma). Nessuna cifra o etichetta di ripiego: se un dato
+                // manca si mostra zero/vuoto, non un valore verosimile inventato.
+                cat: m.categoria ?? 'Senza categoria',
+                st: avM?.stato || m.stato || 'pending',
+                pct: avM?.percentuale ?? 0,
+                h: m.orePreventivate ?? 0,
+                a: m.oreConsuntivate ?? 0,
+                p: m.prezzo != null ? m.prezzo / 100 : 0,
+                // Le assegnazioni vivono sul server (risorse per micro-voce): il DB non
+                // espone un "team" numerico del modulo, quindi l'array resta vuoto e la
+                // UI non mostra avatar inventati (riga con AvatarGroup più sotto).
+                team: [],
+                delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
+                // §16.1 — sforamento ore: distinto dal ritardo di calendario. Il modulo
+                // avanza, ma sta costando più del preventivo, e il banner lo dice a parte.
+                rischio: Boolean(avM?.segnaleRischio),
+                oreExtra: avM?.oreExtra ?? 0,
+                v: (m.microvoci || []).map((mv: any) => ({
+                  n: mv.nome,
+                  hE: mv.orePreventivate ?? 0,
+                  hA: mv.oreConsuntivate ?? 0,
+                  s: mv.stato || 'pending',
+                  vn: mv.causaNota || undefined,
+                })),
+              };
+            }),
+          };
+        });
+      // Una risposta paginata valida è l'intero dataset: non va fusa con le copie locali,
+      // altrimenti un progetto rimasto solo in localStorage comparirebbe qui e non in
+      // Progetti. Stessa regola della pagina Progetti.
+      combined = dbProjs;
     } catch (err) {
-      console.warn('Fetch DB fallback:', err);
-    }
-
-    // 3. Se e solo se è il tenant demo Bluecode Ltd, l'API non ha risposto e non c'è nulla in
-    //    locale, carica i progetti di seed
-    if (!apiDisponibile && combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
-      const seedData = getTenantSeedData(currentTenantId);
-      combined.push(...seedData.projects);
+      console.warn('Dashboard: lettura progetti non riuscita', err);
+      combined = [];
+      setError(`I progetti non sono stati caricati: ${err instanceof Error ? err.message : 'il server non ha risposto'}.`);
     }
 
     setProjectList(combined);

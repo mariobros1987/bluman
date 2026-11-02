@@ -7,7 +7,7 @@ import { fmt, progressColor } from '../utils';
 import { fetchProgetti } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { NewProjectWizard } from '../components/NewProjectWizard';
-import { getTenantStorageKey, getTenantSeedData, getCurrentTenantId, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId } from '../utils/tenant';
 import type { Progetto } from '../types';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
@@ -49,21 +49,10 @@ export function Projects() {
   const loadProjects = async () => {
     setLoading(true);
     setErrore('');
+    // F5 — niente copie locali né progetti di seed: se l'API non risponde la pagina lo dice
+    // («Riprova») e l'elenco resta vuoto.
     let combined: Progetto[] = [];
-    let apiDisponibile = false;
     const currentTenantId = getCurrentTenantId();
-    const storageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
-
-    // 1. Carica progetti salvati localmente per questo specifico Tenant
-    const localStr = localStorage.getItem(storageKey);
-    if (localStr) {
-      try {
-        const localProjs = JSON.parse(localStr);
-        if (Array.isArray(localProjs)) combined.push(...localProjs);
-      } catch (err) {
-        console.warn('Errore parsing custom projects:', err);
-      }
-    }
 
     // 2. Carica progetti remoti dal backend Fastify/DB se presenti (filtrati per tenantId)
     //
@@ -78,7 +67,6 @@ export function Projects() {
     try {
       const remote = await fetchProgetti({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc', dataDa: dataDa || undefined, dataA: dataA || undefined });
       if (isRispostaPaginata<any>(remote)) {
-        apiDisponibile = true;
         setMeta(remote.meta);
         if (remote.meta.pagine > 0 && page > remote.meta.pagine) setPage(remote.meta.pagine);
         const dbProjs: Progetto[] = remote.data
@@ -146,30 +134,10 @@ export function Projects() {
         throw new Error('Risposta progetti non valida');
       }
     } catch (err) {
-      setErrore(err instanceof Error ? err.message : 'Errore caricamento progetti');
-      console.warn('Fetch DB fallback:', err);
-    }
-
-    // 3. Se e solo se è il tenant demo Bluecode Ltd e non ci sono progetti salvati, carica i progetti di seed
-    if (!apiDisponibile && combined.length === 0 && currentTenantId === BLUECODE_TENANT_ID) {
-      const seedData = getTenantSeedData(currentTenantId);
-      combined.push(...seedData.projects);
-    }
-
-    if (!apiDisponibile) {
-      const filtroLocale = searchDebounced.toLowerCase();
-      combined = combined.filter(p =>
-        !filtroLocale ||
-        p.n?.toLowerCase().includes(filtroLocale) ||
-        p.cl?.toLowerCase().includes(filtroLocale) ||
-        (p.mods || []).some(m => m.n?.toLowerCase().includes(filtroLocale)),
-      );
-      const totale = combined.length;
-      const pagine = totale === 0 ? 0 : Math.ceil(totale / limit);
-      const paginaEffettiva = pagine === 0 ? 1 : Math.min(page, pagine);
-      if (paginaEffettiva !== page) setPage(paginaEffettiva);
-      setMeta({ page: paginaEffettiva, limit, totale, pagine });
-      combined = combined.slice((paginaEffettiva - 1) * limit, paginaEffettiva * limit);
+      setErrore(`Le pratiche non sono state caricate: ${err instanceof Error ? err.message : 'il server non ha risposto'}.`);
+      console.warn('Progetti: lettura non riuscita', err);
+      combined = [];
+      setMeta(META_INIZIALE);
     }
 
     setProjectList(combined);
@@ -509,8 +477,14 @@ export function Projects() {
       </div>
 
       {/* ── 3. Contenuto Principale: Visualizzazione Selezionata ─────────── */}
-      {errore && <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
-      {filteredProjects.length === 0 ? (
+      {errore && (
+        <div role="alert" style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span>{errore}</span>
+          <button type="button" className="btn btn-secondary" onClick={() => loadProjects()}>🔄 Riprova</button>
+        </div>
+      )}
+      {/* Un errore di lettura non è «nessuna pratica»: con l'errore non si mostra lo stato vuoto. */}
+      {errore ? null : filteredProjects.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 20px', background: 'var(--card)', borderRadius: 16, border: '1px solid var(--border)', color: 'var(--muted)' }}>
           <div style={{ fontSize: 44, marginBottom: 12 }}>📁</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Nessuna pratica corrisponde ai filtri</div>

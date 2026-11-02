@@ -1,8 +1,8 @@
 // §7 — il confine fra «il server ha risposto» e «il server non ha risposto».
 //
-// Da questa parte del confine dipendono i dati dimostrativi: devono comparire **solo** quando la
-// risposta non è arrivata. Scambiarli per la risposta è il difetto che ha fatto apparire cinque
-// collaboratori inesistenti e, nella pagina di amministrazione, studi cancellati dal database.
+// Scambiare un ripiego per la risposta è il difetto che ha fatto apparire cinque collaboratori
+// inesistenti e, nella pagina di amministrazione, studi cancellati dal database. F5: nemmeno
+// senza risposta il seed dimostrativo torna — la squadra resta vuota.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./http', () => ({
@@ -14,7 +14,7 @@ vi.mock('./http', () => ({
 }));
 
 import { apiFetch } from './http';
-import { fetchUtentiTenant, fetchAdminTenantsApi, DEFAULT_TEAM_USERS } from './tenant';
+import { fetchUtentiTenant, fetchAdminTenantsApi, fetchTenantInfoApi } from './tenant';
 import { invalidateCache } from './cache';
 import { BLUECODE_TENANT_ID } from '../utils/tenant';
 
@@ -43,8 +43,6 @@ describe('fetchUtentiTenant — un elenco vuoto è una risposta, non un guasto',
     localStorage.setItem(`bluman_custom_team_users_tenant_${BLUECODE_TENANT_ID}`, JSON.stringify([]));
     const utenti = await fetchUtentiTenant({ forceRefresh: true });
     expect(utenti).toEqual([]);
-    // Il presidio vero: nessuna delle cinque persone inventate.
-    expect(utenti.some((u: any) => DEFAULT_TEAM_USERS.some((finto) => finto.email === u.email))).toBe(false);
   });
 
   it('gli utenti veri del database vincono sul seed', async () => {
@@ -54,14 +52,27 @@ describe('fetchUtentiTenant — un elenco vuoto è una risposta, non un guasto',
     ]);
   });
 
-  it('col server irraggiungibile il seed dimostrativo resta (comportamento voluto: vetrina offline)', async () => {
+  it('col server irraggiungibile niente seed dimostrativo: la squadra resta vuota (F5)', async () => {
     mockApiFetch.mockRejectedValue(new Error('rete giù'));
-    await expect(fetchUtentiTenant({ forceRefresh: true })).resolves.toEqual(DEFAULT_TEAM_USERS);
+    await expect(fetchUtentiTenant({ forceRefresh: true })).resolves.toEqual([]);
   });
 
-  it('un errore del server (500) vale come «non ha risposto»: il seed resta', async () => {
+  it('nemmeno un errore del server (500) fa comparire il seed (F5)', async () => {
     mockApiFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as any);
-    await expect(fetchUtentiTenant({ forceRefresh: true })).resolves.toEqual(DEFAULT_TEAM_USERS);
+    await expect(fetchUtentiTenant({ forceRefresh: true })).resolves.toEqual([]);
+  });
+});
+
+describe('fetchTenantInfoApi — senza risposta niente anagrafica di seed (F5)', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset();
+    localStorage.clear();
+    localStorage.setItem('bluman_user', JSON.stringify({ ruolo: 'advisor', tenantId: BLUECODE_TENANT_ID }));
+  });
+
+  it('server irraggiungibile e nessuna copia locale → null, non lo studio dimostrativo', async () => {
+    mockApiFetch.mockRejectedValue(new Error('rete giù'));
+    await expect(fetchTenantInfoApi()).resolves.toBeNull();
   });
 });
 

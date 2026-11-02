@@ -1,18 +1,7 @@
-import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, BLUECODE_TENANT_ID, senzaSegretiTenant } from '../utils/tenant';
+import { getTenantStorageKey, getCurrentTenantId, getStudioInfoForTenant, senzaSegretiTenant } from '../utils/tenant';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi } from './http';
 import { queryPaginazione, type ParametriListaPaginata } from './paginazione';
 import { cachedQuery, invalidateCache } from './cache';
-
-// DEFAULT_TEAM_USERS è il seed del Tenant Demo Bluecode, e vale **solo** quando il server non
-// risponde affatto (rete giù, errore, risposta non riconoscibile). Non è la risposta a «questo
-// studio non ha ancora collaboratori»: quella è un elenco vuoto, e va mostrata vuota.
-export const DEFAULT_TEAM_USERS = [
-  { id: 'usr-01', nome: 'Joe Disabato', email: 'joe@bluecode.advisory', ruolo: 'super_admin', specializzazione: 'Lead Advisor & Strategia', tenantId: '00000000-0000-0000-0000-000000000001' },
-  { id: 'usr-02', nome: 'Avv. Lorenzo Marino', email: 'lorenzo.marino@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & IP', tenantId: '00000000-0000-0000-0000-000000000001' },
-  { id: 'usr-03', nome: 'Dr. Elena Russo', email: 'elena.russo@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Tax Advisor — Fiscalità Internazionale & Holding', tenantId: '00000000-0000-0000-0000-000000000001' },
-  { id: 'usr-04', nome: 'Francesca Disabato', email: 'francesca@bluecode.advisory', ruolo: 'operator', specializzazione: 'Back Office & Compliance KYC/AML', tenantId: '00000000-0000-0000-0000-000000000001' },
-  { id: 'usr-05', nome: 'Avv. Mario Dibenedetto', email: 'mario.dibenedetto@bluecode.advisory', ruolo: 'advisor', specializzazione: 'Legal Counsel — Diritto Societario, Contrattualistica & Trust', tenantId: '00000000-0000-0000-0000-000000000001' },
-];
 
 export async function fetchUtentiTenant(options?: { forceRefresh?: boolean }) {
   const currentTenantId = getCurrentTenantId();
@@ -34,11 +23,11 @@ export async function fetchUtentiTenant(options?: { forceRefresh?: boolean }) {
         if (res.ok) {
           const dbUsers = await res.json();
           // §7 — qui c'era `&& dbUsers.length > 0`: un elenco **vuoto** dal database non veniva
-          // creduto e si scendeva al ripiego, che per il tenant Bluecode è `DEFAULT_TEAM_USERS`,
-          // cioè cinque persone che non esistono. Era la stessa guardia mancante di
+          // creduto e si scendeva al ripiego, che per il tenant Bluecode era un seed di cinque
+          // persone che non esistono. Era la stessa guardia mancante di
           // `QuickTimeTracker`: l'assenza di *righe* scambiata per assenza di *risposta*. Un
           // database che risponde «nessun collaboratore» ha risposto, e va creduto — anche
-          // quando la risposta è zero. Il seed resta vivo solo se il server non ha risposto.
+          // quando la risposta è zero.
           if (Array.isArray(dbUsers)) {
             // Aggiungi solo eventuali custom locali non già presenti nel DB
             const existingEmails = new Set(dbUsers.map((u: any) => (u.email || '').toLowerCase()));
@@ -60,12 +49,8 @@ export async function fetchUtentiTenant(options?: { forceRefresh?: boolean }) {
         return customList;
       }
 
-      // 3. Fallback solo per il Tenant Demo Bluecode Ltd
-      if (currentTenantId === BLUECODE_TENANT_ID) {
-        return DEFAULT_TEAM_USERS;
-      }
-
-      // 4. Per qualsiasi altro tenant senza dati: lista vuota (l'admin dello studio aggiungerà i propri collaboratori)
+      // 3. Nessuna risposta e nessuna copia locale: lista vuota. Qui c'era, per il tenant
+      // Bluecode, un seed di cinque persone inventate mostrate come la squadra vera (F5).
       return [];
     },
     { ttlMs: 60_000, forceRefresh: options?.forceRefresh }
@@ -244,21 +229,14 @@ export async function fetchTenantInfoApi(tenantIdParam?: string) {
     }
     return data;
   } catch (err) {
+    // F5 — la copia locale di una risposta passata resta; l'anagrafica di seed dello studio
+    // no: senza risposta né copia si restituisce `null` e i chiamanti lo trattano come assente.
+    console.warn('fetchTenantInfoApi: anagrafica studio non letta', err);
     const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', currentTenantId));
     if (local) {
       try { return JSON.parse(local); } catch {}
     }
-    const studioInfo = getStudioInfoForTenant(currentTenantId);
-    return {
-      id: currentTenantId,
-      ragioneSociale: studioInfo.ragioneSociale,
-      sedeLegale: studioInfo.sedeLegale,
-      piva: studioInfo.piva,
-      telefono: studioInfo.telefono,
-      email: studioInfo.email,
-      iban: studioInfo.iban,
-      codiceSdi: studioInfo.codiceSdi,
-    };
+    return null;
   }
 }
 

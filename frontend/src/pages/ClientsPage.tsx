@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchClienti, fetchCliente, creaClienteApi, resetPasswordClienteApi } from '../api/client';
-import { getCurrentTenantId, getTenantStorageKey, getTenantSeedData, BLUECODE_TENANT_ID } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey } from '../utils/tenant';
 import type { Cliente } from '../types';
 import styles from './ClientsPage.module.css';
 import { AnagraficaErpModal } from '../components/clients/AnagraficaErpModal';
@@ -140,8 +140,9 @@ export function ClientsPage() {
     setLoading(true);
     setErrore('');
     const currentTenantId = getCurrentTenantId();
-    let apiList: Cliente[] = [];
-    let apiDisponibile = false;
+    // F5 — niente clienti di seed né ricavati dalle copie locali: se l'API non risponde la
+    // pagina lo dice («Riprova») e l'elenco resta vuoto.
+    let visibleClients: Cliente[] = [];
     try {
       const res = await fetchClienti({
         page,
@@ -154,90 +155,16 @@ export function ClientsPage() {
       });
       if (isCancelled()) return; // risposta stantia: una richiesta più recente è in corso
       if (!isRispostaPaginata<Cliente>(res)) throw new Error('Risposta clienti non valida');
-      apiList = res.data.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
-      apiDisponibile = true;
+      visibleClients = res.data.filter((c: any) => !c.tenantId || c.tenantId === currentTenantId);
       setMeta(res.meta);
       if (res.meta.pagine > 0 && page > res.meta.pagine) setPage(res.meta.pagine);
       setRiepilogo((res.riepilogo as { societa: number; persone: number; senzaPortale: number } | undefined) || { societa: 0, persone: 0, senzaPortale: 0 });
     } catch (err) {
       if (isCancelled()) return;
-      setErrore(err instanceof Error ? err.message : 'Errore caricamento clienti');
+      setErrore(`I clienti non sono stati caricati: ${err instanceof Error ? err.message : 'il server non ha risposto'}.`);
       console.warn('Errore fetch clienti DB:', err);
-    }
-
-    // Estrai clienti dai progetti del tenant
-    const projStorageKey = getTenantStorageKey('bluman_custom_projects', currentTenantId);
-    const localProjStr = localStorage.getItem(projStorageKey);
-    // JSON.parse protetto: uno storage corrotto non deve far uscire la funzione prima di
-    // setLoading(false), lasciando lo spinner bloccato per sempre.
-    let localProjs: any[] = [];
-    try { localProjs = localProjStr ? JSON.parse(localProjStr) : []; } catch { localProjs = []; }
-    const extractedClients: Cliente[] = [];
-
-    localProjs.forEach((p: any) => {
-      if (p.cl) {
-        extractedClients.push({
-          id: `cl-proj-${p.id}`,
-          nome: p.cl,
-          tipo: p.ct || 'company',
-          // Campi vuoti quando il progetto non li porta, non valori inventati. Qui c'erano
-          // una P.IVA, un codice fiscale, una sede a Milano, un codice SDI, un telefono e
-          // un'email (`client@holdingbeta.advisory`) scritti nel codice: comparivano
-          // nell'anagrafica di ogni cliente ricavato da un progetto, e quell'email finiva
-          // precompilata nella finestra del Magic Link — cioè il link di accesso al portale
-          // partiva verso una casella che non esiste.
-          piva: p.piva || '',
-          codiceFiscale: p.codFisc || '',
-          sedeLegale: p.sede || '',
-          codiceSdi: p.codiceSdi || '',
-          email: p.email || '',
-          telefono: p.telefono || '',
-          isAttivo: true,
-        });
-      }
-    });
-
-    // Includi clienti demo SOLO se è il tenant demo Bluecode Ltd
-    const defaultClients: Cliente[] = currentTenantId === BLUECODE_TENANT_ID ? getTenantSeedData(currentTenantId).clients : [];
-
-    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
-    const localClientsStr = localStorage.getItem(clientStorageKey);
-    let localClients: Cliente[] = [];
-    try { localClients = localClientsStr ? JSON.parse(localClientsStr) : []; } catch { localClients = []; }
-
-    const mergedMap = new Map();
-    // Una pagina DB valida resta una pagina DB: i fallback locali si usano solo se l'API non è disponibile.
-    const fontiLocali = !apiDisponibile
-      ? [...defaultClients, ...extractedClients, ...localClients]
-      : [];
-    [...fontiLocali, ...apiList].forEach(c => {
-      if (c && c.nome) {
-        const key = c.nome.toLowerCase().trim();
-        const existing = mergedMap.get(key) || {};
-        mergedMap.set(key, { ...existing, ...c });
-      }
-    });
-
-    const finalClients = Array.from(mergedMap.values()) as Cliente[];
-    let visibleClients = finalClients;
-    if (!apiDisponibile) {
-      const filtroLocale = searchDebounced.toLowerCase();
-      visibleClients = finalClients.filter(c => {
-        const corrispondeRicerca = !filtroLocale || c.nome.toLowerCase().includes(filtroLocale);
-        const corrispondeTipo = filterType === 'all' || c.tipo === filterType;
-        return corrispondeRicerca && corrispondeTipo;
-      });
-      const totale = visibleClients.length;
-      const pagine = totale === 0 ? 0 : Math.ceil(totale / limit);
-      const paginaEffettiva = pagine === 0 ? 1 : Math.min(page, pagine);
-      if (paginaEffettiva !== page) setPage(paginaEffettiva);
-      setMeta({ page: paginaEffettiva, limit, totale, pagine });
-      setRiepilogo({
-        societa: visibleClients.filter(c => c.tipo === 'company').length,
-        persone: visibleClients.filter(c => c.tipo === 'individual').length,
-        senzaPortale: visibleClients.filter(c => !c.hasPassword).length,
-      });
-      visibleClients = visibleClients.slice((paginaEffettiva - 1) * limit, paginaEffettiva * limit);
+      setMeta({ page: 1, limit, totale: 0, pagine: 0 });
+      setRiepilogo({ societa: 0, persone: 0, senzaPortale: 0 });
     }
     setClienti(visibleClients);
 
@@ -491,10 +418,15 @@ export function ClientsPage() {
       </div>
 
       {/* Elenco clienti — due viste sulla stessa lista, la scelta è dell'operatore */}
-      {errore && <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>}
+      {errore && (
+        <div role="alert" style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span>{errore}</span>
+          <button type="button" className="btn btn-secondary" onClick={() => loadClienti()}>🔄 Riprova</button>
+        </div>
+      )}
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Caricamento anagrafica clienti...</div>
-      ) : filtered.length === 0 ? (
+      ) : errore ? null : filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div>Nessun cliente trovato con i filtri correnti ({meta.totale} totali in anagrafica).</div>
           <button
