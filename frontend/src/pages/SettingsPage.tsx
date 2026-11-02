@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchUtentiTenant, creaUtenteTenantApi, uploadFileApi, fetchTenantInfoApi, updateTenantInfoApi, testEmailApi, testImapApi, testChannelApi, resetPasswordUtenteApi, rigeneraSlugWhatsappApi } from '../api/client';
 import { chiaviDatiLocali } from '../utils/datiLocali';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, isAdminStudio, saveTenantInfoToStorage } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, isAdminStudio, saveTenantInfoToStorage } from '../utils/tenant';
 import { useAnagraficaStudio } from '../hooks/useAnagraficaStudio';
 import { AnagraficaStudioModal } from '../components/AnagraficaStudioModal';
 import { UserProfileModal } from '../components/UserProfileModal';
@@ -23,6 +23,14 @@ import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import { ArchiviaOperatoreModal } from '../components/settings/ArchiviaOperatoreModal';
 import styles from './Settings.module.css';
+
+// Il <fieldset disabled> blocca campi e pulsanti di salvataggio senza cambiare l'impaginazione.
+const STILE_FIELDSET: React.CSSProperties = { border: 0, padding: 0, margin: 0, minWidth: 0 };
+
+// §35 — i flag `<chiave>Impostata` del server: la credenziale c'è, anche se non torna indietro.
+const flagSegreti = (d: any) => Object.fromEntries(
+  ['smtpPass', 'imapPass', 'waAccessToken', 'waVerifyToken', 'waAppSecret', 'tgBotToken', 'signalToken'].map((k) => [k, Boolean(d[`${k}Impostata`])]),
+);
 
 type Tab = 'company' | 'users' | 'sdi' | 'invoice_design' | 'channels' | 'compliance' | 'servizi_esterni' | 'manutenzione' | 'sicurezza';
 
@@ -64,6 +72,7 @@ export function SettingsPage() {
     setModuliStandby((cur) => (cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]));
   const handleSaveModuli = async () => {
     setModuliMsg(null);
+    if (salvataggioBloccato) return;
     try {
       const tid = getCurrentTenantId();
       await updateTenantInfoApi({ moduliDisattivati: moduliStandby }, tid);
@@ -208,32 +217,30 @@ export function SettingsPage() {
     smtpPass?: boolean; imapPass?: boolean; waAccessToken?: boolean; waVerifyToken?: boolean; waAppSecret?: boolean; tgBotToken?: boolean; signalToken?: boolean;
   }>({});
   
+  // 3.10 — finché l'anagrafica non è stata letta il salvataggio resta bloccato: salvare un
+  // modulo vuoto sovrascriverebbe il database. Errore distinto dal caricamento (regola 13).
+  const [statoInfoStudio, setStatoInfoStudio] = useState<'caricamento' | 'letto' | 'errore'>('caricamento');
+  const salvataggioBloccato = statoInfoStudio !== 'letto';
+
   const loadTenantData = async () => {
     setLoadingUsers(true);
+    setStatoInfoStudio('caricamento');
     const currentTenantId = getCurrentTenantId();
-    const studioDefaults = getStudioInfoForTenant(currentTenantId);
-
     const dbTenant = await fetchTenantInfoApi(currentTenantId);
+    setStatoInfoStudio(dbTenant && typeof dbTenant === 'object' ? 'letto' : 'errore');
     const localInfoStr = localStorage.getItem(getTenantStorageKey('bluman_tenant_info', currentTenantId));
     let localInfo: any = {};
     if (localInfoStr) {
       try { localInfo = JSON.parse(localInfoStr); } catch {}
     }
 
-    // Unione intelligente: parte dai defaults dello studio, sovrascrive con i dati DB se non vuoti, e infine con le modifiche locali
-    const tData: any = { ...studioDefaults };
-    if (dbTenant && typeof dbTenant === 'object') {
-      Object.keys(dbTenant).forEach(k => {
-        if (dbTenant[k] !== null && dbTenant[k] !== undefined && dbTenant[k] !== '') {
-          tData[k] = dbTenant[k];
-        }
-      });
-    }
-    if (localInfo && typeof localInfo === 'object') {
-      Object.keys(localInfo).forEach(k => {
-        if (localInfo[k] !== null && localInfo[k] !== undefined && localInfo[k] !== '') {
-          tData[k] = localInfo[k];
-        }
+    // 3.10 — si parte da campi vuoti (mai dai dati dello studio dimostrativo), poi i dati del
+    // database, poi le modifiche locali non ancora salvate. Un campo vuoto resta vuoto.
+    const tData: any = {};
+    for (const fonte of [dbTenant, localInfo]) {
+      if (!fonte || typeof fonte !== 'object') continue;
+      Object.keys(fonte).forEach(k => {
+        if (fonte[k] !== null && fonte[k] !== undefined && fonte[k] !== '') tData[k] = fonte[k];
       });
     }
 
@@ -289,15 +296,7 @@ export function SettingsPage() {
       setMostraIva(tData.mostraIva !== undefined ? tData.mostraIva : true);
       setSignalEndpoint(tData.signalEndpoint || '');
       setSignalNumber(tData.signalNumber || '');
-      setSegretiImpostati({
-        smtpPass: Boolean(tData.smtpPassImpostata),
-        imapPass: Boolean(tData.imapPassImpostata),
-        waAccessToken: Boolean(tData.waAccessTokenImpostata),
-        waVerifyToken: Boolean(tData.waVerifyTokenImpostata),
-        waAppSecret: Boolean(tData.waAppSecretImpostata),
-        tgBotToken: Boolean(tData.tgBotTokenImpostata),
-        signalToken: Boolean(tData.signalTokenImpostata),
-      });
+      setSegretiImpostati(flagSegreti(tData));
     }
 
     const dbUsers = await fetchUtentiTenant();
@@ -313,6 +312,7 @@ export function SettingsPage() {
 
   const handleSaveCompany = async (e?: React.FormEvent) => {
     if (e && e.preventDefault) e.preventDefault();
+    if (salvataggioBloccato) return;
     const currentTenantId = getCurrentTenantId();
     const dataToSave = {
       id: currentTenantId,
@@ -380,15 +380,7 @@ export function SettingsPage() {
       // campi e si aggiornano i flag «già impostata», così il prossimo salvataggio con i campi
       // vuoti non prova a riscrivere niente.
       if (salvato && typeof salvato === 'object') {
-        setSegretiImpostati({
-          smtpPass: Boolean(salvato.smtpPassImpostata),
-          imapPass: Boolean(salvato.imapPassImpostata),
-          waAccessToken: Boolean(salvato.waAccessTokenImpostata),
-          waVerifyToken: Boolean(salvato.waVerifyTokenImpostata),
-          waAppSecret: Boolean(salvato.waAppSecretImpostata),
-          tgBotToken: Boolean(salvato.tgBotTokenImpostata),
-          signalToken: Boolean(salvato.signalTokenImpostata),
-        });
+        setSegretiImpostati(flagSegreti(salvato));
         // Lo slug nasce al primo salvataggio della configurazione WhatsApp: la Callback URL
         // che il server ha appena calcolato è quella da incollare in Meta, e senza aggiornarla
         // qui l'operatore continuerebbe a vedere il campo vuoto fino al ricaricamento.
@@ -657,9 +649,16 @@ export function SettingsPage() {
         </div>
       )}
 
+      {statoInfoStudio === 'errore' && (
+        <div role="alert" style={{ background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', padding: '12px 16px', borderRadius: 10, fontSize: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span>Impossibile leggere l'anagrafica dello studio dal server. Il salvataggio è disabilitato finché i dati non sono stati letti, per non sovrascriverli con un modulo vuoto.</span>
+          <button type="button" className="btn btn-sm" onClick={() => loadTenantData()}>Riprova</button>
+        </div>
+      )}
+
       {/* TAB 1: Dati Società & Sedi */}
       {tab === 'company' && (
-        <>
+        <fieldset disabled={salvataggioBloccato} style={STILE_FIELDSET}>
         <TabCompany
           ragioneSociale={ragioneSociale}
           setRagioneSociale={setRagioneSociale}
@@ -740,12 +739,12 @@ export function SettingsPage() {
             {moduliMsg && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{moduliMsg}</span>}
           </div>
         </div>
-        </>
+        </fieldset>
       )}
 
       {/* TAB 2: Personalizzazione Layout Fattura PDF (§Admin) */}
       {tab === 'invoice_design' && (
-        <TabInvoiceDesign
+        <fieldset disabled={salvataggioBloccato} style={STILE_FIELDSET}><TabInvoiceDesign
           setPreviewOpen={setPreviewOpen}
           handleLogoUpload={handleLogoUpload}
           uploadingLogo={uploadingLogo}
@@ -761,7 +760,7 @@ export function SettingsPage() {
           mostraIva={mostraIva}
           setMostraIva={setMostraIva}
           handleSaveCompany={handleSaveCompany}
-        />
+        /></fieldset>
       )}
 
       {/* Modal Live Preview Fattura PDF (§Admin) */}
@@ -795,7 +794,7 @@ export function SettingsPage() {
 
       {/* TAB 3: Configurazione Canali Omnichannel (WhatsApp, Telegram, Email, Signal) */}
       {tab === 'channels' && (
-        <TabChannels
+        <fieldset disabled={salvataggioBloccato} style={STILE_FIELDSET}><TabChannels
           handleSaveCompany={handleSaveCompany}
           handleTestSmtp={handleTestSmtp}
           testingSmtp={testingSmtp}
@@ -874,7 +873,7 @@ export function SettingsPage() {
           signalNumber={signalNumber}
           setSignalNumber={setSignalNumber}
           segretiImpostati={segretiImpostati}
-        />
+        /></fieldset>
       )}
 
       {/* TAB 3: Gestione Team & Accessi */}
