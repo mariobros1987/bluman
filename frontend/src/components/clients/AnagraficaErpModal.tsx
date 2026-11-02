@@ -191,6 +191,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   };
 
   const [saving, setSaving] = useState(false);
+  const [erroreSalvataggio, setErroreSalvataggio] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,41 +278,38 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       referentiJson: referentiObj,
     };
 
-    // 1. Aggiorna oggetto in memoria corrente
-    Object.assign(client, clientPayload);
-
-    // 2. Persisti in localStorage bluman_custom_clients isolato per tenant
-    const currentTenantId = getCurrentTenantId();
-    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', currentTenantId);
-    const savedStr = localStorage.getItem(clientStorageKey);
-    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
-    const updatedArr = [
-      clientPayload,
-      ...savedArr.filter((c: any) => c.id !== client.id && c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
-    ];
-    localStorage.setItem(clientStorageKey, JSON.stringify(updatedArr));
-
-    // 3. Persisti in PostgreSQL tramite API Fastify
+    // 1. Il salvataggio vero è quello su database. F3 — prima un errore API finiva in un
+    // console.warn, il modale si chiudeva con onSaved() e il localStorage era già stato scritto:
+    // l'operatore vedeva i dati «salvati» che il server non aveva.
+    setErroreSalvataggio(null);
+    const nomePrecedente = client.nome;
     try {
       if (client.id && !client.id.startsWith('cl-0') && !client.id.startsWith('cl-proj-')) {
         await aggiornaClienteApi(client.id, clientPayload);
       } else {
         const nuovo = await creaClienteApi(clientPayload);
-        if (nuovo && nuovo.id) {
-          client.id = nuovo.id;
-          clientPayload.id = nuovo.id;
-          localStorage.setItem(clientStorageKey, JSON.stringify([
-            clientPayload,
-            ...savedArr.filter((c: any) => c.nome?.toLowerCase() !== client.nome?.toLowerCase()),
-          ]));
-        }
+        if (nuovo && nuovo.id) clientPayload.id = nuovo.id;
       }
     } catch (apiErr) {
-      console.warn('Salvataggio API DB cliente fallback:', apiErr);
-    } finally {
+      setErroreSalvataggio(
+        `Salvataggio non riuscito: ${apiErr instanceof Error ? apiErr.message : 'errore sconosciuto'}. I dati non sono stati salvati.`,
+      );
       setSaving(false);
-      onSaved();
+      return;
     }
+
+    // 2. Solo dopo il salvataggio riuscito: oggetto in memoria e copia in localStorage (per tenant).
+    Object.assign(client, clientPayload);
+    const clientStorageKey = getTenantStorageKey('bluman_custom_clients', getCurrentTenantId());
+    const savedStr = localStorage.getItem(clientStorageKey);
+    const savedArr: any[] = savedStr ? JSON.parse(savedStr) : [];
+    localStorage.setItem(clientStorageKey, JSON.stringify([
+      clientPayload,
+      ...savedArr.filter((c: any) => c.id !== client.id && c.nome?.toLowerCase() !== nomePrecedente?.toLowerCase()),
+    ]));
+
+    setSaving(false);
+    onSaved();
   };
 
   return (
@@ -832,6 +830,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {erroreSalvataggio && (
+          <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', padding: '10px 14px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
+            {erroreSalvataggio}
           </div>
         )}
 
