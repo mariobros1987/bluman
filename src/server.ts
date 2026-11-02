@@ -33,7 +33,7 @@ import {
   type Ruolo,
 } from './util/authorization.js';
 // Mappa rotta → chiave modulo per l'enforcement della Matrice Permessi (RBAC).
-import { moduloDellaRotta, permessoDefaultPerRuolo, type LivelloPermesso } from './util/rbacModuli.js';
+import { moduloDellaRotta, permessoDefaultPerRuolo, rottaVietataAllEsterno, type LivelloPermesso } from './util/rbacModuli.js';
 
 // Helper condivisi (costanti di sessione, audit, recapiti, IP reale): estratti in
 // src/util/serverHelpers.ts dallo split dei monoliti — stesse identiche implementazioni.
@@ -533,6 +533,13 @@ export function buildServer(app: AppPort): FastifyInstance {
       !rottaConsentitaAlCliente(req.method, patternRotta)
     ) {
       return reply.code(403).send({ errore: 'Non autorizzato per il portale cliente.' });
+    }
+    // A2 — le rotte fuori matrice con dati AML, ciclo passivo, IVA e firme restano chiuse al
+    // collaboratore esterno qualunque cosa dica la matrice (vedi `PREFISSI_VIETATI_ESTERNO`).
+    if (req.method !== 'OPTIONS' && rottaEsistente && autenticato && ruolo === 'collaboratore_esterno' && rottaVietataAllEsterno(patternRotta)) {
+      return reply.code(403).send({
+        errore: 'Questa sezione non è accessibile ai collaboratori esterni dello studio.',
+      });
     }
 
     // ─── RBAC: ENFORCEMENT DELLA MATRICE PERMESSI (PermessoModulo) ────

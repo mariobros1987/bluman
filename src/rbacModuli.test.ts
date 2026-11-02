@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moduloDellaRotta } from './util/rbacModuli.js';
+import { moduloDellaRotta, PREFISSI_VIETATI_ESTERNO, rottaVietataAllEsterno } from './util/rbacModuli.js';
 
 // La mappa rotta → modulo è il cuore dell'enforcement RBAC: se una rotta finisce
 // nel modulo sbagliato, la matrice dello studio restringe (o lascia aperto) il
@@ -84,5 +84,24 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     // startsWith nudo farebbe cadere /progettistica in projects.
     expect(moduloDellaRotta('/progettistica')).toBeUndefined();
     expect(moduloDellaRotta('/clienti-privati/:id')).toBeUndefined();
+  });
+});
+
+describe('rottaVietataAllEsterno — rotte fuori matrice chiuse al collaboratore esterno (A2)', () => {
+  it.each(PREFISSI_VIETATI_ESTERNO.map((p) => [p]))('%s e le sue sotto-rotte sono vietate', (prefisso) => {
+    expect(rottaVietataAllEsterno(prefisso)).toBe(true);
+    expect(rottaVietataAllEsterno(`${prefisso}/:id`)).toBe(true);
+  });
+
+  it('un prefisso simile ma diverso non è vietato', () => {
+    expect(rottaVietataAllEsterno('/kyc-pubblico')).toBe(false);
+    expect(rottaVietataAllEsterno('/firme-digitali')).toBe(false);
+    expect(rottaVietataAllEsterno('/contabilita/anteprima-fascicolo-commercialista-bis')).toBe(false);
+  });
+
+  it('le rotte di lavoro del collaboratore restano libere', () => {
+    expect(rottaVietataAllEsterno('/progetti/:id')).toBe(false);
+    expect(rottaVietataAllEsterno('/documenti')).toBe(false);
+    expect(rottaVietataAllEsterno(undefined)).toBe(false);
   });
 });

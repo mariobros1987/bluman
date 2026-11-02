@@ -115,6 +115,27 @@ export function moduloDellaRotta(patternRotta: string | undefined): ModuloChiave
   return undefined;
 }
 
+/**
+ * Rotte fuori dalla matrice che il collaboratore_esterno non deve raggiungere: dati AML,
+ * fornitori, ciclo passivo, IVA, fascicolo del commercialista, firme. Non sono chiavi
+ * configurabili: è un divieto per ruolo, valutato nell'hook di server.ts prima della matrice.
+ */
+export const PREFISSI_VIETATI_ESTERNO = [
+  '/kyc',
+  '/fornitori',
+  '/fatture-ricevute',
+  '/liquidazione-iva',
+  '/contabilita/anteprima-fascicolo-commercialista',
+  '/contabilita/export-fascicolo-commercialista',
+  '/firme',
+] as const;
+
+/** Stesso confronto di `moduloDellaRotta`: uguale al prefisso o prefisso seguito da `/`. */
+export function rottaVietataAllEsterno(patternRotta: string | undefined): boolean {
+  if (!patternRotta) return false;
+  return PREFISSI_VIETATI_ESTERNO.some((p) => patternRotta === p || patternRotta.startsWith(`${p}/`));
+}
+
 export type LivelloPermesso = 'denied' | 'read' | 'write';
 
 /**
