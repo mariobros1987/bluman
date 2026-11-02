@@ -45,9 +45,15 @@ import { intervalloAnnoSolare } from '../../services/fatturaEngine.js';
  * Notifica di avvio progetto (§10, §22) — righe Notifica in-app per gli operatori
  * attivi dello studio, via `notificaStudioSilenziosa`. Il fallback a console.log resta
  * per quando il database non risponde: la notifica non deve mai rompere l'avvio.
+ * Il tenant si legge al momento della notifica, come il getter di `PrismaApp`: il default
+ * del costruttore vale solo fuori da una richiesta.
  */
 class NotificheStudioPort implements NotificationPort {
-  constructor(private readonly tenantId: string) {}
+  constructor(private readonly tenantIdDefault: string) {}
+
+  private get tenantId(): string {
+    return contestoTenant.getStore()?.tenantId ?? this.tenantIdDefault;
+  }
 
   async notificaProgettoAvviato(input: { progettoId: string; clienteId: string; moduliProgettoIds: string[] }): Promise<void> {
     try {

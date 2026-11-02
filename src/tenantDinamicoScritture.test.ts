@@ -13,7 +13,17 @@
  * tenant di default (Bluecode, come in produzione) e poi la usano dentro il contesto di un secondo
  * studio: la scrittura deve portare il tenant del **contesto**, non quello del costruttore.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const notificheInviate = vi.hoisted(() => [] as { tenantId: string }[]);
+vi.mock('./services/notificheService.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./services/notificheService.js')>()),
+  notificaStudioSilenziosa: async (tenantId: string) => {
+    notificheInviate.push({ tenantId });
+    return 1;
+  },
+}));
+
 import { PrismaApp } from './adapters/prisma/prismaApp.js';
 import { contestoTenant } from './util/prismaClient.js';
 
@@ -91,5 +101,22 @@ describe('la scrittura porta il tenant del contesto della richiesta, non quello 
       await app.creaCliente({ nome: 'Bluecode', tipo: 'company' });
     });
     expect(catturato.cliente.tenantId).toBe(BLUECODE);
+  });
+});
+
+describe('la notifica di avvio progetto va allo studio della richiesta (A11)', () => {
+  const avvio = { progettoId: 'prg-1', clienteId: 'cli-1', moduliProgettoIds: ['m1'] };
+
+  it('emessa nel contesto di studio-2 arriva a studio-2, non al tenant del costruttore', async () => {
+    notificheInviate.length = 0;
+    const porta = (new PrismaApp({} as any, BLUECODE) as any).notifiche;
+    await contestoTenant.run({ tenantId: STUDIO_2, ruolo: 'advisor' }, () => porta.notificaProgettoAvviato(avvio));
+    expect(notificheInviate).toEqual([{ tenantId: STUDIO_2 }]);
+  });
+
+  it('fuori da una richiesta usa il tenant del costruttore', async () => {
+    notificheInviate.length = 0;
+    await (new PrismaApp({} as any, BLUECODE) as any).notifiche.notificaProgettoAvviato(avvio);
+    expect(notificheInviate).toEqual([{ tenantId: BLUECODE }]);
   });
 });
