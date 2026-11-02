@@ -5,6 +5,10 @@ import { getTenantStorageKey } from '../../utils/tenant';
 import { ProgressBar } from '../ui/ProgressBar';
 import { useToast } from '../ui/ToastProvider';
 import { Modal } from '../ui/Modal';
+import { MODULI_RBAC } from '../../../../src/util/rbacModuli';
+
+/** Le chiavi che `PUT /tenant/utenti/:userId/permessi` accetta: la stessa lista del server. */
+const CHIAVI_MATRICE_SERVER: ReadonlySet<string> = new Set(MODULI_RBAC);
 
 // ─── Modal Performance Operatore & Report Ore ──────────────────────
 export function OperatorDetailModal({
@@ -180,7 +184,9 @@ export function OperatorDetailModal({
       // errore di rete non veniva nemmeno catturato e l'alert annunciava comunque
       // «permessi ATTIVI», mentre a database restavano i vecchi livelli di accesso.
       try {
-        await salvaPermessiUtenteApi(operator.id, payload);
+        // Al server solo le chiavi della sua matrice: rifiuta (400) quelle che non conosce, e
+        // `calendar` / `settings` esistono solo qui. Restano nella copia locale qui sopra.
+        await salvaPermessiUtenteApi(operator.id, payload.filter((p) => CHIAVI_MATRICE_SERVER.has(p.moduloChiave)));
         setSavingPermessi(false);
         setModificato(false);
         toast.successo(`Matrice Permessi RBAC salvata ed ATTIVA per ${operator.nome || operator.name}! I moduli bloccati (Denied) sono ora inaccessibili.`);
