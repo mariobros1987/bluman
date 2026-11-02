@@ -7,6 +7,7 @@ import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
 import {
   salvaDocumentoApi,
   generaDocumentoApi,
+  avvisoCampiMancanti,
   listaDocumentiProgetto,
   aggiornaStatoDocumentoApi,
   nuovaVersioneDocumentoApi,
@@ -279,6 +280,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
     let dbId: string | undefined;
     let savedFileUrl: string | undefined;
+    let campiMancanti: string[] = [];
 
     try {
       if (tmpl && !fileBase64) {
@@ -302,6 +304,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
         });
         dbId = salvato.id;
         savedFileUrl = salvato.fileUrl;
+        campiMancanti = salvato.campiMancanti;
       } else {
         // Upload manuale di un file dell'operatore: resta nel formato originale (allegato),
         // senza doppio formato generato.
@@ -370,7 +373,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     setShowCatalogModal(false);
 
     const metodoNome = metodoFirma === 'fea_otp' ? 'Firma semplice (OTP)' : metodoFirma === 'manuale_scansionata' ? 'Olografa Tradizionale' : metodoFirma === 'qualificata_esterna' ? 'Qualificata QES' : 'Libera';
-    toast.successo(`Documento "${formattedName}" collegato. Richiede firma: ${richiedeFirma ? `Sì (${metodoNome})` : 'No (sola lettura)'} · ${statoDoc === 'pubblicato' ? 'Pubblicato al cliente' : 'Bozza interna'}`);
+    toast.successo(`Documento "${formattedName}" collegato. Richiede firma: ${richiedeFirma ? `Sì (${metodoNome})` : 'No (sola lettura)'} · ${statoDoc === 'pubblicato' ? 'Pubblicato al cliente' : 'Bozza interna'}${avvisoCampiMancanti(campiMancanti)}`);
 
     if (effProgettoId) await ricaricaDocumentiDb();
   };
@@ -549,12 +552,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
       // server (PDF master + Word) dallo stesso merge dati, invece del PDF jsPDF
       // client-side. Il template viaggia con i placeholder {{...}} irrisolti: la
       // risoluzione avviene sul server dai dati autorevoli di DB.
+      let campiMancanti: string[] = [];
       const generaEPubblicaDaTemplate = async (progettoId: string) => {
         const tmpl = localDoc?.templateId ? ALL_STUDIO_TEMPLATES.find(t => t.id === localDoc.templateId) : null;
         const rawHtml = tmpl?.contenutoHtml || '';
         const rawName = localDoc?.nome || 'Documento.pdf';
         const titolo = rawName.replace(/\.(pdf|docx?)$/i, '');
-        await generaDocumentoApi({
+        const generato = await generaDocumentoApi({
           progettoId,
           microvoceProgettoId: microvoceDbId,
           contenutoHtml: rawHtml || `<p>${titolo}</p>`,
@@ -565,6 +569,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           // documento viene (ri)generato dal server al momento della pubblicazione.
           livelloFirmaRichiesto: localDoc?.livelloFirmaRichiesto ?? 'ses',
         });
+        campiMancanti = generato.campiMancanti;
       };
 
       if (isLocalId && effProgettoId) {
@@ -581,7 +586,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           }
         }
       }
-      toast.successo('Documento pubblicato al cliente. Ora è visibile nel portale per la firma.');
+      toast.successo(`Documento pubblicato al cliente. Ora è visibile nel portale per la firma.${avvisoCampiMancanti(campiMancanti)}`);
       await ricaricaDocumentiDb();
     } catch (err: any) {
       toast.errore(`Errore pubblicazione: ${err?.message ?? 'Errore sconosciuto'}`);

@@ -762,10 +762,10 @@ export function resolveDocumentTemplateHtml(
       const clsArr = clsStr ? JSON.parse(clsStr) : [];
       targetCliente = clsArr.find((c: any) => c.nome === context.cl || String(c.id) === String(context.clienteId)) || {
         nome: context.cl,
-        referenteNome: context.referente || context.cl,
+        referenteNome: context.referente,
       };
     } catch {
-      targetCliente = { nome: context.cl, referenteNome: context.referente || context.cl };
+      targetCliente = { nome: context.cl, referenteNome: context.referente };
     }
   } else if (context) {
     targetProgetto = context.progetto;
@@ -781,30 +781,32 @@ export function resolveDocumentTemplateHtml(
     } catch {}
   }
 
-  // Dati studio dinamici dal tenant attivo
-  const studioRagioneSociale = targetStudio?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
+  // Dati studio dinamici dal tenant attivo. Un dato assente è un segnaposto evidente, come nei
+  // documenti generati dal server: mai un'etichetta verosimile che si legga come un dato vero.
+  const mancante = (campo: string) => `[DATO MANCANTE: ${campo}]`;
+  const studioRagioneSociale = targetStudio?.ragioneSociale || studioInfo.ragioneSociale || mancante('ragione sociale dello studio');
   const studioPiva = targetStudio?.piva || studioInfo.piva || '';
   const studioSede = targetStudio?.sedeLegale || studioInfo.sedeLegale || '';
   const studioIban = targetStudio?.iban || studioInfo.iban || '';
   // §7 — qui c'era `|| 'Lead Senior Advisor'`: non un nome, ma un **ruolo**, stampato al posto
   // del nome del responsabile dello studio su proposte e contratti. Chi lo legge crede che
   // quello sia il nome di una persona («Advisor Lead: Lead Senior Advisor»). Senza il dato il
-  // campo resta vuoto: si vede che manca, invece di leggere qualcosa che non esiste.
-  const studioLeadAdvisor = studioInfo.leadAdvisor || '';
+  // campo mostra il segnaposto: si vede che manca, invece di leggere qualcosa che non esiste.
+  const studioLeadAdvisor = studioInfo.leadAdvisor || mancante('responsabile dello studio');
   const studioTel = targetStudio?.telefono || studioInfo.telefono || '';
   const studioEmail = targetStudio?.email || studioInfo.email || '';
 
   // Dati cliente
-  const clientNome = targetCliente?.nome || targetProgetto?.cl || 'Cliente Committente';
+  const clientNome = targetCliente?.nome || targetProgetto?.cl || mancante('ragione sociale del cliente');
   const clientPiva = targetCliente?.piva || targetCliente?.codiceFiscale || '';
   const clientCodFisc = targetCliente?.codiceFiscale || targetCliente?.piva || '';
   const clientSede = targetCliente?.sedeLegale || '';
   const clientPec = targetCliente?.pec || '';
   const clientSdi = targetCliente?.codiceSdi || '';
   const clientIban = targetCliente?.iban || '';
-  const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || 'Legale Rappresentante';
+  const clientRef = targetCliente?.referenteNome || (targetCliente?.referentiJson as any)?.referente || targetCliente?.referente || mancante('legale rappresentante del cliente');
   const clientCell = targetCliente?.cellulare || '';
-  const clientUbo = targetCliente?.ubo || targetCliente?.referenteNome || 'Titolare Effettivo (UBO)';
+  const clientUbo = targetCliente?.ubo || mancante('titolare effettivo (UBO) del cliente');
   const clientDocNum = targetCliente?.documentoNumero || '';
   const clientDocTipo = targetCliente?.documentoTipo || '';
   const clientDataNasc = targetCliente?.dataNascita || '';
@@ -815,8 +817,8 @@ export function resolveDocumentTemplateHtml(
 
   const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
-  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || 'Incarico Professionale';
-  const projImporto = targetProgetto?.totalePreventivo || targetProgetto?.val || 0;
+  const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || mancante('titolo del progetto');
+  const projImporto = targetProgetto?.totalePreventivo ?? targetProgetto?.val;
 
   // Sostituzione formale dei tag: NESSUN riquadro o badge, solo elegante grassetto istituzionale
   const wrapTag = (value: string) => {
@@ -844,7 +846,7 @@ export function resolveDocumentTemplateHtml(
   out = out.replace(/\{\{cliente\.indirizzo_alloggio\}\}/g, wrapTag(clientIndAllog));
 
   out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo));
-  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto ? `€ ${Number(projImporto).toLocaleString('it-IT')},00` : '€ 0,00'));
+  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto == null ? mancante('valore del progetto') : `€ ${Number(projImporto).toLocaleString('it-IT')},00`));
 
   out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale));
   out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva));

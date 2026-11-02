@@ -25,7 +25,7 @@ import { prisma } from '../util/prismaClient.js';
 import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 import { uploadDocumento, rifirmaUrlUpload } from '../services/storageService.js';
 import { scanFileBuffer } from '../services/securityScanner.js';
-import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento } from '../services/generazioneDocumenti.js';
+import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento, campiMancantiNelTesto } from '../services/generazioneDocumenti.js';
 import { notificaCliente, avvisaClienteViaCanali } from '../services/notificheService.js';
 import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta, normalizzaGrafometrica } from '../util/serverHelpers.js';
 import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
@@ -504,6 +504,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
 
       const contesto = contestoTagDocumento({ tenant, cliente: progetto.cliente, progetto });
       const blocchi = blocchiDaHtml(sanitizzaHtmlDocumento(risolviTagDocumento(htmlTemplate, contesto)));
+      // I dati assenti restano segnaposto nel documento: la generazione non si blocca, ma
+      // l'operatore riceve l'elenco di cosa completare.
+      const campiMancanti = campiMancantiNelTesto(JSON.stringify(blocchi));
       if (blocchi.length === 0) {
         return reply.code(400).send({ errore: 'Il template non produce contenuto: verificare i blocchi HTML.' });
       }
@@ -607,7 +610,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         });
       }
 
-      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] } });
+      return reply.send({ ok: true, documento: { ...documento, firmato: false, firma: null, richiesteModifica: [] }, campiMancanti });
     } catch (err) {
       return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore generazione documento' });
     }

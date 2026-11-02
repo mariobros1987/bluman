@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getTemplateForVoce } from './documentTemplates';
+import { getTemplateForVoce, resolveDocumentTemplateHtml } from './documentTemplates';
+import { avvisoCampiMancanti } from '../api/documenti';
 
 // Aggancio dei modelli Malta «trasferimento residenza / guest» (modulo mod-r01) alle micro-voci.
 // La proprietà che conta: queste tre voci risolvono ai modelli dedicati e NON cadono sulle regole
@@ -19,5 +20,37 @@ describe('getTemplateForVoce — modelli Malta guest', () => {
   it('le voci non-Malta continuano a usare le regole esistenti', () => {
     expect(getTemplateForVoce('Lettera di incarico', '').id).toBe('tmpl-engagement');
     expect(getTemplateForVoce('Accordo di riservatezza NDA', '').id).toBe('tmpl-nda');
+  });
+});
+
+// 3.6 — un dato assente nell'anteprima è un segnaposto evidente, non un'etichetta verosimile.
+describe('resolveDocumentTemplateHtml — dati mancanti', () => {
+  it('cliente senza legale rappresentante né UBO → segnaposto, non «Legale Rappresentante»', () => {
+    const html = resolveDocumentTemplateHtml('<p>{{cliente.referente}} / {{cliente.ubo}}</p>', {
+      cliente: { nome: 'Ditta Verdi' },
+      progetto: { nome: 'Pratica' },
+      studio: { ragioneSociale: 'Studio' },
+    });
+    expect(html).toContain('[DATO MANCANTE: legale rappresentante del cliente]');
+    expect(html).toContain('[DATO MANCANTE: titolare effettivo (UBO) del cliente]');
+    expect(html).not.toContain('Legale Rappresentante');
+    expect(html).not.toContain('Titolare Effettivo');
+  });
+
+  it('progetto senza titolo né valore → segnaposti; valore 0 resta un dato', () => {
+    const senza = resolveDocumentTemplateHtml('{{progetto.titolo}} {{progetto.importo_totale}}', { cliente: { nome: 'X' }, progetto: {} });
+    expect(senza).toContain('[DATO MANCANTE: titolo del progetto]');
+    expect(senza).toContain('[DATO MANCANTE: valore del progetto]');
+    const zero = resolveDocumentTemplateHtml('{{progetto.importo_totale}}', { cliente: { nome: 'X' }, progetto: { nome: 'P', val: 0 } });
+    expect(zero).toContain('€ 0,00');
+  });
+});
+
+describe('avvisoCampiMancanti', () => {
+  it('elenca i campi mancanti dopo la generazione, vuoto se non manca nulla', () => {
+    expect(avvisoCampiMancanti(['legale rappresentante del cliente', 'valore del progetto'])).toBe(
+      ' Mancano: legale rappresentante del cliente, valore del progetto.',
+    );
+    expect(avvisoCampiMancanti([])).toBe('');
   });
 });

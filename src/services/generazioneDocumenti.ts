@@ -94,9 +94,22 @@ function referenteDaJson(json: unknown): string | null {
 }
 
 /**
+ * Il segnaposto di un dato che il database non ha. Prima al suo posto c'era un'etichetta
+ * verosimile («Legale Rappresentante», «Cliente Committente»…) che nell'atto si leggeva come un
+ * dato vero: il segnaposto si vede, e `campiMancantiNelTesto` lo ritrova per avvisare l'operatore.
+ */
+export function segnapostoDatoMancante(campo: string): string {
+  return `[DATO MANCANTE: ${campo}]`;
+}
+
+/** I campi mancanti citati in un documento risolto, senza doppioni e nell'ordine di comparsa. */
+export function campiMancantiNelTesto(testo: string): string[] {
+  return [...new Set([...testo.matchAll(/\[DATO MANCANTE: ([^\]]+)\]/g)].map((m) => m[1]!))];
+}
+
+/**
  * Costruisce il contesto di merge dalle righe Prisma (Tenant, Cliente, Progetto).
- * I fallback replicano quelli del client: etichette neutre («Studio Professionale»,
- * «Incarico Professionale», «Legale Rappresentante»), mai dati di fantasia.
+ * Un dato assente diventa `segnapostoDatoMancante(...)`, mai un'etichetta verosimile.
  */
 export function contestoTagDocumento(entita: {
   tenant?: {
@@ -132,8 +145,8 @@ export function contestoTagDocumento(entita: {
 }): ContestoTagDocumento {
   const { tenant, cliente, progetto } = entita;
 
-  const referente = referenteDaJson(cliente?.referentiJson) ?? 'Legale Rappresentante';
-  const valore = progetto?.valoreTotale ?? 0;
+  const referente = referenteDaJson(cliente?.referentiJson) ?? segnapostoDatoMancante('legale rappresentante del cliente');
+  const valore = progetto?.valoreTotale;
 
   return {
     dataOdierna: (entita.dataOdierna ?? new Date()).toLocaleDateString('it-IT', {
@@ -142,17 +155,17 @@ export function contestoTagDocumento(entita: {
       year: 'numeric',
     }),
     studio: {
-      ragioneSociale: tenant?.ragioneSociale || 'Studio Professionale',
+      ragioneSociale: tenant?.ragioneSociale || segnapostoDatoMancante('ragione sociale dello studio'),
       piva: tenant?.piva || '',
       codiceFiscale: tenant?.codiceFiscale || '',
       sedeLegale: tenant?.sedeLegale || '',
       iban: tenant?.iban || '',
-      leadAdvisor: tenant?.leadAdvisorNome || 'Lead Senior Advisor',
+      leadAdvisor: tenant?.leadAdvisorNome || segnapostoDatoMancante('responsabile dello studio'),
       telefono: tenant?.telefono || '',
       email: tenant?.email || '',
     },
     cliente: {
-      ragioneSociale: cliente?.nome || 'Cliente Committente',
+      ragioneSociale: cliente?.nome || segnapostoDatoMancante('ragione sociale del cliente'),
       partitaIva: cliente?.piva || cliente?.codiceFiscale || '',
       codiceFiscale: cliente?.codiceFiscale || cliente?.piva || '',
       sedeLegale: cliente?.sedeLegale || '',
@@ -162,7 +175,8 @@ export function contestoTagDocumento(entita: {
       iban: cliente?.iban || '',
       referente,
       cellulare: cliente?.cellulare || '',
-      ubo: cliente?.ubo || referente,
+      // Il titolare effettivo non è il referente: se manca si dichiara, non si ricopia (AML).
+      ubo: cliente?.ubo || segnapostoDatoMancante('titolare effettivo (UBO) del cliente'),
       documentoTipo: cliente?.documentoTipo || '',
       documentoNumero: cliente?.documentoNumero || '',
       dataNascita: cliente?.dataNascita || '',
@@ -171,9 +185,11 @@ export function contestoTagDocumento(entita: {
       indirizzoAlloggio: cliente?.indirizzoAlloggio || '',
     },
     progetto: {
-      titolo: progetto?.nome || 'Incarico Professionale',
+      titolo: progetto?.nome || segnapostoDatoMancante('titolo del progetto'),
       // `valoreTotale` è in centesimi (A3): prima si stampava come euro, cento volte tanto.
-      importoTotale: `€ ${(valore / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      importoTotale: valore == null
+        ? segnapostoDatoMancante('valore del progetto')
+        : `€ ${(valore / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     },
   };
 }

@@ -172,7 +172,7 @@ export async function generaDocumentoApi(input: {
   dataScadenzaDoc?: string;
   /** Piano firma §3 — se assente, il server eredita il livello del template (default 'ses'). */
   livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
-}): Promise<DocumentoProgetto> {
+}): Promise<DocumentoProgetto & { campiMancanti: string[] }> {
   const res = await apiFetch(`${API_BASE}/documenti/genera`, {
     method: 'POST',
     headers: getAuthHeaders(),
@@ -190,7 +190,14 @@ export async function generaDocumentoApi(input: {
     fileUrl: urlDocumentoAssoluto(data.documento?.fileUrl),
     filePdfUrl: data.documento?.filePdfUrl ? urlDocumentoAssoluto(data.documento.filePdfUrl) : data.documento?.filePdfUrl ?? null,
     fileDocxUrl: data.documento?.fileDocxUrl ? urlDocumentoAssoluto(data.documento.fileDocxUrl) : data.documento?.fileDocxUrl ?? null,
+    // I dati che il server non aveva: nel documento sono segnaposti «[DATO MANCANTE: …]».
+    campiMancanti: Array.isArray(data.campiMancanti) ? data.campiMancanti : [],
   };
+}
+
+/** Coda del messaggio dopo la generazione: vuota se non manca nulla. */
+export function avvisoCampiMancanti(campi: string[]): string {
+  return campi.length ? ` Mancano: ${campi.join(', ')}.` : '';
 }
 
 // 'firmato' non è più un valore accettato: lo scrive solo il sigillo di firma sul server

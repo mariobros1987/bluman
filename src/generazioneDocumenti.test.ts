@@ -26,6 +26,7 @@ import {
   generaPdfDocumento,
   generaDocxDocumento,
   paragrafiDocx,
+  campiMancantiNelTesto,
 } from './services/generazioneDocumenti.js';
 
 /** Stato restituito dal finto client, riscritto da ogni test prima dell'uso. */
@@ -255,16 +256,31 @@ describe('contestoTagDocumento — merge dei tag dal database', () => {
     expect(contesto.progetto.importoTotale).toBe('€ 12.500,00');
   });
 
-  it('senza entità usa le etichette neutre del client, mai dati di fantasia', () => {
+  it('senza entità mette segnaposti evidenti, mai etichette verosimili', () => {
     const contesto = contestoTagDocumento({ dataOdierna: new Date(2026, 7, 27) });
-    expect(contesto.studio.ragioneSociale).toBe('Studio Professionale');
-    expect(contesto.studio.leadAdvisor).toBe('Lead Senior Advisor');
-    expect(contesto.cliente.ragioneSociale).toBe('Cliente Committente');
-    expect(contesto.cliente.referente).toBe('Legale Rappresentante');
-    // L'UBO ripiega sul referente quando manca.
-    expect(contesto.cliente.ubo).toBe('Legale Rappresentante');
-    expect(contesto.progetto.titolo).toBe('Incarico Professionale');
+    expect(contesto.studio.ragioneSociale).toBe('[DATO MANCANTE: ragione sociale dello studio]');
+    expect(contesto.studio.leadAdvisor).toBe('[DATO MANCANTE: responsabile dello studio]');
+    expect(contesto.cliente.ragioneSociale).toBe('[DATO MANCANTE: ragione sociale del cliente]');
+    expect(contesto.cliente.referente).toBe('[DATO MANCANTE: legale rappresentante del cliente]');
+    expect(contesto.cliente.ubo).toBe('[DATO MANCANTE: titolare effettivo (UBO) del cliente]');
+    expect(contesto.progetto.titolo).toBe('[DATO MANCANTE: titolo del progetto]');
+    expect(contesto.progetto.importoTotale).toBe('[DATO MANCANTE: valore del progetto]');
+  });
+
+  it('valore del progetto a zero è un dato, non un mancante', () => {
+    const contesto = contestoTagDocumento({ progetto: { nome: 'X', valoreTotale: 0 }, dataOdierna: new Date(2026, 7, 27) });
     expect(contesto.progetto.importoTotale).toBe('€ 0,00');
+  });
+
+  it('cliente senza legale rappresentante → segnaposto nel documento ed elenco dei mancanti', () => {
+    const contesto = contestoTagDocumento({
+      cliente: { nome: 'Ditta Verdi', referentiJson: null },
+      dataOdierna: new Date(2026, 7, 27),
+    });
+    const html = risolviTagDocumento('<p>{{cliente.nome}}, in persona di {{cliente.referente}} ({{cliente.referente}})</p>', contesto);
+    expect(html).toContain('Ditta Verdi, in persona di [DATO MANCANTE: legale rappresentante del cliente]');
+    expect(html).not.toContain('Legale Rappresentante');
+    expect(campiMancantiNelTesto(html)).toEqual(['legale rappresentante del cliente']);
   });
 
   it('partita IVA assente → ripiega sul codice fiscale; referenti in array → primo nome leggibile', () => {
@@ -476,6 +492,10 @@ describe('POST /documenti/genera — doppio formato dallo stesso merge', () => {
     expect(creato.contenutoBlocchiJson).toHaveLength(6);
     expect(JSON.stringify(creato.contenutoBlocchiJson)).toContain('Rossi Spa');
     expect(JSON.stringify(creato.contenutoBlocchiJson)).not.toContain('{{');
+    // Il cliente della fixture non ha referenti: il documento esce lo stesso, col segnaposto,
+    // e la risposta dice all'operatore cosa manca.
+    expect(JSON.stringify(creato.contenutoBlocchiJson)).toContain('[DATO MANCANTE: legale rappresentante del cliente]');
+    expect(corpo.campiMancanti).toEqual(['legale rappresentante del cliente']);
 
     // Due upload dallo stesso merge, con lo stesso slug.
     const nomi = stato.upload.map((u) => u.filename);
