@@ -247,4 +247,17 @@ describe('GET /tenant/utenti — un errore di lettura non diventa un elenco vuot
     expect(corpo[0]).not.toHaveProperty('passwordHash');
     expect(JSON.stringify(corpo)).not.toContain('hash-finto');
   });
+
+  it('il costo orario arriva ad advisor e super_admin, non ai collaboratori (F1)', async () => {
+    stato.esistente = { ...SUPER_ADMIN_CON_TENANT, ruolo: 'collaboratore_interno', costoOrarioCentesimi: 4500 };
+    const leggi = async (ruolo: 'advisor' | 'collaboratore_interno') =>
+      (await server().inject({
+        method: 'GET',
+        url: '/tenant/utenti',
+        headers: { authorization: `Bearer ${token(ruolo)}` },
+      })).json();
+
+    expect((await leggi('advisor'))[0].costoOrarioCentesimi).toBe(4500);
+    expect((await leggi('collaboratore_interno'))[0]).not.toHaveProperty('costoOrarioCentesimi');
+  });
 });

@@ -81,6 +81,11 @@ export interface PersonaVisualizzata {
  */
 export interface TeamMember extends PersonaVisualizzata {
   dbId: string;
+  /**
+   * Costo orario interno (`user.costo_orario_centesimi`). `null`: non configurato.
+   * Assente: il server non lo manda al ruolo collegato (solo advisor e super_admin lo leggono).
+   */
+  costoOrarioCentesimi?: number | null;
 }
 
 export interface MicroVoce {

@@ -585,7 +585,11 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         include: { periodiCollaborazione: { orderBy: { dal: 'asc' } } },
         orderBy: { createdAt: 'asc' },
       });
-      return reply.send(utenti.map(senzaHash));
+      // Il costo orario dei colleghi (redditività delle pratiche) lo legge solo chi dirige lo
+      // studio: agli altri ruoli il campo non arriva.
+      const vedeCosti = ruoloRichiedente === 'advisor' || ruoloRichiedente === 'super_admin';
+      return reply.send(utenti.map(senzaHash).map(({ costoOrarioCentesimi, ...resto }) =>
+        (vedeCosti ? { ...resto, costoOrarioCentesimi } : resto)));
     } catch (err) {
       // Il ripiego di prima chiamava `app.listaUtenti()`, che era un secondo percorso di
       // scrittura sullo stesso database appena fallito — e riassegnava utenti al tenant

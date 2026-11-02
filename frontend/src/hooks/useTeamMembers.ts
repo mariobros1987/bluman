@@ -117,6 +117,8 @@ function apiUserToTeamMember(u: any, idx: number): TeamMember | null {
     // §1ter.6 (C1) — non è più opzionale: la guardia in testa alla funzione ha già escluso
     // le righe che non hanno un id di database, quindi qui la stringa c'è.
     dbId: u.id as string,
+    // F1 — la redditività legge il costo vero; assente se il ruolo collegato non lo vede.
+    ...('costoOrarioCentesimi' in u ? { costoOrarioCentesimi: u.costoOrarioCentesimi ?? null } : {}),
     n: name,
     r: role,
     i: initials,
