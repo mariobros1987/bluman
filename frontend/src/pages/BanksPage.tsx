@@ -19,13 +19,18 @@ export function BanksPage() {
   const [isDefault, setIsDefault] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // F6 — una lettura fallita è un errore da dichiarare, non «nessun conto configurato».
+  const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
+
   const loadConti = async () => {
     setLoading(true);
+    setErroreCaricamento(null);
     try {
-      const data = await fetchContiBancariApi();
+      const data = await fetchContiBancariApi({ rigettaSuErrore: true });
       setConti(data || []);
     } catch (err) {
-      console.warn('Errore lettura conti bancari:', err);
+      setConti([]);
+      setErroreCaricamento(err instanceof Error ? err.message : 'Errore di rete');
     } finally {
       setLoading(false);
     }
@@ -113,6 +118,12 @@ export function BanksPage() {
       {/* Griglia Conti */}
       {loading ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento conti bancari dal database...</div>
+      ) : erroreCaricamento ? (
+        <div role="alert" style={{ padding: '2rem', textAlign: 'center', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile caricare i conti bancari.</div>
+          <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreCaricamento}</div>
+          <button type="button" className="btn" onClick={() => loadConti()}>Riprova</button>
+        </div>
       ) : conti.length === 0 ? (
         <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🏦</div>

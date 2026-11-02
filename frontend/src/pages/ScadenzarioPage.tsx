@@ -32,17 +32,22 @@ export function ScadenzarioPage() {
   const [noteOperatore, setNoteOperatore] = useState('');
   const [savingIncasso, setSavingIncasso] = useState(false);
 
+  // F6 — una lettura fallita è un errore da dichiarare, non «nessuna scadenza».
+  const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
+
   const loadData = async () => {
     setLoading(true);
+    setErroreCaricamento(null);
     try {
       const [scadData, clData] = await Promise.all([
-        fetchScadenzarioIncassiApi({ dataDa: dataDa || undefined, dataA: dataA || undefined }),
+        fetchScadenzarioIncassiApi({ dataDa: dataDa || undefined, dataA: dataA || undefined }, { rigettaSuErrore: true }),
         fetchClienti(),
       ]);
       setScadenze(scadData || []);
       setClienti(clData || []);
     } catch (err) {
-      console.warn('Errore lettura scadenzario:', err);
+      setScadenze([]);
+      setErroreCaricamento(err instanceof Error ? err.message : 'Errore di rete');
     } finally {
       setLoading(false);
     }
@@ -165,6 +170,12 @@ export function ScadenzarioPage() {
 
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento scadenze dal database...</div>
+        ) : erroreCaricamento ? (
+          <div role="alert" style={{ padding: '2rem', textAlign: 'center', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile caricare lo scadenzario.</div>
+            <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreCaricamento}</div>
+            <button type="button" className="btn" onClick={() => loadData()}>Riprova</button>
+          </div>
         ) : (
           <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}><table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>

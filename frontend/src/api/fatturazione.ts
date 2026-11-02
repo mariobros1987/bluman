@@ -78,9 +78,16 @@ export async function fetchTutteFattureStudioApi(parametri?: ParametriListaPagin
   );
 }
 
+/**
+ * F6 — `rigettaSuErrore`: chi lo passa riceve l'errore invece di `null`/`[]`, e può mostrare
+ * «errore, riprova» invece di «nessun dato». Gli altri chiamanti restano come prima. La chiave di
+ * cache è distinta, così un `[]` di ripiego memorizzato per gli altri non arriva a chi vuole l'errore.
+ */
+type OpzioniLettura = { forceRefresh?: boolean; rigettaSuErrore?: boolean };
+
 export async function fetchScadenzarioIncassiApi(
   parametri?: { dataDa?: string; dataA?: string },
-  options?: { forceRefresh?: boolean },
+  options?: OpzioniLettura,
 ) {
   const currentTenantId = getCurrentTenantId();
   const qs = new URLSearchParams();
@@ -88,13 +95,14 @@ export async function fetchScadenzarioIncassiApi(
   if (parametri?.dataA) qs.set('dataA', parametri.dataA);
   const query = qs.toString();
   return cachedQuery(
-    `scadenzario_${currentTenantId}_${query}`,
+    `scadenzario_${currentTenantId}_${query}${options?.rigettaSuErrore ? '_rigetta' : ''}`,
     async () => {
       try {
         const res = await apiFetch(`${API_BASE}/invoices/scadenzario${query ? `?${query}` : ''}`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Errore recupero scadenzario incassi');
         return await res.json();
       } catch (err) {
+        if (options?.rigettaSuErrore) throw err;
         console.warn('Scadenzario incassi API fallback', err);
         return null;
       }
@@ -136,16 +144,17 @@ export async function downloadFatturaXmlApi(fatturaId: string, numero?: string) 
   }
 }
 
-export async function fetchContrattiRicorrentiApi(options?: { forceRefresh?: boolean }) {
+export async function fetchContrattiRicorrentiApi(options?: OpzioniLettura) {
   const currentTenantId = getCurrentTenantId();
   return cachedQuery(
-    `contratti_ricorrenti_${currentTenantId}`,
+    `contratti_ricorrenti_${currentTenantId}${options?.rigettaSuErrore ? '_rigetta' : ''}`,
     async () => {
       try {
         const res = await apiFetch(`${API_BASE}/contratti-ricorrenti`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Errore recupero contratti');
         return await res.json();
       } catch (err) {
+        if (options?.rigettaSuErrore) throw err;
         console.warn('Contratti ricorrenti API fallback', err);
         return null;
       }
@@ -223,16 +232,17 @@ export async function inviaWebhookSdiApi(fatturaId: string, statoSdi: 'consegnat
   return await res.json();
 }
 
-export async function fetchContiBancariApi(options?: { forceRefresh?: boolean }) {
+export async function fetchContiBancariApi(options?: OpzioniLettura) {
   const currentTenantId = getCurrentTenantId();
   return cachedQuery(
-    `conti_bancari_${currentTenantId}`,
+    `conti_bancari_${currentTenantId}${options?.rigettaSuErrore ? '_rigetta' : ''}`,
     async () => {
       try {
         const res = await apiFetch(`${API_BASE}/conti-bancari`, { headers: getAuthHeaders() });
         if (!res.ok) throw new Error('Errore recupero conti bancari');
         return await res.json();
       } catch (err) {
+        if (options?.rigettaSuErrore) throw err;
         // §3.3 — prima il fallback restituiva QUATTRO conti bancari inventati (IBAN fittizi, saldi
         // a 7 cifre, Unicredit/Intesa/Stripe/Cassa) spacciandoli per reali in una schermata
         // finanziaria. Una lettura che fallisce restituisce lista vuota, non un bilancio immaginario.

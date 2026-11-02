@@ -30,11 +30,15 @@ export function RetainersPage() {
   const [saving, setSaving] = useState(false);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
 
+  // F6 — una lettura fallita è un errore da dichiarare, non «nessun contratto».
+  const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
+
   const loadData = async () => {
     setLoading(true);
+    setErroreCaricamento(null);
     try {
       const [cData, clData, prData] = await Promise.all([
-        fetchContrattiRicorrentiApi(),
+        fetchContrattiRicorrentiApi({ rigettaSuErrore: true }),
         fetchClienti(),
         fetchProgetti(),
       ]);
@@ -42,7 +46,8 @@ export function RetainersPage() {
       setClienti(clData || []);
       setProgetti(prData || []);
     } catch (err) {
-      console.warn('Errore lettura contratti retainer:', err);
+      setContratti([]);
+      setErroreCaricamento(err instanceof Error ? err.message : 'Errore di rete');
     } finally {
       setLoading(false);
     }
@@ -151,6 +156,12 @@ export function RetainersPage() {
       {/* Griglia Contratti */}
       {loading ? (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Caricamento contratti dal database...</div>
+      ) : erroreCaricamento ? (
+        <div role="alert" style={{ padding: '2rem', textAlign: 'center', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile caricare i contratti ricorrenti.</div>
+          <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreCaricamento}</div>
+          <button type="button" className="btn" onClick={() => loadData()}>Riprova</button>
+        </div>
       ) : contratti.length === 0 ? (
         <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--card)', borderRadius: 12, border: '1px solid var(--border)' }}>
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔄</div>
