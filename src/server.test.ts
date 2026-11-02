@@ -80,6 +80,9 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       }
       return (reale.prisma as any).tenant.findUnique(args);
     },
+    // PATCH /tenant/info: senza database la scrittura deve riuscire per finta, non ripiegare su una
+    // copia in memoria (A6: un salvataggio fallito ora risponde 500).
+    upsert: async (args: any) => ({ id: args.where.id, ...args.create, ...args.update }),
   });
   const preventivo = delega((reale.prisma as any).preventivo, {
     findFirst: async (args: any) => {

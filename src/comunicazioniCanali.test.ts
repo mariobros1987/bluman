@@ -25,7 +25,8 @@ import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 const stato: {
   tenant: any;
   upsert: any[];
-} = { tenant: null, upsert: [] };
+  upsertEsplode: boolean;
+} = { tenant: null, upsert: [], upsertEsplode: false };
 
 vi.mock('./util/prismaClient.js', async importOriginal => {
   // Il contesto tenant resta quello vero (AsyncLocalStorage, non tocca il database): gli
@@ -40,6 +41,7 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       return stato.tenant;
     },
     upsert: async (args: any) => {
+      if (stato.upsertEsplode) throw new Error('database irraggiungibile (simulato)');
       stato.upsert.push(args);
       stato.tenant = { ...stato.tenant, ...args.update };
       return stato.tenant;
@@ -147,6 +149,7 @@ for (const chiave of AMBIENTE_DA_SVUOTARE) ambienteOriginale.set(chiave, process
 beforeEach(() => {
   stato.tenant = null;
   stato.upsert = [];
+  stato.upsertEsplode = false;
   for (const chiave of AMBIENTE_DA_SVUOTARE) delete process.env[chiave];
 });
 
@@ -191,6 +194,24 @@ describe('§35 — GET /tenant/info non consegna le credenziali al browser', () 
   it('la rotta resta protetta: senza token 401', async () => {
     const res = await server().inject({ method: 'GET', url: '/tenant/info' });
     expect(res.statusCode).toBe(401);
+  });
+});
+
+describe('A6 — PATCH /tenant/info: un salvataggio fallito non risponde «ok»', () => {
+  it("se l'upsert esplode → 500 con messaggio, non 200 con la copia in memoria", async () => {
+    stato.tenant = { ...TENANT_CONFIGURATO };
+    stato.upsertEsplode = true;
+
+    const res = await server().inject({
+      method: 'PATCH',
+      url: '/tenant/info',
+      headers: auth(),
+      payload: { ragioneSociale: 'Studio mai salvato' },
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(res.json().errore).toMatch(/non riuscito/);
+    expect(res.body).not.toContain('Studio mai salvato');
   });
 });
 

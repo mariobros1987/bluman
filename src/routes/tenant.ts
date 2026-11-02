@@ -510,11 +510,10 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       });
       return reply.send(tenantPubblico(updated));
     } catch (err) {
-      console.warn('Prisma tenant upsert fallback to inMemory store:', err);
-      const current = inMemoryTenantStore.get(tenantId) || { id: tenantId };
-      const updated = { ...current, ...sanitizedData, id: tenantId };
-      inMemoryTenantStore.set(tenantId, updated);
-      return reply.send(tenantPubblico(updated));
+      // A6 — prima si ripiegava sulla copia in memoria e si rispondeva 200: il salvataggio
+      // spariva al riavvio e l'operatore lo credeva riuscito.
+      req.log.error({ tenantId, err: err instanceof Error ? err.message : err }, 'PATCH /tenant/info — salvataggio fallito');
+      return reply.code(500).send({ errore: 'Salvataggio delle impostazioni dello studio non riuscito. Riprova.' });
     }
   });
 
