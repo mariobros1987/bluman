@@ -658,7 +658,12 @@ export class PrismaApp implements AppPort {
       // per ora perché non è un bug, solo un margine di ottimizzazione.
       const template = await this.istanziazione
         .eseguiInTransazione((tx) => tx.getModuloTemplateConDistinta(riga.moduloTemplateId, riga.moduloTemplateVersione))
-        .catch(() => null);
+        // A13 — solo «riga assente» (P2025 di findFirstOrThrow) è un modulo non trovato; un
+        // errore del database si propaga com'è, invece di travestirsi da modulo mancante.
+        .catch((err) => {
+          if ((err as { code?: string })?.code === 'P2025') return null;
+          throw err;
+        });
       if (!template) throw new ModuloNonTrovatoError(`Modulo non trovato in libreria: ${riga.moduloTemplateId}@${riga.moduloTemplateVersione}`);
       valoreTotale += calcolaPrezzoModulo(template);
     }

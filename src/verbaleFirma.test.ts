@@ -27,6 +27,8 @@ const stato = {
   /** Lo studio (riga `tenant`): entra nell'impronta della lettera d'incarico (§8.4). */
   tenant: null as any,
   uploadFails: false,
+  /** A13 — il collegamento della copia firmata alla firma (fileFirmatoUrl) fallisce. */
+  collegaCopiaFails: false,
   /** §36 — byte del file in archivio: servono a `improntaDocumentoDelFascicolo`. */
   fileArchivio: null as Buffer | null,
   // Registri per asserire cosa il server ha scritto davvero.
@@ -88,6 +90,7 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         return { ...args.data, id: 'firma-1' };
       },
       update: async (args: any) => {
+        if (stato.collegaCopiaFails && args.data?.fileFirmatoUrl) throw new Error('database irraggiungibile (simulato)');
         stato.firmeAggiornate.push(args);
         return { ...args.data };
       },
@@ -266,6 +269,7 @@ beforeEach(() => {
   stato.documento = null;
   stato.tenant = null;
   stato.uploadFails = false;
+  stato.collegaCopiaFails = false;
   stato.fileArchivio = null;
   stato.upload = [];
   stato.uploadContenuti = [];
@@ -753,6 +757,25 @@ describe('§36 — verify-otp-and-sign incorpora la firma nel documento', () => 
     expect(testo).toContain(stato.firmeCreate[0].signatureId);
 
     expect(stato.audit.some(a => a.azione === 'COPIA_FIRMATA_GENERATA')).toBe(true);
+  });
+
+  it('copia firmata non collegata alla firma (A13): la firma resta valida, il guasto va in audit', async () => {
+    preparaDocumentoVault();
+    stato.collegaCopiaFails = true;
+    const server = serverConToken(tokenCliente());
+    const res = await server.inject({
+      method: 'POST',
+      url: '/portal/verify-otp-and-sign',
+      payload: { otp: CODICE_OTP, ambito: 'documento_vault', riferimentoId: 'doc-1', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().ok).toBe(true);
+    expect(stato.firmeCreate).toHaveLength(1);
+    const audit = stato.audit.find(a => a.azione === 'COPIA_FIRMATA_NON_COLLEGATA');
+    expect(audit).toBeTruthy();
+    expect(audit.entita).toBe('doc-1');
+    expect(audit.dettagli).toContain(stato.firmeCreate[0].signatureId);
+    expect(audit.dettagli).toContain('database irraggiungibile (simulato)');
   });
 
   it('documento generato prima di §36: nessuna copia, la firma resta valida', async () => {

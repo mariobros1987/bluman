@@ -1681,10 +1681,18 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
           ipAddress: sigillo.ipAddress,
         });
         if (esitoCopia?.url) {
-          await prisma.firmaElettronica.update({
-            where: { id: firma.id },
-            data: { fileFirmatoUrl: esitoCopia.url },
-          }).catch(() => {});
+          // A13 — collegamento non scritto: la firma resta valida, ma il guasto si dice (log + audit).
+          try {
+            await prisma.firmaElettronica.update({ where: { id: firma.id }, data: { fileFirmatoUrl: esitoCopia.url } });
+          } catch (err) {
+            const motivo = (err as Error)?.message ?? String(err);
+            req.log.error({ err, documentoId: riferimentoId, firmaId: firma.id }, 'Copia firmata non collegata alla firma');
+            await recordAudit({
+              tenantId, userId: req.userId, ruolo: req.ruolo, azione: 'COPIA_FIRMATA_NON_COLLEGATA',
+              entita: riferimentoId, ipAddress: sigillo.ipAddress,
+              dettagli: `Copia firmata ${esitoCopia.url} non collegata alla firma ${firma.signatureId} su "${documentoTitolo}": ${motivo}`,
+            });
+          }
         }
       }
 
