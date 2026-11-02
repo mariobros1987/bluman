@@ -21,19 +21,22 @@
 // aggiunge la chiave alla matrice lato frontend, poi qui la rotta.
 
 /** Le chiavi modulo che la Matrice Permessi dello studio può configurare. */
-export type ModuloChiaveRbac =
-  | 'projects'
-  | 'clients'
-  | 'invoices'
-  | 'scadenzario'
-  | 'primanota'
-  | 'banks'
-  | 'retainers'
-  | 'reports'
-  | 'communications'
-  | 'documents'
-  | 'library'
-  | 'audit';
+export const MODULI_RBAC = [
+  'projects',
+  'clients',
+  'invoices',
+  'scadenzario',
+  'primanota',
+  'banks',
+  'retainers',
+  'reports',
+  'communications',
+  'documents',
+  'library',
+  'audit',
+] as const;
+
+export type ModuloChiaveRbac = (typeof MODULI_RBAC)[number];
 
 /**
  * Pattern di rotta → chiave modulo, dal più specifico al più generico: la

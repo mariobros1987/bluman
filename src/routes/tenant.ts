@@ -10,8 +10,8 @@
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import { RuoloUtente } from '@prisma/client';
-import { prisma, prismaAmministrativo, contestoTenant } from '../util/prismaClient.js';
-import { CreaTenantSchema, AggiornaTenantSchema, AuditLogSchema } from '../schemas/tenant.schema.js';
+import { prisma, prismaAmministrativo, contestoTenant, conContestoInTransazione } from '../util/prismaClient.js';
+import { CreaTenantSchema, AggiornaTenantSchema, AuditLogSchema, PermessiUtenteSchema } from '../schemas/tenant.schema.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
 import { rifirmaUrlUpload } from '../services/storageService.js';
 import { provaPostaInUscita, provaPostaInArrivo, sendInvitoCollaboratoreEmail } from '../services/emailService.js';
@@ -1785,48 +1785,50 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     }
   });
 
-  server.put<{
-    Params: { userId: string };
-    Body: { permessi: Array<{ moduloChiave: string; livello: 'denied' | 'read' | 'write' }> };
-  }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
-    const tenantId = req.tenantId;
-    const { userId } = req.params;
-    const { permessi } = req.body;
-
-    if (!Array.isArray(permessi)) {
-      return reply.code(400).send({ errore: 'Array permessi obbligatorio' });
+  server.put<{ Params: { userId: string } }>('/tenant/utenti/:userId/permessi', async (req, reply) => {
+    // Stessi tre controlli della gestione utenti: ruolo del richiedente, studio, super admin.
+    const utente = await utenteGestibile(req, reply, req.params.userId);
+    if (!utente) return reply;
+    // Il super admin non ha matrice (bypassa l'RBAC) e un utente senza studio non ha dove scriverla.
+    if (utente.ruolo === 'super_admin' || !utente.tenantId) {
+      return reply.code(400).send({ errore: "La matrice permessi si applica solo agli utenti di uno studio." });
     }
+    const parse = PermessiUtenteSchema.safeParse(req.body || {});
+    if (!parse.success) {
+      return reply.code(400).send({ errore: parse.error.issues[0]?.message ?? 'Permessi non validi' });
+    }
+    const { permessi } = parse.data;
+    // Il tenant è quello del collaboratore, non quello della richiesta: per il super_admin differiscono.
+    const tenantId = utente.tenantId;
+    const userId = utente.id;
 
     try {
-      for (const p of permessi) {
-        await prisma.permessoModulo.upsert({
-          where: {
-            tenantId_userId_moduloChiave: {
-              tenantId,
-              userId,
-              moduloChiave: p.moduloChiave,
-            },
-          },
-          update: { livello: p.livello },
-          create: {
-            tenantId,
-            userId,
-            moduloChiave: p.moduloChiave,
-            livello: p.livello,
-          },
-        });
-      }
+      await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          for (const p of permessi) {
+            await tx.permessoModulo.upsert({
+              where: { tenantId_userId_moduloChiave: { tenantId, userId, moduloChiave: p.moduloChiave } },
+              update: { livello: p.livello },
+              create: { tenantId, userId, moduloChiave: p.moduloChiave, livello: p.livello },
+            });
+          }
+        }),
+      );
 
       await recordAudit({
         tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'PERMESSI_UTENTE_AGGIORNATI',
         entita: userId,
-        dettagli: `Aggiornata matrice permessi RBAC per l'utente ${userId}`,
+        dettagli: `Matrice permessi di ${userId}: ${permessi.map((p) => `${p.moduloChiave}→${p.livello}`).join(', ')}`,
+        ipAddress: req.ip,
       });
 
       return reply.send({ ok: true, messaggio: 'Matrice permessi aggiornata con successo' });
     } catch (err) {
-      return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore aggiornamento permessi' });
+      req.log.error({ tenantId, userId, err: err instanceof Error ? err.message : err }, 'PUT permessi utente — errore');
+      return reply.code(500).send({ errore: 'Errore aggiornamento permessi' });
     }
   });
 }

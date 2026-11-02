@@ -1,4 +1,15 @@
 import { z } from 'zod';
+import { MODULI_RBAC } from '../util/rbacModuli.js';
+
+/**
+ * `PUT /tenant/utenti/:userId/permessi`: solo chiavi della matrice e livelli noti. Una chiave
+ * inventata creerebbe righe `PermessoModulo` che nessun controllo legge.
+ */
+export const PermessiUtenteSchema = z.object({
+  permessi: z
+    .array(z.object({ moduloChiave: z.enum(MODULI_RBAC), livello: z.enum(['denied', 'read', 'write']) }))
+    .min(1, 'Almeno un permesso'),
+});
 
 /** Email opzionale che tollera la stringa vuota (reset del campo), come in `clienti.schema.ts`. */
 const emailOpzionale = z.string().email('Formato email non valido').optional().nullable().or(z.literal(''));
