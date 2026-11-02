@@ -18,6 +18,7 @@ import {
 } from '../api/client';
 import type { Progetto, Passaggio, Cliente } from '../types';
 import { fetchComunicazioniMicrovoceApi, type MessaggioDiMicrovoce } from '../api/progetti';
+import { fetchProfiloUtenteApi } from '../api/auth';
 import type { CanaleInvio } from '../hooks/useInvioComunicazione';
 import { ALL_STUDIO_TEMPLATES, getSmartDocumentRecommendation } from './passaggio/catalogoModelliStudio';
 import { getDefaultPassaggi } from './passaggio/passaggioUtils';
@@ -85,11 +86,20 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     if (saved) {
       try { return JSON.parse(saved); } catch {}
     }
-    return [
-      { id: 'n1', autore: 'Avv. Mario Dibenedetto', data: new Date().toLocaleDateString('it-IT'), testo: 'Attività avviata nel fascicolo digitale dello studio.' },
-    ];
+    // F4 — nessuna nota fabbricata all'apertura: prima ne compariva una a nome di un avvocato reale.
+    return [];
   });
   const [newNote, setNewNote] = useState('');
+
+  // F4 — l'autore di una nota è l'utente collegato, letto dal profilo (`/auth/profilo`), non un nome scritto nel codice.
+  const [autoreCorrente, setAutoreCorrente] = useState<string | null>(null);
+  useEffect(() => {
+    let attivo = true;
+    fetchProfiloUtenteApi()
+      .then((u) => { if (attivo) setAutoreCorrente(u?.nome || u?.email || null); })
+      .catch((err) => { console.warn('Profilo utente non disponibile:', err); });
+    return () => { attivo = false; };
+  }, []);
 
   // Calcolo Pre-screening Intelligente
   const recommendation = getSmartDocumentRecommendation(voce.n, mod.cat, mod.n);
@@ -203,9 +213,13 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNote.trim()) return;
+    if (!autoreCorrente) {
+      toast.errore("Impossibile identificare l'utente collegato: la nota non è stata aggiunta. Riprova.");
+      return;
+    }
     const entry: NoteEntry = {
       id: `n-${Date.now()}`,
-      autore: 'Avv. Mario Dibenedetto (Advisor)',
+      autore: autoreCorrente,
       data: new Date().toLocaleString('it-IT'),
       testo: newNote,
     };
