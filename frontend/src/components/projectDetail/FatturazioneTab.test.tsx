@@ -118,3 +118,35 @@ describe('F2 — niente righe o conferme fabbricate', () => {
     expect(navigate).toHaveBeenCalled();
   });
 });
+
+describe('2.7 — l’importo ricavato dal modulo si dichiara', () => {
+  const conValore = () => progetto({
+    mods: [{ id: 1, n: 'Modulo A', st: 'in_progress', val: 1000, v: [
+      { id: 11, n: 'Parere', s: 'done', hA: 5 },
+      { id: 12, n: 'Memoria', s: 'done', hA: 2 },
+    ] }],
+  });
+
+  it('accanto alla quota del modulo c’è «ripartito dal modulo», con la spiegazione nel title', () => {
+    apriCompositore(conValore());
+
+    const etichette = screen.getAllByText('ripartito dal modulo');
+    expect(etichette).toHaveLength(2);
+    expect(etichette[0]).toHaveAttribute('title', expect.stringMatching(/diviso per il numero delle sue voci/));
+    expect(screen.getByLabelText('Importo Parere')).toHaveValue(500);
+  });
+
+  it('sparisce quando l’operatore modifica l’importo a mano', () => {
+    apriCompositore(conValore());
+
+    fireEvent.change(screen.getByLabelText('Importo Parere'), { target: { value: '650' } });
+
+    expect(screen.getAllByText('ripartito dal modulo')).toHaveLength(1);
+    expect(screen.getByLabelText('Importo Parere')).toHaveValue(650);
+  });
+
+  it('una voce senza importo non ha l’etichetta: non c’è nulla di ripartito', () => {
+    apriCompositore();
+    expect(screen.queryByText('ripartito dal modulo')).toBeNull();
+  });
+});

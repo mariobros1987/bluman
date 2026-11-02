@@ -19,6 +19,8 @@ export interface VoceFatturabile {
   oreConsuntivate: number;
   /** Imponibile in euro; `null` = importo mancante, da inserire prima di emettere (N3). */
   importo: number | null;
+  /** L'importo è la quota del modulo (valore / numero di voci), non un dato della voce. */
+  ripartitoDaModulo?: boolean;
   selezionato: boolean;
   giaFatturata?: boolean;
   dettaglioFattura?: {
@@ -104,6 +106,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           stato: st,
           oreConsuntivate: ore,
           importo: imp,
+          ripartitoDaModulo: imp !== null,
           giaFatturata,
           dettaglioFattura,
           // PREVENZIONE DOPPIA FATTURAZIONE: Se è già fatturata, parte SEMPRE deselezionata!
@@ -178,7 +181,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   };
 
   const updateVoceImporto = (key: string, importo: number | null) => {
-    setVociFatturabili(prev => prev.map(v => v.key === key ? { ...v, importo } : v));
+    // Modificato a mano, l'importo non è più la quota ripartita: l'etichetta sparisce.
+    setVociFatturabili(prev => prev.map(v => v.key === key ? { ...v, importo, ripartitoDaModulo: false } : v));
   };
 
   const toggleVoce = (key: string) => {
@@ -697,6 +701,14 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
                                   {v.importo === null && (
                                     <span style={{ fontSize: 10, color: 'var(--pill-amber-fg)', fontWeight: 600 }}>importo mancante</span>
+                                  )}
+                                  {v.ripartitoDaModulo && (
+                                    <span
+                                      style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}
+                                      title={`Valore del modulo «${v.moduloNome}» diviso per il numero delle sue voci: modificalo se la voce vale un importo diverso.`}
+                                    >
+                                      ripartito dal modulo
+                                    </span>
                                   )}
                                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>€</span>
                                   <input
