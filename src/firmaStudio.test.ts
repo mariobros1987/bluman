@@ -30,6 +30,8 @@ const stato = {
   otp: null as any,
   audit: [] as any[],
   upload: [] as string[],
+  /** Simula il guasto della lettura delle firme che fa la copia firmata (N5). */
+  letturaFirmeCopiaFails: false,
   userAdvisor: {
     id: 'usr-advisor',
     tenantId: TENANT_STUDIO,
@@ -120,7 +122,10 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     },
     firmaElettronica: {
       findFirst: async () => stato.firmeCreate[0] || null,
-      findMany: async () => stato.firmeCreate,
+      findMany: async (args: any) => {
+        if (stato.letturaFirmeCopiaFails && args?.select?.sigilloDigest) throw new Error('lettura firme fallita (simulato)');
+        return stato.firmeCreate;
+      },
       create: async (args: any) => {
         stato.firmeCreate.push(args.data);
         return { ...args.data, id: `firma-${Date.now()}` };
@@ -220,6 +225,7 @@ beforeEach(() => {
   stato.audit.length = 0;
   stato.upload.length = 0;
   stato.otp = null;
+  stato.letturaFirmeCopiaFails = false;
   stato.documento = {
     id: DOC_ID,
     tenantId: TENANT_STUDIO,
@@ -306,6 +312,24 @@ describe('🏛️ Firma Studio & Professionista — Route Tests', () => {
     expect(stato.firmeCreate).toHaveLength(1);
     expect(stato.firmeCreate[0].tipoFirma).toBe('studio');
     expect(stato.audit.some((a) => a.azione === 'DOCUMENTO_FIRMATO_STUDIO')).toBe(true);
+  });
+
+  it('se la copia firmata non si genera la firma resta, il guasto va in audit e in risposta (N5)', async () => {
+    stato.letturaFirmeCopiaFails = true;
+    const server = serverConToken(tokenAdvisor());
+    const res = await server.inject({
+      method: 'POST',
+      url: `/documenti/${DOC_ID}/firma-studio`,
+      payload: { modalita: 'grafometrica', firmaGrafometricaPng: GRAFOMETRICA },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().copiaFirmataErrore).toMatch(/lettura firme fallita/);
+    expect(stato.firmeCreate).toHaveLength(1);
+    expect(stato.documentiCreati.some((d) => d.tipo === 'firmato')).toBe(false);
+    const audit = stato.audit.find((a) => a.azione === 'COPIA_FIRMATA_NON_GENERATA');
+    expect(audit?.ruolo).toBe('advisor');
+    expect(audit?.dettagli).toMatch(/lettura firme fallita/);
   });
 
   it('aggiorna lo stato del padre e genera il verbale, come il percorso cliente', async () => {

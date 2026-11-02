@@ -1362,12 +1362,23 @@ export async function registraRotteFirma(server: FastifyInstance): Promise<void>
     documentoTitolo: string;
     ipAddress: string | null;
   }): Promise<EsitoCopiaFirmata | null> {
-    const esito = await generaCopiaFirmata({
-      tenantId: params.tenantId,
-      documentoId: params.documentoId,
-      firma: params.firma,
-      sigilloDigest: params.sigilloDigest,
-    });
+    let esito: EsitoCopiaFirmata | null;
+    try {
+      esito = await generaCopiaFirmata({
+        tenantId: params.tenantId,
+        documentoId: params.documentoId,
+        firma: params.firma,
+        sigilloDigest: params.sigilloDigest,
+      });
+    } catch (err) {
+      // La firma resta valida, ma il guasto della copia resta scritto nel registro.
+      await recordAudit({
+        tenantId: params.tenantId, userId: null, ruolo: null, azione: 'COPIA_FIRMATA_NON_GENERATA',
+        entita: params.documentoId, ipAddress: params.ipAddress,
+        dettagli: `Copia firmata non generata per ${params.firma.signatureId} su "${params.documentoTitolo}": ${(err as Error)?.message ?? String(err)}`,
+      });
+      return null;
+    }
     if (!esito) return null;
     await recordAudit({
       tenantId: params.tenantId,

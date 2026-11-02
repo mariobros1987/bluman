@@ -211,21 +211,33 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
         // l'HMAC che lega documento, firmatario e istante, e il token lo attesta.
         const marcaTemporale = await marcaTemporaleFirma(tenantId, firma);
 
-        // Ricomponi il PDF con la firma dello studio nello slot studio
-        const copiaFirmata = await generaCopiaFirmata({
-          tenantId,
-          documentoId: id,
-          firma: {
-            signatureId,
-            firmatarioNome,
-            firmatoAt: firma.firmatoAt,
-            valoreLegale,
-            firmaGrafometricaPng: grafometrica,
-          },
-          sigilloDigest,
-          slot: 'studio',
-          userId: req.userId,
-        });
+        // Ricomponi il PDF con la firma dello studio nello slot studio. Se fallisce la firma
+        // resta valida: il guasto va nell'audit e la risposta lo dichiara.
+        let copiaFirmata: Awaited<ReturnType<typeof generaCopiaFirmata>> = null;
+        let erroreCopia: string | null = null;
+        try {
+          copiaFirmata = await generaCopiaFirmata({
+            tenantId,
+            documentoId: id,
+            firma: {
+              signatureId,
+              firmatarioNome,
+              firmatoAt: firma.firmatoAt,
+              valoreLegale,
+              firmaGrafometricaPng: grafometrica,
+            },
+            sigilloDigest,
+            slot: 'studio',
+            userId: req.userId,
+          });
+        } catch (err) {
+          erroreCopia = (err as Error)?.message ?? String(err);
+          await recordAudit({
+            tenantId, userId: req.userId, userEmail: utente?.email, ruolo: req.ruolo,
+            azione: 'COPIA_FIRMATA_NON_GENERATA', entita: id, ipAddress: ipReale(req),
+            dettagli: `Copia firmata non generata per ${signatureId} su «${docTitolo}»: ${erroreCopia}`,
+          });
+        }
 
         if (copiaFirmata) {
           await prisma.firmaElettronica.update({
@@ -272,6 +284,7 @@ export async function registraRotteDocumentiFirmaStudio(server: FastifyInstance)
           },
           marcaTemporale,
           fileFirmatoUrl: copiaFirmata?.url ?? doc.fileUrl,
+          ...(erroreCopia ? { copiaFirmataErrore: `Copia firmata non generata: ${erroreCopia}` } : {}),
         });
       }
 

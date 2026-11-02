@@ -11,7 +11,8 @@
  * 3. l'archiviazione: `generaCopiaFirmata` crea una riga NUOVA (`tipo='firmato'`,
  *    `documentoPadreId` → originale) e non tocca il file su cui è fissato l'hash del sigillo;
  * 4. i casi in cui la copia NON si fa e non deve sollevare: documento generato prima di §36,
- *    template senza segnaposto, upload dello storage fallito.
+ *    template senza segnaposto; e quelli in cui un guasto (storage, lettura delle firme,
+ *    ricerca della copia esistente) solleva perché il chiamante lo scriva nell'audit.
  *
  * Prisma e storage sono mockati come in `generazioneDocumenti.test.ts`: i byte del PDF
  * restano nel registro così i test possono leggere dentro il file davvero generato.
@@ -25,19 +26,29 @@ const stato = {
   upload: [] as { filename: string; buffer: Buffer }[],
   creati: [] as any[],
   uploadFails: false,
+  firmeFails: false,
+  ricercaCopiaFails: false,
 };
 
 vi.mock('./util/prismaClient.js', async importOriginal => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
   const finto: any = {
     documento: {
-      findFirst: async () => stato.documento,
+      findFirst: async (args: any) => {
+        if (args?.where?.tipo === 'firmato' && stato.ricercaCopiaFails) throw new Error('db non raggiungibile (simulato)');
+        return stato.documento;
+      },
       create: async (args: any) => {
         stato.creati.push(args.data);
         return { ...args.data, id: 'doc-firmato-1' };
       },
     },
-    firmaElettronica: { findMany: async () => stato.firmeDb },
+    firmaElettronica: {
+      findMany: async () => {
+        if (stato.firmeFails) throw new Error('lettura firme fallita (simulato)');
+        return stato.firmeDb;
+      },
+    },
     auditLog: { create: async () => ({}) },
   };
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
@@ -114,6 +125,8 @@ beforeEach(() => {
   stato.upload.length = 0;
   stato.creati.length = 0;
   stato.uploadFails = false;
+  stato.firmeFails = false;
+  stato.ricercaCopiaFails = false;
 });
 
 // ---------------------------------------------------------------------------
@@ -364,16 +377,46 @@ describe('generaCopiaFirmata', () => {
     expect(stato.creati).toHaveLength(0);
   });
 
-  it('se lo storage cade la firma resta valida: ritorna null e non solleva', async () => {
+  it('se lo storage cade, l’errore risale al chiamante e nessuna copia è archiviata', async () => {
     stato.documento = originaleConBlocchi();
     stato.uploadFails = true;
-    const esito = await generaCopiaFirmata({
-      tenantId: TENANT,
-      documentoId: 'doc-orig-1',
-      firma: firmaFinta(),
-      sigilloDigest: 'e'.repeat(64),
-    });
-    expect(esito).toBeNull();
+    await expect(
+      generaCopiaFirmata({
+        tenantId: TENANT,
+        documentoId: 'doc-orig-1',
+        firma: firmaFinta(),
+        sigilloDigest: 'e'.repeat(64),
+      }),
+    ).rejects.toThrow(/storage non raggiungibile/);
+    expect(stato.creati).toHaveLength(0);
+  });
+
+  it('se le firme già apposte non si leggono non esce una copia senza la controparte (N5)', async () => {
+    stato.documento = originaleConBlocchi();
+    stato.firmeFails = true;
+    await expect(
+      generaCopiaFirmata({
+        tenantId: TENANT,
+        documentoId: 'doc-orig-1',
+        firma: firmaFinta(),
+        sigilloDigest: 'e'.repeat(64),
+      }),
+    ).rejects.toThrow(/lettura firme fallita/);
+    expect(stato.upload).toHaveLength(0);
+    expect(stato.creati).toHaveLength(0);
+  });
+
+  it('se la ricerca della copia esistente fallisce non ne crea una seconda (N5)', async () => {
+    stato.documento = originaleConBlocchi();
+    stato.ricercaCopiaFails = true;
+    await expect(
+      generaCopiaFirmata({
+        tenantId: TENANT,
+        documentoId: 'doc-orig-1',
+        firma: firmaFinta(),
+        sigilloDigest: 'e'.repeat(64),
+      }),
+    ).rejects.toThrow(/db non raggiungibile/);
     expect(stato.creati).toHaveLength(0);
   });
 

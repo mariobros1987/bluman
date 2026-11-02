@@ -119,11 +119,11 @@ export interface EsitoCopiaFirmata {
  * - non ha i blocchi salvati, perché è stato generato prima di §36 o caricato a mano come
  *   allegato: non esiste nulla da ricomporre e l'originale resta l'unico file;
  * - il suo template non prevede `{{firma_cliente}}`: senza slot la copia sarebbe identica
- *   all'originale con quattro righe in fondo, cioè un doppione inutile nel fascicolo;
- * - qualcosa fallisce (storage, PDF, database).
+ *   all'originale con quattro righe in fondo, cioè un doppione inutile nel fascicolo.
  *
- * Chi chiama registra l'audit: qui non si scrive nel registro perché il servizio non conosce
- * l'IP della richiesta né il contesto della rotta.
+ * Se invece qualcosa fallisce (lettura delle firme, storage, PDF, database) l'errore si logga
+ * e si SOLLEVA: chi chiama lo registra nell'audit, la firma resta valida, la copia non esce.
+ * Qui non si scrive nel registro perché il servizio non conosce l'IP della richiesta.
  */
 export async function generaCopiaFirmata(params: {
   tenantId: string;
@@ -166,26 +166,25 @@ export async function generaCopiaFirmata(params: {
     // Recupera eventuali altre firme già apposte sul documento (es. controfirma). Il select è
     // esplicito: sono esattamente le colonne che servono a ricomporre la riga della controparte,
     // e leggerle per nome evita che una colonna rinominata torni `undefined` in silenzio.
+    // Nessun ripiego su lista vuota: una copia senza la firma della controparte sarebbe falsa.
     let firmeDb: any[] = [];
-    try {
-      if (prisma.firmaElettronica?.findMany) {
-        firmeDb = await prisma.firmaElettronica.findMany({
-          where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
-          select: {
-            parte: true,
-            signatureId: true,
-            firmatarioNome: true,
-            firmatarioRuolo: true,
-            valoreLegale: true,
-            standard: true,
-            firmatoAt: true,
-            firmaGrafometricaPng: true,
-            sigilloDigest: true,
-          },
-          orderBy: { firmatoAt: 'desc' },
-        });
-      }
-    } catch {}
+    if (prisma.firmaElettronica?.findMany) {
+      firmeDb = await prisma.firmaElettronica.findMany({
+        where: { tenantId, ambito: 'documento_vault', riferimentoId: documentoId },
+        select: {
+          parte: true,
+          signatureId: true,
+          firmatarioNome: true,
+          firmatarioRuolo: true,
+          valoreLegale: true,
+          standard: true,
+          firmatoAt: true,
+          firmaGrafometricaPng: true,
+          sigilloDigest: true,
+        },
+        orderBy: { firmatoAt: 'desc' },
+      });
+    }
 
     const firmeDaApporre: { cliente?: any; studio?: any } = {};
 
@@ -284,18 +283,17 @@ export async function generaCopiaFirmata(params: {
     const nome = nomeCopia(nomeFileDaUrl(originale.fileUrl), firma.signatureId);
     const caricato = await uploadDocumento(nome, pdf.toString('base64'), tenantId);
 
-    // Verifica se esiste già una copia firmata da aggiornare
+    // Verifica se esiste già una copia firmata da aggiornare. Se la ricerca fallisce si
+    // solleva: crearne una seconda al posto dell'aggiornamento duplicherebbe il fascicolo.
     let copiaEsistente: any = null;
-    try {
-      if (prisma.documento?.findFirst) {
-        const trovata = await prisma.documento.findFirst({
-          where: { tenantId, documentoPadreId: originale.id, tipo: 'firmato' },
-        });
-        if (trovata && trovata.id !== originale.id && trovata.tipo === 'firmato') {
-          copiaEsistente = trovata;
-        }
+    if (prisma.documento?.findFirst) {
+      const trovata = await prisma.documento.findFirst({
+        where: { tenantId, documentoPadreId: originale.id, tipo: 'firmato' },
+      });
+      if (trovata && trovata.id !== originale.id && trovata.tipo === 'firmato') {
+        copiaEsistente = trovata;
       }
-    } catch {}
+    }
 
     let copia: any;
     if (copiaEsistente && prisma.documento?.update) {
@@ -332,6 +330,6 @@ export async function generaCopiaFirmata(params: {
     return { documentoId: copia.id, url: caricato.url, nome };
   } catch (err) {
     console.error('Copia firmata non generata: la firma resta valida', firma.signatureId, err);
-    return null;
+    throw err;
   }
 }
