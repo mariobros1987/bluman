@@ -39,6 +39,7 @@ import {
   DipendenzaCiclicaError,
 } from '../appErrors.js';
 import { trovaCicloDipendenze } from '../../services/dipendenzeModuli.js';
+import { intervalloAnnoSolare } from '../../services/fatturaEngine.js';
 
 /**
  * Notifica di avvio progetto (§10, §22) — righe Notifica in-app per gli operatori
@@ -757,8 +758,10 @@ export class PrismaApp implements AppPort {
 
     const dataEmissione = new Date();
     const anno = dataEmissione.getFullYear();
+    // A7 — la numerazione riparte ogni anno solare, come in `contabilitaFatture.ts`: senza il filtro
+    // sull'anno la prima FT di gennaio prendeva il progressivo successivo all'ultima di dicembre.
     const lastFattura = await this.prisma.fattura.findFirst({
-      where: { tenantId: this.tenantId, serie: 'FT', stato: { not: 'bozza' } },
+      where: { tenantId: this.tenantId, serie: 'FT', stato: { not: 'bozza' }, data: intervalloAnnoSolare(dataEmissione) },
       orderBy: { numeroProgressivoSerie: 'desc' },
     });
     const nextProgressivo = (lastFattura?.numeroProgressivoSerie || 0) + 1;

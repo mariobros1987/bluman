@@ -133,6 +133,23 @@ describe('l\'aliquota viene dal regime del cliente, non da un 22 fisso', () => {
   });
 });
 
+describe('A7 — il progressivo FT riparte ogni anno solare', () => {
+  it("con la FT n. 5 dell'anno precedente, la prima dell'anno corrente è la n. 1", async () => {
+    const { prisma, catturato } = fintoPrisma(CLIENTE_STANDARD);
+    const annoScorso = new Date().getFullYear() - 1;
+    const emesse = [{ serie: 'FT', stato: 'emessa', numeroProgressivoSerie: 5, data: new Date(annoScorso, 11, 20) }];
+    // Il finto applica davvero il filtro sulla data, se la query lo chiede.
+    prisma.fattura.findFirst = async ({ where }: any) => {
+      const dentro = emesse.filter((f) => !where.data || (f.data >= where.data.gte && f.data < where.data.lt));
+      return dentro.sort((a, b) => b.numeroProgressivoSerie - a.numeroProgressivoSerie)[0] ?? null;
+    };
+    const app = new PrismaApp(prisma, TENANT);
+    await app.emettiFattura(corpo([{ importo: 10000 }]));
+    expect(catturato.creato.numeroProgressivoSerie).toBe(1);
+    expect(catturato.creato.numero).toMatch(new RegExp(`^FT-${annoScorso + 1}/001$`));
+  });
+});
+
 describe('le guardie di emissione: niente fattura sbagliata o vuota', () => {
   it('rifiuta un elenco di righe vuoto invece di bruciare un progressivo FT', async () => {
     const { prisma } = fintoPrisma(CLIENTE_STANDARD);
