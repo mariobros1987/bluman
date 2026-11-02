@@ -172,7 +172,8 @@ export function contestoTagDocumento(entita: {
     },
     progetto: {
       titolo: progetto?.nome || 'Incarico Professionale',
-      importoTotale: valore ? `€ ${Number(valore).toLocaleString('it-IT')},00` : '€ 0,00',
+      // `valoreTotale` è in centesimi (A3): prima si stampava come euro, cento volte tanto.
+      importoTotale: `€ ${(valore / 100).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     },
   };
 }

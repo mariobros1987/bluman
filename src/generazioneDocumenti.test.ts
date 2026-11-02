@@ -181,7 +181,7 @@ function contestoFisso() {
       ubo: 'Anna Verdi',
       referentiJson: { referente: 'Luigi Bianchi' },
     },
-    progetto: { nome: 'Incarico consulenza 2026', valoreTotale: 12500 },
+    progetto: { nome: 'Incarico consulenza 2026', valoreTotale: 1250000 },
     dataOdierna: new Date(2026, 7, 27),
   });
 }
@@ -201,7 +201,7 @@ beforeEach(() => {
     id: 'prog-1',
     clienteId: CLIENTE_ID,
     nome: 'Incarico consulenza 2026',
-    valoreTotale: 12500,
+    valoreTotale: 1250000, // centesimi
     cliente: {
       nome: 'Rossi Spa',
       piva: 'IT09876543210',
