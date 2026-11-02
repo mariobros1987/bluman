@@ -3,6 +3,7 @@ import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '..
 import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
+import { oggi } from '../utils/calendarioDate';
 
 export function PaymentsPage() {
   const toast = useToast();
@@ -16,6 +17,8 @@ export function PaymentsPage() {
   // Modal Registrazione Incasso Prima Nota
   const [selectedScadenza, setSelectedScadenza] = useState<any>(null);
   const [importoIncasso, setImportoIncasso] = useState('');
+  // 2.2 — la data in cui il denaro è arrivato (AAAA-MM-GG), non quella in cui la si registra.
+  const [dataIncasso, setDataIncasso] = useState(oggi());
   const [metodoPagamento, setMetodoPagamento] = useState('bonifico');
   const [riferimentoTransazione, setRiferimentoTransazione] = useState('');
   const [noteOperatore, setNoteOperatore] = useState('');
@@ -61,6 +64,10 @@ export function PaymentsPage() {
   const handleSaveIncasso = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedScadenza || !importoIncasso) return;
+    if (!dataIncasso || dataIncasso > oggi()) {
+      toast.errore("Indica la data dell'incasso: oggi o un giorno passato, mai futura.");
+      return;
+    }
     setSavingIncasso(true);
     const importoCentesimi = Math.round(parseFloat(importoIncasso) * 100);
 
@@ -69,6 +76,7 @@ export function PaymentsPage() {
     try {
       const res = await registraIncassoApi(selectedScadenza.id, {
         importoIncassatoCentesimi: importoCentesimi,
+        dataIncasso,
         metodoPagamento,
         riferimentoTransazione,
         noteOperatore,
@@ -225,6 +233,7 @@ export function PaymentsPage() {
                               onClick={() => {
                                 setSelectedScadenza(scad);
                                 setImportoIncasso(importoRata.toString());
+                                setDataIncasso(oggi());
                               }}
                               style={{ background: 'var(--indigo)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
                             >
@@ -262,6 +271,19 @@ export function PaymentsPage() {
                 required
                 value={importoIncasso}
                 onChange={(e) => setImportoIncasso(e.target.value)}
+                style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label htmlFor="data-incasso" style={{ display: 'block', fontSize: 12, marginBottom: 4, fontWeight: 600 }}>Data dell'incasso *</label>
+              <input
+                id="data-incasso"
+                type="date"
+                required
+                max={oggi()}
+                value={dataIncasso}
+                onChange={(e) => setDataIncasso(e.target.value)}
                 style={{ width: '100%', padding: '8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
               />
             </div>

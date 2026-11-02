@@ -111,7 +111,8 @@ export async function fetchScadenzarioIncassiApi(
   );
 }
 
-export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
+/** `dataIncasso` è il giorno dell'incasso (AAAA-MM-GG); senza, il server usa oggi. */
+export async function registraIncassoApi(scadenzaId: string, input: { importoIncassatoCentesimi: number; dataIncasso?: string; metodoPagamento?: string; riferimentoTransazione?: string; noteOperatore?: string }) {
   const res = await apiFetch(`${API_BASE}/invoices/scadenze/${scadenzaId}/incassi`, {
     method: 'POST',
     headers: getAuthHeaders(),
