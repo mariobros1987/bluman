@@ -785,22 +785,24 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       // scaffolding: i documenti prodotti dai passaggi restano nel fascicolo
       // (microvoce_progetto_id → NULL via ON DELETE SET NULL), le checklist cascano a DB.
       try {
-        await prisma.$transaction(async (tx) => {
-          const microvoceIds = modulo.microvoci.map((mv) => mv.id);
-          await tx.accessoRisorsa.deleteMany({
-            where: {
-              OR: [{ moduloProgettoId: moduloId }, ...(microvoceIds.length ? [{ microvoceProgettoId: { in: microvoceIds } }] : [])],
-            },
-          });
-          if (microvoceIds.length) {
-            await tx.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: { in: microvoceIds } } });
-            await tx.microvoceProgetto.deleteMany({ where: { id: { in: microvoceIds } } });
-          }
-          await tx.moduloProgettoDipendenza.deleteMany({
-            where: { OR: [{ moduloProgettoId: moduloId }, { dipendeDaModuloProgettoId: moduloId }] },
-          });
-          await tx.moduloProgetto.delete({ where: { id: moduloId } });
-        });
+        await prisma.$transaction(async (tx) =>
+          conContestoInTransazione(tx, async () => {
+            const microvoceIds = modulo.microvoci.map((mv) => mv.id);
+            await tx.accessoRisorsa.deleteMany({
+              where: {
+                OR: [{ moduloProgettoId: moduloId }, ...(microvoceIds.length ? [{ microvoceProgettoId: { in: microvoceIds } }] : [])],
+              },
+            });
+            if (microvoceIds.length) {
+              await tx.passaggioProgetto.deleteMany({ where: { microvoceProgettoId: { in: microvoceIds } } });
+              await tx.microvoceProgetto.deleteMany({ where: { id: { in: microvoceIds } } });
+            }
+            await tx.moduloProgettoDipendenza.deleteMany({
+              where: { OR: [{ moduloProgettoId: moduloId }, { dipendeDaModuloProgettoId: moduloId }] },
+            });
+            await tx.moduloProgetto.delete({ where: { id: moduloId } });
+          }),
+        );
       } catch (err) {
         req.log.error(err, 'Errore eliminazione modulo');
         return reply.code(500).send({ errore: err instanceof Error ? err.message : 'Errore eliminazione modulo' });

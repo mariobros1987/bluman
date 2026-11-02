@@ -94,6 +94,8 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     },
     // La transazione interattiva del delete modulo esegue il callback sullo stesso client.
     $transaction: async (fn: any) => (typeof fn === 'function' ? fn(finto) : fn),
+    // Serve a `conContestoInTransazione` (eliminazione modulo, A10).
+    $executeRaw: async () => 1,
   };
 
   return { ...reale, prisma: finto, prismaAmministrativo: () => finto };
