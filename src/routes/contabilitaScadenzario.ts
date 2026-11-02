@@ -13,6 +13,11 @@ import { recordAudit } from '../util/serverHelpers.js';
 import { RegistraIncassoSchema } from '../schemas/contabilita.schema.js';
 import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 
+/** Il giorno di calendario a Roma come `AAAA-MM-GG`: confrontabile come stringa. */
+function giornoARoma(data: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(data);
+}
+
 export async function registraRotteContabilitaScadenzario(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── SCADENZARIO & REGISTRAZIONE INCASSI CON PRIMA NOTA AUTOMATICA ──
   server.get<{ Querystring: { dataDa?: string; dataA?: string } }>('/invoices/scadenzario', async (req, reply) => {
@@ -61,6 +66,15 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
       return reply.code(400).send({ errore: parseResult.error.issues[0]?.message || 'Dati incasso non validi' });
     }
     const { importoIncassatoCentesimi, metodoPagamento, riferimentoTransazione, contoBancarioId, noteOperatore } = parseResult.data;
+    // A4 — la data dell'incasso arrivava validata e poi si perdeva: registrazione e movimento
+    // prendevano la data del server. Ora entrambi usano quella indicata (default oggi), mai futura.
+    const dataIncasso = parseResult.data.dataIncasso ?? new Date();
+    if (Number.isNaN(dataIncasso.getTime())) {
+      return reply.code(400).send({ errore: "Data dell'incasso non valida" });
+    }
+    if (giornoARoma(dataIncasso) > giornoARoma(new Date())) {
+      return reply.code(400).send({ errore: "La data dell'incasso non può essere futura" });
+    }
 
     try {
       // L'incasso è UNA sola operazione contabile: registrazione, stato della
@@ -116,6 +130,7 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                   scadenzaIncassoId: id,
                   fatturaId: scadenza.fatturaId,
                   importoIncassatoCentesimi,
+                  dataIncasso,
                   metodoPagamento: metodoPagamento || 'bonifico',
                   riferimentoTransazione,
                   noteOperatore,
@@ -165,6 +180,7 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                   contoBancarioId: contoIncasso,
                   fatturaId: scadenza.fatturaId,
                   clienteId: scadenza.fattura.clienteId,
+                  data: dataIncasso,
                   tipo: 'entrata',
                   categoria: 'incasso_fattura',
                   descrizione: `Incasso rata #${scadenza.numeroRata} fattura ${scadenza.fattura.numero || scadenza.fatturaId}`,

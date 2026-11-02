@@ -11,8 +11,9 @@
 // entrambi. Questi test la seguono nei quattro casi che si presentano davvero.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { creaMovimento, aggiornaSaldo, trovaPredefinito } = vi.hoisted(() => ({
+const { creaMovimento, aggiornaSaldo, trovaPredefinito, creaRegistrazione } = vi.hoisted(() => ({
   creaMovimento: vi.fn(async (args: any) => ({ id: 'mv-1', ...args.data })),
+  creaRegistrazione: vi.fn(async (args: any) => ({ id: 'reg-1', ...args.data })),
   aggiornaSaldo: vi.fn(async () => ({})),
   trovaPredefinito: vi.fn(async () => ({ id: 'c-predefinito' })),
 }));
@@ -64,7 +65,7 @@ vi.mock('./util/prismaClient.js', () => {
           : [],
       update: async () => ({}),
     },
-    registrazioneIncasso: { create: async (args: any) => ({ id: 'reg-1', ...args.data }) },
+    registrazioneIncasso: { create: creaRegistrazione },
     fattura: { update: async () => ({}) },
     movimentoPrimaNota: { create: creaMovimento },
     contoBancario: { findFirst: trovaPredefinito, update: aggiornaSaldo },
@@ -168,5 +169,44 @@ describe('POST /invoices/scadenze/:id/incassi — il movimento e il saldo nomina
     expect(res.statusCode).toBe(201);
     expect(creaMovimento.mock.calls[0]![0].data.contoBancarioId).toBeNull();
     expect(aggiornaSaldo).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /invoices/scadenze/:id/incassi — la data dell’incasso è quella indicata (A4)', () => {
+  beforeEach(() => {
+    creaMovimento.mockClear();
+    creaRegistrazione.mockClear();
+    db.contoAccreditoFattura = null;
+    db.statoScadenza = 'in_attesa';
+  });
+
+  it('un incasso del mese scorso porta quella data su registrazione e movimento', async () => {
+    const oggi = new Date();
+    const meseScorso = new Date(Date.UTC(oggi.getUTCFullYear(), oggi.getUTCMonth() - 1, 10, 10));
+
+    const res = await incassa({ dataIncasso: meseScorso.toISOString() });
+
+    expect(res.statusCode).toBe(201);
+    expect(creaRegistrazione.mock.calls[0]![0].data.dataIncasso).toEqual(meseScorso);
+    expect(creaMovimento.mock.calls[0]![0].data.data).toEqual(meseScorso);
+  });
+
+  it('senza data, registrazione e movimento portano la stessa data di oggi', async () => {
+    const res = await incassa({});
+
+    expect(res.statusCode).toBe(201);
+    const dataRegistrazione: Date = creaRegistrazione.mock.calls[0]![0].data.dataIncasso;
+    expect(dataRegistrazione).toBeInstanceOf(Date);
+    expect(creaMovimento.mock.calls[0]![0].data.data).toEqual(dataRegistrazione);
+  });
+
+  it('una data futura → 400, niente registrazione né movimento', async () => {
+    const dopodomani = new Date(Date.now() + 2 * 86_400_000);
+
+    const res = await incassa({ dataIncasso: dopodomani.toISOString() });
+
+    expect(res.statusCode).toBe(400);
+    expect(creaRegistrazione).not.toHaveBeenCalled();
+    expect(creaMovimento).not.toHaveBeenCalled();
   });
 });
