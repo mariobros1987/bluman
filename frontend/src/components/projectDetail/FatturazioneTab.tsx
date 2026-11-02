@@ -17,7 +17,8 @@ export interface VoceFatturabile {
   titolo: string;
   stato: string; // 'done' | 'in_progress' | 'pending'
   oreConsuntivate: number;
-  importo: number;
+  /** Imponibile in euro; `null` = importo mancante, da inserire prima di emettere (N3). */
+  importo: number | null;
   selezionato: boolean;
   giaFatturata?: boolean;
   dettaglioFattura?: {
@@ -25,6 +26,16 @@ export interface VoceFatturabile {
     data?: string;
     importo?: number;
   };
+}
+
+/**
+ * La quota del valore del modulo per ciascuna delle sue voci, oppure `null` se il modulo non ha un
+ * valore: un modulo a 0 o senza valore non dà un importo da fatturare, e non se ne inventa uno.
+ */
+function quotaModulo(m: unknown, numVoci: number): number | null {
+  const val = (m as { val?: unknown })?.val;
+  if (typeof val !== 'number' || !(val > 0)) return null;
+  return Math.round(val / (numVoci || 1));
 }
 
 // ─── Fatturazione Tab ─────────────────────────────────────────────
@@ -43,8 +54,10 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const [vociFatturabili, setVociFatturabili] = useState<VoceFatturabile[]>([]);
 
-  // Inizializza le voci dai moduli e microvoci del progetto, identificando quelle già fatturate
-  const initVoci = () => {
+  // Le voci dai moduli e microvoci del progetto, identificando quelle già fatturate.
+  // N3 — niente importi di ripiego (400, 120 €/h, 1000): una voce senza valore resta «importo
+  // mancante», non è preselezionata e non si emette finché l'operatore non glielo dà.
+  const costruisciVoci = (): VoceFatturabile[] => {
     const list: VoceFatturabile[] = [];
 
     // Mappa per tracciare tutte le microvoci e moduli già presenti in fatture emesse (escluse annullate)
@@ -68,14 +81,13 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
     (project.mods || []).forEach((m, mIdx) => {
       const numV = (m.v || []).length;
-      const baseVal = (m as any).val ? Math.round((m as any).val / (numV || 1)) : 400;
+      const imp = quotaModulo(m, numV);
       const modNome = m.n || 'Modulo';
 
       (m.v || []).forEach((mv, vIdx) => {
         const anyMv = mv as any;
         const st = anyMv.s || anyMv.st || (anyMv.done ? 'done' : 'pending');
         const ore = anyMv.hA || anyMv.a || 0;
-        const imp = ore > 0 ? ore * 120 : baseVal;
         const tit = mv.n || 'Micro-voce operativa';
 
         // Match su descrizione fattura: `[NomeModulo] TitoloMicrovoce` o `TitoloMicrovoce`
@@ -95,7 +107,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           giaFatturata,
           dettaglioFattura,
           // PREVENZIONE DOPPIA FATTURAZIONE: Se è già fatturata, parte SEMPRE deselezionata!
-          selezionato: !giaFatturata && (st === 'done' || anyMv.done === true),
+          // Senza importo non si preseleziona: si emetterebbe una riga a 0.
+          selezionato: !giaFatturata && imp !== null && (st === 'done' || anyMv.done === true),
         });
       });
 
@@ -113,24 +126,25 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           titolo: modNome,
           stato: m.st || 'pending',
           oreConsuntivate: (m as any).a || 0,
-          importo: (m as any).val || 1000,
+          importo: imp,
           giaFatturata,
           dettaglioFattura,
-          selezionato: !giaFatturata && m.st === 'done',
+          selezionato: !giaFatturata && imp !== null && m.st === 'done',
         });
       }
     });
-    setVociFatturabili(list);
+    return list;
   };
 
   const handleOpenModal = () => {
-    initVoci();
+    setVociFatturabili(costruisciVoci());
     setModalOpen(true);
   };
 
   const vociSelezionate = vociFatturabili.filter(v => v.selezionato);
+  const selezionateSenzaImporto = vociSelezionate.filter(v => v.importo === null);
   // Gli imponibili riga per riga: servono al calcolo dell'IVA **per riga**, come fa il backend.
-  const imponibiliVoci = vociSelezionate.map(v => Number(v.importo) || 0);
+  const imponibiliVoci = vociSelezionate.map(v => v.importo ?? 0);
   const totaleImponibile = imponibiliVoci.reduce((acc, e) => acc + e, 0);
   // L'aliquota e i totali dell'anteprima vengono dalla regola pura in `utils/fatturazione`, la
   // **stessa** che rispecchia il backend (`emettiFattura`): estratta lì per poterla collaudare
@@ -163,7 +177,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
     }));
   };
 
-  const updateVoceImporto = (key: string, importo: number) => {
+  const updateVoceImporto = (key: string, importo: number | null) => {
     setVociFatturabili(prev => prev.map(v => v.key === key ? { ...v, importo } : v));
   };
 
@@ -178,13 +192,17 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       toast.attenzione('Seleziona almeno una micro-voce o modulo da fatturare.');
       return;
     }
+    if (selezionateSenzaImporto.length > 0) {
+      toast.attenzione(`Inserisci l'importo per: ${selezionateSenzaImporto.map(v => v.titolo).join(', ')}.`);
+      return;
+    }
     setSubmitting(true);
     try {
       const effId = rawDbProject?.id || String(project.id);
       const righe = vociSelezionate.map(v => ({
         tipo: 'modulo_completo' as const,
         moduloProgettoId: v.moduloId.startsWith('mod-') ? v.moduloId.replace('mod-', '') : v.moduloId,
-        importo: Math.abs(Number(v.importo)) * 100, // centesimi, imponibile di riga
+        importo: Math.abs(v.importo ?? 0) * 100, // centesimi, imponibile di riga (mai null: controllato sopra)
         descrizione: `[${v.moduloNome}] ${v.titolo}`,
       }));
 
@@ -209,9 +227,14 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const handleApriInDocumentStudio = () => {
     const effId = rawDbProject?.id || String(project.id);
-    const targetRows = vociSelezionate.length > 0 ? vociSelezionate : (vociFatturabili.length > 0 ? vociFatturabili : [
-      { key: 'def-1', moduloId: '1', moduloNome: 'Incarico Professionale', titolo: project.n || 'Prestazioni Professionali', stato: 'done', oreConsuntivate: 0, importo: project.val || 3500, selezionato: true }
-    ]);
+    // F2 — niente riga fabbricata «Incarico Professionale» (con 3500 € di ripiego): si riportano le
+    // voci vere, e se il progetto non ne ha si dice invece di inventarne una.
+    const tutteLeVoci = vociFatturabili.length > 0 ? vociFatturabili : costruisciVoci();
+    const targetRows = vociSelezionate.length > 0 ? vociSelezionate : tutteLeVoci;
+    if (targetRows.length === 0) {
+      toast.attenzione('Il progetto non ha moduli o micro-voci da riportare nella proforma.');
+      return;
+    }
     const targetTotal = vociSelezionate.length > 0 ? totaleImponibile : project.val;
 
     sessionStorage.setItem('bluman_proforma_table_rows', JSON.stringify({
@@ -239,32 +262,30 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   });
 
   let vociDaFatturareCount = 0;
+  let vociDaFatturareSenzaImporto = 0;
   let importoDaFatturareTotale = 0;
+  const contaDaFatturare = (imp: number | null) => {
+    vociDaFatturareCount++;
+    if (imp === null) vociDaFatturareSenzaImporto++;
+    else importoDaFatturareTotale += imp;
+  };
   (project.mods || []).forEach((m, mIdx) => {
     const numV = (m.v || []).length;
-    const baseVal = (m as any).val ? Math.round((m as any).val / (numV || 1)) : 400;
+    const imp = quotaModulo(m, numV);
     const modNome = m.n || 'Modulo';
     (m.v || []).forEach((mv) => {
       const anyMv = mv as any;
       const st = anyMv.s || anyMv.st || (anyMv.done ? 'done' : 'pending');
-      const ore = anyMv.hA || anyMv.a || 0;
-      const imp = ore > 0 ? ore * 120 : baseVal;
       const tit = mv.n || 'Micro-voce operativa';
       const k1 = `[${modNome.trim().toLowerCase()}] ${tit.trim().toLowerCase()}`;
       const k2 = tit.trim().toLowerCase();
       const isFatturata = fatturateDescSet.has(k1) || fatturateDescSet.has(k2);
-      if ((st === 'done' || anyMv.done === true) && !isFatturata) {
-        vociDaFatturareCount++;
-        importoDaFatturareTotale += imp;
-      }
+      if ((st === 'done' || anyMv.done === true) && !isFatturata) contaDaFatturare(imp);
     });
     if (numV === 0 && m.st === 'done') {
       const k1 = `[${modNome.trim().toLowerCase()}] ${modNome.trim().toLowerCase()}`;
       const isFatturata = fatturateDescSet.has(`mod-${m.id || mIdx}`) || fatturateDescSet.has(k1);
-      if (!isFatturata) {
-        vociDaFatturareCount++;
-        importoDaFatturareTotale += (m as any).val || 1000;
-      }
+      if (!isFatturata) contaDaFatturare(imp);
     }
   });
 
@@ -300,12 +321,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               : `🔹 Incassato Effettivo: ${fmt(totFatturato)} / ${fmt(project.val)} (Incasso Parziale)`}
           </div>
         </div>
-        <button
-          onClick={() => toast.successo('Stato Incassi Progetto sincronizzato con lo Scadenzario e Prima Nota')}
-          style={{ background: totFatturato === 0 ? 'var(--pill-slate-bd)' : totFatturato >= project.val ? 'var(--green)' : 'var(--pill-amber-bd)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
-        >
-          💳 Registro Incassi Progetto
-        </button>
+        {/* F2 — qui c'era un pulsante che annunciava «sincronizzato con Scadenzario e Prima Nota»
+            senza chiamare nessuna API: un'operazione mai avvenuta. Tolto. */}
       </div>
 
       {/* Banner Microvoci pronte per la fatturazione */}
@@ -326,6 +343,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
             </div>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginTop: 2 }}>
               {vociDaFatturareCount} voci pronte per un valore stimato di {fmt(importoDaFatturareTotale)}
+              {vociDaFatturareSenzaImporto > 0 && ` · ${vociDaFatturareSenzaImporto} con importo mancante`}
             </div>
             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
               Nessuna duplicazione: il sistema esclude in automatico le microvoci già presenti in fatture emesse.
@@ -352,13 +370,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               <div key={i} className={styles.fatturaRow}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600 }}>{f.desc}</div>
+                  {/* N4 — numero e stato vengono dalla fattura vera: prima il numero era costruito
+                      dall'indice in elenco («FT-2026-00{i+1}») e lo stato era un testo fisso. */}
                   <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-                    Fattura N. <strong>FT-2026-00{i + 1}</strong> · Canale: <strong>SDI (invio manuale)</strong> · Stato: <span style={{ color: 'var(--indigo-l)' }}>Emessa · pronta per invio</span>
+                    Fattura N. <strong>{f.numero || 'numero non disponibile'}</strong>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <button
-                    onClick={() => setPreviewFattura({ ...f, numero: `FT-2026-00${i + 1}` })}
+                    onClick={() => setPreviewFattura(f)}
                     className="btn btn-secondary btn-sm"
                   >
                     🖨 Anteprima PDF / Stampa
@@ -426,7 +446,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               })()}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--indigo-d)' }}>Anteprima fattura — riepilogo</div>
-                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{previewFattura.numero || 'Numero non disponibile'}</div>
                 <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>Il PDF ufficiale (pulsante in basso) riporta ogni voce con i dati fiscali reali.</div>
               </div>
             </div>
@@ -493,7 +513,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                     toast.attenzione('Questa fattura non è ancora salvata a database: emettila prima di scaricarne il PDF.');
                     return;
                   }
-                  await downloadFatturaPdfServerApi(idFattura, previewFattura.numero);
+                  await downloadFatturaPdfServerApi(idFattura, previewFattura.numero || undefined);
                 }}
                 className="btn btn-primary"
               >
@@ -675,11 +695,15 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                 </div>
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+                                  {v.importo === null && (
+                                    <span style={{ fontSize: 10, color: 'var(--pill-amber-fg)', fontWeight: 600 }}>importo mancante</span>
+                                  )}
                                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>€</span>
                                   <input
                                     type="number"
-                                    value={v.importo}
-                                    onChange={e => updateVoceImporto(v.key, Number(e.target.value))}
+                                    aria-label={`Importo ${v.titolo}`}
+                                    value={v.importo ?? ''}
+                                    onChange={e => updateVoceImporto(v.key, e.target.value === '' ? null : Number(e.target.value))}
                                     disabled={!v.selezionato}
                                     style={{
                                       width: 85,
