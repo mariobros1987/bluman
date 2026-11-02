@@ -3,6 +3,14 @@
  * Supporta: TD01 (Fattura), TD04 (Nota di Credito), Ritenuta, Cassa Previdenziale, Bollo e Pagamento.
  */
 
+/** Un blocco DatiCassaPrevidenziale per una combinazione aliquota/natura delle righe soggette a cassa. */
+export interface CassaPerAliquotaSdi {
+  imponibileCassa: number;
+  importoContributoCassa: number;
+  aliquotaIvaCassa: number;
+  naturaCassa: string | null;
+}
+
 export interface DatiFatturaSdiXml {
   idTrasmittentePaese?: string;
   idTrasmittenteCodice?: string;
@@ -46,6 +54,8 @@ export interface DatiFatturaSdiXml {
   aliquotaIvaCassa?: number;
   /** Natura (N1…N7) della cassa quando la sua aliquota IVA è 0: SdI la richiede in quel caso. */
   naturaCassa?: string | null;
+  /** A5 — righe soggette a cassa con aliquote/nature diverse: un blocco per combinazione. */
+  cassaPerAliquota?: CassaPerAliquotaSdi[];
 
   // Dati Ritenuta
   tipoRitenuta?: 'RT01' | 'RT02'; // RT01 persone fisiche, RT02 persone giuridiche
@@ -219,7 +229,20 @@ export function generaFatturaElettronicaXml(dati: DatiFatturaSdiXml): string {
   }
 
   // Cassa Previdenziale
-  if (dati.importoContributoCassa && dati.importoContributoCassa > 0) {
+  if (dati.importoContributoCassa && dati.importoContributoCassa > 0 && (dati.cassaPerAliquota?.length ?? 0) > 1) {
+    for (const g of dati.cassaPerAliquota!) {
+      xmlParts.push(
+        `        <DatiCassaPrevidenziale>`,
+        `          <TipoCassa>${dati.tipoCassa || 'TC22'}</TipoCassa>`,
+        `          <AlCassa>${(dati.aliquotaCassa ?? 4).toFixed(2)}</AlCassa>`,
+        `          <ImportoContributoCassa>${g.importoContributoCassa.toFixed(2)}</ImportoContributoCassa>`,
+        `          <ImponibileCassa>${g.imponibileCassa.toFixed(2)}</ImponibileCassa>`,
+        `          <AliquotaIVA>${g.aliquotaIvaCassa.toFixed(2)}</AliquotaIVA>`,
+        ...(g.naturaCassa ? [`          <Natura>${g.naturaCassa}</Natura>`] : []),
+        `        </DatiCassaPrevidenziale>`
+      );
+    }
+  } else if (dati.importoContributoCassa && dati.importoContributoCassa > 0) {
     xmlParts.push(
       `        <DatiCassaPrevidenziale>`,
       `          <TipoCassa>${dati.tipoCassa || 'TC22'}</TipoCassa>`,

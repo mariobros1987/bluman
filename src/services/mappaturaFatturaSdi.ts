@@ -21,7 +21,7 @@
  * la specifica FatturaPA 1.2: una `DatiRiepilogo` per ogni combinazione presente.
  */
 
-import type { DatiFatturaSdiXml } from './sdiXmlGenerator.js';
+import type { CassaPerAliquotaSdi, DatiFatturaSdiXml } from './sdiXmlGenerator.js';
 
 /** Solo i campi delle righe che servono al riepilogo e al dettaglio linee. */
 export interface RigaFatturaPerSdi {
@@ -55,6 +55,46 @@ export function ivaCassaDaRighe(righe: RigaFatturaPerSdi[]): { aliquotaIvaCassa?
   if (combinazioni.size !== 1) return {};
   const [unica] = [...combinazioni.values()];
   return { aliquotaIvaCassa: unica!.aliquota, naturaCassa: unica!.natura };
+}
+
+/**
+ * A5 — cassa su righe con aliquote/nature diverse: un blocco DatiCassaPrevidenziale per
+ * combinazione, con imponibile e contributo ripartiti in proporzione all'imponibile del gruppo
+ * (come `fatturaEngine` ripartisce la cassa sulle righe). L'ultimo gruppo prende il resto
+ * dell'arrotondamento, così i contributi sommano il totale cassa. Con una sola combinazione
+ * (o nessun imponibile) restituisce `undefined`: vale il blocco unico di sempre.
+ */
+export function ripartizioneCassaDaRighe(
+  righe: RigaFatturaPerSdi[],
+  totaleCassaCentesimi: number,
+): CassaPerAliquotaSdi[] | undefined {
+  const gruppi = new Map<string, { aliquota: number; natura: string | null; imponibileCent: number }>();
+  for (const r of righe) {
+    if (r.applicaCassa === false) continue;
+    const aliquota = r.aliquotaIva ?? 0;
+    const natura = aliquota === 0 ? r.naturaEsenzione || null : null;
+    const chiave = `${aliquota}|${natura ?? ''}`;
+    const g = gruppi.get(chiave) ?? { aliquota, natura, imponibileCent: 0 };
+    g.imponibileCent += r.imponibileCentesimi ?? r.importo ?? 0;
+    gruppi.set(chiave, g);
+  }
+  const elenco = [...gruppi.values()];
+  const imponibileTotale = elenco.reduce((acc, g) => acc + g.imponibileCent, 0);
+  if (elenco.length < 2 || imponibileTotale <= 0) return undefined;
+
+  let assegnato = 0;
+  return elenco.map((g, i) => {
+    const contributo = i === elenco.length - 1
+      ? totaleCassaCentesimi - assegnato
+      : Math.round(totaleCassaCentesimi * (g.imponibileCent / imponibileTotale));
+    assegnato += contributo;
+    return {
+      imponibileCassa: g.imponibileCent / 100,
+      importoContributoCassa: contributo / 100,
+      aliquotaIvaCassa: g.aliquota,
+      naturaCassa: g.natura,
+    };
+  });
 }
 
 export interface FatturaPerSdi {
@@ -203,6 +243,9 @@ export function costruisciDatiFatturaSdi(input: {
     importoContributoCassa: fattura.totaleCassaCentesimi ? fattura.totaleCassaCentesimi / 100 : undefined,
     // A5 — prima nessuno la passava e il generatore scriveva 22 anche su una cassa esente.
     ...ivaCassaDaRighe(righeOrdinate),
+    cassaPerAliquota: fattura.totaleCassaCentesimi
+      ? ripartizioneCassaDaRighe(righeOrdinate, fattura.totaleCassaCentesimi)
+      : undefined,
     tipoRitenuta: 'RT01',
     importoRitenuta: fattura.totaleRitenutaCentesimi ? fattura.totaleRitenutaCentesimi / 100 : undefined,
     aliquotaRitenuta: fattura.aliquotaRitenuta ?? undefined,
