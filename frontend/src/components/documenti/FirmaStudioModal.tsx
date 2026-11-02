@@ -1,6 +1,7 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { firmaStudioDocumentoApi, richiediOtpStudioApi, type FirmaStudioPayload, type DocumentoProgetto } from '../../api/documenti';
 import { SmoothStrokeTracker, getCanvasCoordinates } from '../../utils/smoothSignature';
+import { toast } from '../ui/ToastProvider';
 
 interface FirmaStudioModalProps {
   doc: DocumentoProgetto;
@@ -183,6 +184,12 @@ export function FirmaStudioModal({ doc, onClose, onSigned }: FirmaStudioModalPro
 
       const res = await firmaStudioDocumentoApi(doc.id, payload);
       if (res.ok) {
+        // 3.11 — la firma è valida anche senza copia firmata: lo si dice, senza annullarla.
+        // Il server antepone «Copia firmata non generata:» al motivo; qui serve solo il motivo.
+        if (res.copiaFirmataErrore) {
+          const motivo = res.copiaFirmataErrore.replace(/^Copia firmata non generata:\s*/, '').replace(/\.\s*$/, '');
+          toast.attenzione(`Firma apposta. La copia firmata del PDF non è stata generata: ${motivo}. Riprova la generazione o contatta l'amministratore.`, 0);
+        }
         onSigned({
           ...doc,
           firmato: true,

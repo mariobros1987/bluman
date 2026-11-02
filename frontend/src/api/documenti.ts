@@ -665,7 +665,7 @@ export async function richiediOtpStudioApi(
 export async function firmaStudioDocumentoApi(
   docId: string,
   payload: FirmaStudioPayload,
-): Promise<{ ok: boolean; firma: any; fileFirmatoUrl?: string }> {
+): Promise<{ ok: boolean; firma: any; fileFirmatoUrl?: string; copiaFirmataErrore?: string }> {
   const res = await apiFetch(`${API_BASE}/documenti/${docId}/firma-studio`, {
     method: 'POST',
     headers: getAuthHeaders(),
