@@ -44,6 +44,8 @@ export interface DatiFatturaSdiXml {
   importoContributoCassa?: number;
   imponibileCassa?: number;
   aliquotaIvaCassa?: number;
+  /** Natura (N1…N7) della cassa quando la sua aliquota IVA è 0: SdI la richiede in quel caso. */
+  naturaCassa?: string | null;
 
   // Dati Ritenuta
   tipoRitenuta?: 'RT01' | 'RT02'; // RT01 persone fisiche, RT02 persone giuridiche
@@ -200,7 +202,7 @@ export function generaFatturaElettronicaXml(dati: DatiFatturaSdiXml): string {
       `        <DatiRitenuta>`,
       `          <TipoRitenuta>${dati.tipoRitenuta || 'RT01'}</TipoRitenuta>`,
       `          <ImportoRitenuta>${dati.importoRitenuta.toFixed(2)}</ImportoRitenuta>`,
-      `          <AliquotaRitenuta>${(dati.aliquotaRitenuta || 20).toFixed(2)}</AliquotaRitenuta>`,
+      `          <AliquotaRitenuta>${(dati.aliquotaRitenuta ?? 20).toFixed(2)}</AliquotaRitenuta>`,
       `          <CausalePagamento>${dati.causalePagamentoRitenuta || 'A'}</CausalePagamento>`,
       `        </DatiRitenuta>`
     );
@@ -221,10 +223,12 @@ export function generaFatturaElettronicaXml(dati: DatiFatturaSdiXml): string {
     xmlParts.push(
       `        <DatiCassaPrevidenziale>`,
       `          <TipoCassa>${dati.tipoCassa || 'TC22'}</TipoCassa>`,
-      `          <AlCassa>${(dati.aliquotaCassa || 4).toFixed(2)}</AlCassa>`,
+      `          <AlCassa>${(dati.aliquotaCassa ?? 4).toFixed(2)}</AlCassa>`,
       `          <ImportoContributoCassa>${dati.importoContributoCassa.toFixed(2)}</ImportoContributoCassa>`,
-      `          <ImponibileCassa>${(dati.imponibileCassa || 0).toFixed(2)}</ImponibileCassa>`,
-      `          <AliquotaIVA>${(dati.aliquotaIvaCassa || 22).toFixed(2)}</AliquotaIVA>`,
+      `          <ImponibileCassa>${(dati.imponibileCassa ?? 0).toFixed(2)}</ImponibileCassa>`,
+      // `??`: un'aliquota 0 (cassa su righe esenti) è un valore, non un dato mancante (A5).
+      `          <AliquotaIVA>${(dati.aliquotaIvaCassa ?? 22).toFixed(2)}</AliquotaIVA>`,
+      ...(dati.naturaCassa ? [`          <Natura>${dati.naturaCassa}</Natura>`] : []),
       `        </DatiCassaPrevidenziale>`
     );
   }

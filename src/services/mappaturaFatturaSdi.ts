@@ -34,8 +34,27 @@ export interface RigaFatturaPerSdi {
   ivaCentesimi?: number | null;
   aliquotaIva?: number | null;
   naturaEsenzione?: string | null;
+  applicaCassa?: boolean | null;
   applicaRitenuta?: boolean | null;
   ordine?: number | null;
+}
+
+/**
+ * Aliquota IVA (e natura, se 0) della cassa previdenziale: quella che `fatturaEngine` applica davvero,
+ * cioè l'aliquota delle righe soggette a cassa. Se quelle righe hanno combinazioni diverse, o non ci
+ * sono righe, non c'è un valore unico da dichiarare e si restituisce vuoto.
+ */
+export function ivaCassaDaRighe(righe: RigaFatturaPerSdi[]): { aliquotaIvaCassa?: number; naturaCassa?: string | null } {
+  const combinazioni = new Map<string, { aliquota: number; natura: string | null }>();
+  for (const r of righe) {
+    if (r.applicaCassa === false) continue;
+    const aliquota = r.aliquotaIva ?? 0;
+    const natura = aliquota === 0 ? r.naturaEsenzione || null : null;
+    combinazioni.set(`${aliquota}|${natura ?? ''}`, { aliquota, natura });
+  }
+  if (combinazioni.size !== 1) return {};
+  const [unica] = [...combinazioni.values()];
+  return { aliquotaIvaCassa: unica!.aliquota, naturaCassa: unica!.natura };
 }
 
 export interface FatturaPerSdi {
@@ -180,11 +199,13 @@ export function costruisciDatiFatturaSdi(input: {
     importoTotaleDocumento: (fattura.totaleDocumentoCentesimi || 0) / 100,
 
     tipoCassa: fattura.tipoCassa && fattura.tipoCassa !== 'nessuna' ? 'TC22' : undefined,
-    aliquotaCassa: fattura.aliquotaCassa || undefined,
+    aliquotaCassa: fattura.aliquotaCassa ?? undefined,
     importoContributoCassa: fattura.totaleCassaCentesimi ? fattura.totaleCassaCentesimi / 100 : undefined,
+    // A5 — prima nessuno la passava e il generatore scriveva 22 anche su una cassa esente.
+    ...ivaCassaDaRighe(righeOrdinate),
     tipoRitenuta: 'RT01',
     importoRitenuta: fattura.totaleRitenutaCentesimi ? fattura.totaleRitenutaCentesimi / 100 : undefined,
-    aliquotaRitenuta: fattura.aliquotaRitenuta || undefined,
+    aliquotaRitenuta: fattura.aliquotaRitenuta ?? undefined,
     bolloVirtuale: (fattura.totaleBolloCentesimi || 0) > 0,
     importoBollo: (fattura.totaleBolloCentesimi || 0) / 100,
 
