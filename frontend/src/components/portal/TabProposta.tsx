@@ -100,7 +100,9 @@ export function TabProposta({
   // `dangerouslySetInnerHTML` nel portale cliente, dove il token di sessione vive in localStorage.
   // L'engagement interpola dati di tenant/cliente (nome progetto, ragione sociale digitata dal
   // cliente) senza escape: senza l'allowlist, un markup attivo in quei campi si eseguirebbe qui.
-  const partiProposta = scomponiDocumento(sanitizzaHtmlDocumento(getResolvedEngagementHtml()));
+  // 4.3 — lo stesso HTML sanificato va anche nei download: il PDF passa da innerHTML (pdfA4.ts).
+  const htmlProposta = sanitizzaHtmlDocumento(getResolvedEngagementHtml());
+  const partiProposta = scomponiDocumento(htmlProposta);
 
   /**
    * Il bersaglio della firma del mandato: ambito, titolo **e il progetto**.
@@ -440,7 +442,7 @@ export function TabProposta({
               <button
                 type="button"
                 onClick={async () => {
-                  await downloadRealPdf(`Engagement_Letter_Bozza_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
+                  await downloadRealPdf(`Engagement_Letter_Bozza_${clientName.replace(/\s+/g, '_')}`, htmlProposta);
                 }}
                 style={{
                   background: 'var(--surface-1)',
@@ -705,7 +707,7 @@ export function TabProposta({
                     <button
                       type="button"
                       onClick={async () => {
-                        await downloadRealPdf(`Mandato_${clientName.replace(/\s+/g, '_')}`, getResolvedEngagementHtml());
+                        await downloadRealPdf(`Mandato_${clientName.replace(/\s+/g, '_')}`, htmlProposta);
                       }}
                       style={{ background: 'var(--surface-1)', border: '1px solid var(--indigo-d)', color: 'var(--pill-indigo-fg)', padding: '10px 18px', borderRadius: 8, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
                     >

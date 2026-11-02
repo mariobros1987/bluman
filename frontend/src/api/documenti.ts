@@ -2,6 +2,7 @@ import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { toast } from '../components/ui/ToastProvider';
 import { API_BASE, apiFetch, getAuthHeaders, leggiErroreApi, urlDocumentoAssoluto } from './http';
 import { cachedQuery, invalidateCache } from './cache';
+import { sanitizzaHtmlDocumento } from '../../../src/util/htmlSanitizer';
 import { getCurrentTenantId } from '../utils/tenant';
 export { urlDocumentoAssoluto };
 
@@ -491,7 +492,8 @@ export async function scaricaDocumentoClient(fileUrl?: string | null, nomeFile?:
     const isHtml = textSnippet.includes('<html') || textSnippet.includes('<!DOCTYPE') || textSnippet.includes('<body') || textSnippet.includes('<div') || textSnippet.includes('<p>') || textSnippet.includes('<table');
 
     if (isHtml) {
-      const fullHtml = await blob.text();
+      // 4.3 — un file d'archivio è un dato esterno: sanificato prima di finire in innerHTML.
+      const fullHtml = sanitizzaHtmlDocumento(await blob.text());
       const cleanPdfTitle = (nomeFile || 'Documento').replace(/\.(docx?|html?|txt)$/i, '');
       await downloadRealPdf(cleanPdfTitle, fullHtml);
       return;

@@ -3,6 +3,7 @@ import html2canvas from 'html2canvas';
 import { toast } from '../components/ui/ToastProvider';
 import { A4_MM, A4_PX } from '../../../src/util/paginaA4';
 import { creaPagineA4 } from './pdfA4';
+import { escapeHtmlTesto } from '../../../src/util/htmlSanitizer';
 
 export interface SignatureData {
   signerName: string;
@@ -52,11 +53,11 @@ function htmlFirme(signatures: SignatureData[]): string {
       <div style="display: flex; gap: 14px; flex-wrap: wrap;">
         ${signatures.map(sig => `
           <div style="flex: 1; min-width: 220px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; box-sizing: border-box;">
-            <div style="font-size: 9.5pt; font-weight: 700; color: #0f172a;">${sig.signerRole}: ${sig.signerName}</div>
+            <div style="font-size: 9.5pt; font-weight: 700; color: #0f172a;">${escapeHtmlTesto(sig.signerRole)}: ${escapeHtmlTesto(sig.signerName)}</div>
             <div style="font-size: 9pt; color: #166534; font-weight: 700; margin: 3px 0;">✓ FIRMATO CON OTP VERIFICATA (art. 20 CAD)</div>
             ${sig.signatureImageBase64 ? `<img src="${sig.signatureImageBase64}" style="height: 36px; max-width: 160px; margin: 4px 0; object-fit: contain;" />` : ''}
             <div style="font-size: 8pt; color: #64748b; font-family: monospace; margin-top: 3px; line-height: 1.3;">
-              Data/Ora: ${sig.timestamp}<br/>
+              Data/Ora: ${escapeHtmlTesto(sig.timestamp)}<br/>
               IP: ${sig.ipAddress || 'non registrato'}${sig.signatureId ? `<br/>Sigillo: ${sig.signatureId}` : ''}
               ${sig.sha256Digest ? `<br/>SHA-256: ${sig.sha256Digest}` : ''}
             </div>

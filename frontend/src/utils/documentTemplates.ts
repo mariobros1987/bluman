@@ -1,5 +1,6 @@
 import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from './tenant';
+import { escapeHtmlTesto } from '../../../src/util/htmlSanitizer';
 
 export interface DocumentTemplate {
   id: string;
@@ -820,10 +821,8 @@ export function resolveDocumentTemplateHtml(
   const projTitolo = targetProgetto?.titolo || targetProgetto?.n || targetProgetto?.nome || mancante('titolo del progetto');
   const projImporto = targetProgetto?.totalePreventivo ?? targetProgetto?.val;
 
-  // Sostituzione formale dei tag: NESSUN riquadro o badge, solo elegante grassetto istituzionale
-  const wrapTag = (value: string) => {
-    return `<strong>${value}</strong>`;
-  };
+  // Sostituzione formale dei tag in grassetto. 4.3 — il valore è un dato, non markup: entra come testo.
+  const wrapTag = (value: string) => `<strong>${escapeHtmlTesto(value)}</strong>`;
 
   let out = htmlContent;
   out = out.replace(/\{\{data_odierna\}\}/g, wrapTag(dataOggi));
