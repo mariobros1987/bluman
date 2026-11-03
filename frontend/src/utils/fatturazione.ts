@@ -63,3 +63,106 @@ export function calcolaTotaliFatturaRighe(imponibiliEuro: number[], aliquotaPct:
     totale: (imponibileCent + ivaCent) / 100,
   };
 }
+
+/** Una riga del modulo «Nuova fattura», nei campi che contano per i totali. */
+export interface RigaAnteprimaFattura {
+  quantita?: number;
+  prezzoUnitarioCent: number;
+  scontoPercentuale?: number;
+  aliquotaIva?: number;
+  naturaEsenzione?: string | null;
+  applicaCassa?: boolean;
+  applicaRitenuta?: boolean;
+  applicaBollo?: boolean;
+}
+
+export interface OpzioniAnteprimaFattura {
+  tipoCassa?: string;
+  aliquotaCassa?: number;
+  aliquotaRitenuta?: number;
+  esigibilitaIva?: string;
+  applicaBolloVirtuale?: boolean;
+}
+
+export interface TotaliAnteprimaFattura {
+  totaleImponibileCentesimi: number;
+  totaleCassaCentesimi: number;
+  totaleIvaCentesimi: number;
+  totaleRitenutaCentesimi: number;
+  totaleBolloCentesimi: number;
+  totaleDocumentoCentesimi: number;
+  nettoAPagareCentesimi: number;
+}
+
+export const SOGLIA_BOLLO_CENTESIMI = 7747;
+export const IMPORTO_BOLLO_CENTESIMI = 200;
+
+/**
+ * F8 — I totali del modulo fattura con cassa, ritenuta e bollo: copia passo per passo di
+ * `calcolaTotaliFattura` in `src/services/fatturaEngine.ts`, che è quello che salva. La cassa si
+ * ripartisce sulle righe e prende la **loro** aliquota (una riga esente non paga IVA sulla cassa),
+ * l'IVA si arrotonda per gruppo di aliquota e il bollo scatta sulle righe esenti con natura.
+ * `fatturazione.test.ts` confronta i due calcoli sugli stessi input.
+ */
+export function calcolaTotaliAnteprimaFattura(
+  righe: RigaAnteprimaFattura[],
+  opzioni: OpzioniAnteprimaFattura = {},
+): TotaliAnteprimaFattura {
+  const aliquotaCassa = opzioni.aliquotaCassa ?? (opzioni.tipoCassa && opzioni.tipoCassa !== 'nessuna' ? 4 : 0);
+  const aliquotaRitenuta = opzioni.aliquotaRitenuta ?? 0;
+  const calcolaBolloAuto = opzioni.applicaBolloVirtuale !== false;
+
+  let totaleImponibileCentesimi = 0;
+  let soggettoACassa = 0;
+  let soggettoARitenuta = 0;
+  let esenteBollo = 0;
+  const calcolate = righe.map((r) => {
+    const qta = r.quantita !== undefined && r.quantita > 0 ? r.quantita : 1;
+    const sconto = r.scontoPercentuale && r.scontoPercentuale > 0 ? Math.min(100, r.scontoPercentuale) : 0;
+    const imponibile = Math.round(qta * r.prezzoUnitarioCent * (1 - sconto / 100));
+    const aliquotaIva = r.aliquotaIva !== undefined ? r.aliquotaIva : 22;
+    const applicaCassa = r.applicaCassa !== false;
+    const natura = r.naturaEsenzione || null;
+    const applicaBollo = r.applicaBollo ?? (aliquotaIva === 0 && Boolean(natura));
+
+    totaleImponibileCentesimi += imponibile;
+    if (applicaCassa) soggettoACassa += imponibile;
+    if (r.applicaRitenuta !== false) soggettoARitenuta += imponibile;
+    if (applicaBollo) esenteBollo += imponibile;
+    return { imponibile, aliquotaIva, natura, applicaCassa };
+  });
+
+  const totaleCassaCentesimi = aliquotaCassa > 0 ? Math.round(soggettoACassa * (aliquotaCassa / 100)) : 0;
+
+  const gruppi = new Map<string, { aliquotaIva: number; imponibile: number }>();
+  for (const r of calcolate) {
+    const quotaCassa = soggettoACassa > 0 && r.applicaCassa
+      ? Math.round(totaleCassaCentesimi * (r.imponibile / soggettoACassa))
+      : 0;
+    const chiave = `${r.aliquotaIva}_${r.natura || 'ORD'}`;
+    const gruppo = gruppi.get(chiave) ?? { aliquotaIva: r.aliquotaIva, imponibile: 0 };
+    gruppo.imponibile += r.imponibile + quotaCassa;
+    gruppi.set(chiave, gruppo);
+  }
+  let totaleIvaCentesimi = 0;
+  for (const g of gruppi.values()) {
+    totaleIvaCentesimi += g.aliquotaIva > 0 ? Math.round(g.imponibile * (g.aliquotaIva / 100)) : 0;
+  }
+
+  const totaleRitenutaCentesimi = aliquotaRitenuta > 0 ? Math.round(soggettoARitenuta * (aliquotaRitenuta / 100)) : 0;
+  const totaleBolloCentesimi = calcolaBolloAuto && esenteBollo > SOGLIA_BOLLO_CENTESIMI ? IMPORTO_BOLLO_CENTESIMI : 0;
+  const totaleDocumentoCentesimi = totaleImponibileCentesimi + totaleCassaCentesimi + totaleIvaCentesimi + totaleBolloCentesimi;
+  const nettoAPagareCentesimi = opzioni.esigibilitaIva === 'split'
+    ? totaleDocumentoCentesimi - totaleIvaCentesimi - totaleRitenutaCentesimi
+    : totaleDocumentoCentesimi - totaleRitenutaCentesimi;
+
+  return {
+    totaleImponibileCentesimi,
+    totaleCassaCentesimi,
+    totaleIvaCentesimi,
+    totaleRitenutaCentesimi,
+    totaleBolloCentesimi,
+    totaleDocumentoCentesimi,
+    nettoAPagareCentesimi,
+  };
+}

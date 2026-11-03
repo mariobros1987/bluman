@@ -18,6 +18,7 @@ import {
   importFromTimesheetApi,
 } from '../api/client';
 import { fmt } from '../utils';
+import { calcolaTotaliAnteprimaFattura } from '../utils/fatturazione';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
@@ -156,65 +157,10 @@ export function InvoicesPage() {
     loadData();
   }, [page, limit, searchDebounced, filterStato, dataDa, dataA]);
 
-  // Calcolo Totali Real-Time nel Form
-  const calcolaTotaliForm = () => {
-    let totImponibileCent = 0;
-    let totIvaCent = 0;
-    let totSoggetteCassaCent = 0;
-    let totSoggetteRitenutaCent = 0;
-    let totEsenteCent = 0;
-
-    righe.forEach((r) => {
-      const pUnit = r.prezzoUnitarioCent || 0;
-      const qta = r.quantita || 1;
-      const sconto = r.scontoPercentuale || 0;
-      const nettoRiga = Math.round(pUnit * qta * (1 - sconto / 100));
-      totImponibileCent += nettoRiga;
-
-      if (r.applicaCassa && tipoCassa !== 'nessuna') {
-        totSoggetteCassaCent += nettoRiga;
-      }
-      if (r.applicaRitenuta) {
-        totSoggetteRitenutaCent += nettoRiga;
-      }
-
-      if (r.aliquotaIva === 0) {
-        totEsenteCent += nettoRiga;
-      }
-    });
-
-    const cassaCent = tipoCassa !== 'nessuna' ? Math.round(totSoggetteCassaCent * (aliquotaCassa / 100)) : 0;
-
-    righe.forEach((r) => {
-      if (r.aliquotaIva > 0) {
-        const pUnit = r.prezzoUnitarioCent || 0;
-        const qta = r.quantita || 1;
-        const sconto = r.scontoPercentuale || 0;
-        const nettoRiga = Math.round(pUnit * qta * (1 - sconto / 100));
-        totIvaCent += Math.round(nettoRiga * (r.aliquotaIva / 100));
-      }
-    });
-    if (cassaCent > 0) {
-      totIvaCent += Math.round(cassaCent * 0.22);
-    }
-
-    const ritenutaCent = Math.round(totSoggetteRitenutaCent * (aliquotaRitenuta / 100));
-    const bolloCent = totEsenteCent > 7747 ? 200 : 0; // €2,00 se esente > €77,47
-    const totaleDocumentoCent = totImponibileCent + cassaCent + totIvaCent + bolloCent;
-    const nettoAPagareCent = totaleDocumentoCent - ritenutaCent;
-
-    return {
-      totImponibileCent,
-      cassaCent,
-      totIvaCent,
-      ritenutaCent,
-      bolloCent,
-      totaleDocumentoCent,
-      nettoAPagareCent,
-    };
-  };
-
-  const totaliForm = calcolaTotaliForm();
+  // F8 — l'anteprima usa lo stesso calcolo del backend (cassa ripartita sulle righe, IVA per
+  // aliquota, bollo sulle righe esenti): prima la pagina aveva una sua formula, con IVA sulla
+  // cassa fissa al 22% anche su una fattura esente.
+  const totaliForm = calcolaTotaliAnteprimaFattura(righe, { tipoCassa, aliquotaCassa, aliquotaRitenuta, esigibilitaIva });
 
   // Handlers Creazione & Importazione
   const handleAggiungiRiga = () => {
@@ -988,25 +934,25 @@ export function InvoicesPage() {
             <div style={{ background: 'var(--surface-2)', padding: '1.25rem', borderRadius: 10, marginBottom: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, border: '1px solid var(--pill-slate-bg)' }}>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>Imponibile</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmt(totaliForm.totImponibileCent / 100)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{fmt(totaliForm.totaleImponibileCentesimi / 100)}</div>
               </div>
-              {totaliForm.cassaCent > 0 && (
+              {totaliForm.totaleCassaCentesimi > 0 && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>Cassa Prev. (4%)</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.cassaCent / 100)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.totaleCassaCentesimi / 100)}</div>
                 </div>
               )}
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>IVA</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.totIvaCent / 100)}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>+ {fmt(totaliForm.totaleIvaCentesimi / 100)}</div>
               </div>
-              {totaliForm.ritenutaCent > 0 && (
+              {totaliForm.totaleRitenutaCentesimi > 0 && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--pill-red-fg)' }}>Ritenuta (20%)</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-red-fg)' }}>- {fmt(totaliForm.ritenutaCent / 100)}</div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-red-fg)' }}>- {fmt(totaliForm.totaleRitenutaCentesimi / 100)}</div>
                 </div>
               )}
-              {totaliForm.bolloCent > 0 && (
+              {totaliForm.totaleBolloCentesimi > 0 && (
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--pill-amber-fg)' }}>Bollo Virtuale</div>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--pill-amber-fg)' }}>+ € 2,00</div>
@@ -1014,7 +960,7 @@ export function InvoicesPage() {
               )}
               <div style={{ borderLeft: '2px solid var(--pill-slate-bd)', paddingLeft: 12 }}>
                 <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 700 }}>NETTO A PAGARE</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{fmt(totaliForm.nettoAPagareCent / 100)}</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{fmt(totaliForm.nettoAPagareCentesimi / 100)}</div>
               </div>
             </div>
 

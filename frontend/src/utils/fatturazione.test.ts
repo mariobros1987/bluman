@@ -7,7 +7,14 @@
  * qualcuno cambia la regola di qui e non quella del backend, o viceversa, il test lo veda.
  */
 import { describe, it, expect } from 'vitest';
-import { risolviAliquotaIva, calcolaTotaliFattura, calcolaTotaliFatturaRighe } from './fatturazione';
+import { risolviAliquotaIva, calcolaTotaliFattura, calcolaTotaliFatturaRighe, calcolaTotaliAnteprimaFattura } from './fatturazione';
+import {
+  calcolaTotaliFattura as calcolaTotaliFatturaBackend,
+  SOGLIA_BOLLO_CENTESIMI as SOGLIA_BOLLO_CENTESIMI_BACKEND,
+  type RigaFatturaInput,
+  type OpzioniCalcoloFattura,
+} from '../../../src/services/fatturaEngine';
+import sorgenteInvoicesPage from '../pages/InvoicesPage.tsx?raw';
 
 describe('risolviAliquotaIva — il regime del cliente vince, con ripiego per tipo documento', () => {
   it('usa l\'aliquota registrata sul cliente quando c\'è', () => {
@@ -77,5 +84,60 @@ describe('calcolaTotaliFatturaRighe — arrotonda l\'IVA per riga come il backen
   it('elenco vuoto → tutti zero, senza NaN', () => {
     const t = calcolaTotaliFatturaRighe([], 22);
     expect(t).toEqual({ imponibile: 0, iva: 0, totale: 0 });
+  });
+});
+
+// F8 — l'anteprima del modulo «Nuova fattura» era calcolata a mano nella pagina: IVA sulla cassa
+// fissa al 22% anche su una fattura esente, e bollo su ogni riga ad aliquota 0. Qui la si
+// confronta con il motore che salva, sugli stessi input.
+describe('calcolaTotaliAnteprimaFattura — gli stessi numeri di fatturaEngine', () => {
+  const casi: Array<[string, RigaFatturaInput[], OpzioniCalcoloFattura]> = [
+    ['esente con cassa', [{ descrizione: 'a', prezzoUnitarioCent: 100000, aliquotaIva: 0, naturaEsenzione: 'N2.2', applicaRitenuta: false }], { tipoCassa: 'inps_gestione_separata', aliquotaCassa: 4 }],
+    ['ordinaria con cassa e ritenuta', [{ descrizione: 'a', prezzoUnitarioCent: 150000 }], { tipoCassa: 'cassa_forense', aliquotaCassa: 4, aliquotaRitenuta: 20 }],
+    ['miste, sconti e quantità', [
+      { descrizione: 'a', prezzoUnitarioCent: 1015, quantita: 2, aliquotaIva: 22 },
+      { descrizione: 'b', prezzoUnitarioCent: 33333, scontoPercentuale: 10, aliquotaIva: 10, applicaCassa: false },
+      { descrizione: 'c', prezzoUnitarioCent: 9000, aliquotaIva: 0, naturaEsenzione: 'N1', applicaRitenuta: false },
+    ], { tipoCassa: 'cassa_commercialisti', aliquotaCassa: 4, aliquotaRitenuta: 20 }],
+    ['bollo sotto soglia', [{ descrizione: 'a', prezzoUnitarioCent: 7747, aliquotaIva: 0, naturaEsenzione: 'N4' }], {}],
+    ['bollo sopra soglia', [{ descrizione: 'a', prezzoUnitarioCent: 7748, aliquotaIva: 0, naturaEsenzione: 'N4' }], {}],
+    ['aliquota 0 senza natura: niente bollo', [{ descrizione: 'a', prezzoUnitarioCent: 50000, aliquotaIva: 0 }], {}],
+    ['bollo escluso dalla riga', [{ descrizione: 'a', prezzoUnitarioCent: 50000, aliquotaIva: 0, naturaEsenzione: 'N4', applicaBollo: false }], {}],
+    ['split payment', [{ descrizione: 'a', prezzoUnitarioCent: 200000 }], { esigibilitaIva: 'split', aliquotaRitenuta: 20 }],
+    ['nessuna cassa con aliquota cassa valorizzata', [{ descrizione: 'a', prezzoUnitarioCent: 100000 }], { tipoCassa: 'nessuna', aliquotaCassa: 4 }],
+  ];
+
+  it.each(casi)('%s', (_caso, righe, opzioni) => {
+    const backend = calcolaTotaliFatturaBackend(righe, opzioni);
+    const anteprima = calcolaTotaliAnteprimaFattura(righe, opzioni);
+    expect(anteprima).toEqual({
+      totaleImponibileCentesimi: backend.totaleImponibileCentesimi,
+      totaleCassaCentesimi: backend.totaleCassaCentesimi,
+      totaleIvaCentesimi: backend.totaleIvaCentesimi,
+      totaleRitenutaCentesimi: backend.totaleRitenutaCentesimi,
+      totaleBolloCentesimi: backend.totaleBolloCentesimi,
+      totaleDocumentoCentesimi: backend.totaleDocumentoCentesimi,
+      nettoAPagareCentesimi: backend.nettoAPagareCentesimi,
+    });
+  });
+
+  it('fattura esente con cassa: nessuna IVA sulla cassa', () => {
+    const t = calcolaTotaliAnteprimaFattura(
+      [{ prezzoUnitarioCent: 100000, aliquotaIva: 0, naturaEsenzione: 'N2.2' }],
+      { tipoCassa: 'inps_gestione_separata', aliquotaCassa: 4 },
+    );
+    expect(t.totaleCassaCentesimi).toBe(4000);
+    expect(t.totaleIvaCentesimi).toBe(0);
+  });
+
+  it('bollo: stessa soglia del backend (oltre 77,47 €)', () => {
+    const riga = (cent: number) => [{ prezzoUnitarioCent: cent, aliquotaIva: 0, naturaEsenzione: 'N4' }];
+    expect(calcolaTotaliAnteprimaFattura(riga(SOGLIA_BOLLO_CENTESIMI_BACKEND)).totaleBolloCentesimi).toBe(0);
+    expect(calcolaTotaliAnteprimaFattura(riga(SOGLIA_BOLLO_CENTESIMI_BACKEND + 1)).totaleBolloCentesimi).toBe(200);
+  });
+
+  it('InvoicesPage non ricalcola i totali a mano', () => {
+    expect(sorgenteInvoicesPage).toContain('calcolaTotaliAnteprimaFattura(');
+    expect(sorgenteInvoicesPage).not.toContain('* 0.22');
   });
 });
