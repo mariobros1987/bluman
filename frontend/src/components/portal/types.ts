@@ -33,11 +33,18 @@ export interface ModuloDeliverable {
   docCompleto?: DocumentoPortale;
 }
 
+/** Somma dei prezzi noti dei moduli; con `mancanti` > 0 il totale è parziale. */
+export interface TotaleModuli {
+  totale: number;
+  mancanti: number;
+}
+
 export interface ModuloProposta {
   id: string;
   nome: string;
   cat: CategoriaModulo;
-  prezzo: number;
+  /** Euro; null se il backend non lo indica. */
+  prezzo: number | null;
   ore: number;
   righeCount: number;
   descrizione?: string;

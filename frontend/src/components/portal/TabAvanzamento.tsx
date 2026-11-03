@@ -1,5 +1,5 @@
 import { CatBadge } from '../ui/CatBadge';
-import { fmt } from '../../utils';
+import { fmtPrezzo } from './format';
 import type { ModuloProposta } from './types';
 import { docBoxStyle } from './styles';
 
@@ -131,7 +131,7 @@ export function TabAvanzamento({
                       ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                     </span>
                   )}
-                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmtPrezzo(m.prezzo)}</div>
                 </div>
               </div>
 

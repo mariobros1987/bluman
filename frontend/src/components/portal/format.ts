@@ -1,3 +1,6 @@
+import { fmt } from '../../utils';
+import type { TotaleModuli } from './types';
+
 /**
  * Data e ora nel formato italiano, a partire da quello che manda il backend (ISO).
  * Se il valore non è una data valida si restituisce così com'è: meglio un testo grezzo che un
@@ -19,3 +22,10 @@ export const mascheraIban = (iban: string) => {
 
 /** §2.4 — Maschera il titolare effettivo: il nome intero si vede solo scoprendo il dato. */
 export const mascheraUbo = (nome: string) => ((nome || '').trim() ? '••••••••' : '');
+
+/** Prezzo di un modulo nel portale: null vuol dire che lo studio non l'ha indicato, e lo si dice. */
+export const fmtPrezzo = (euro: number | null) => (euro == null ? 'Corrispettivo non indicato' : fmt(euro));
+
+/** Totale dei moduli: con prezzi mancanti è la somma dei soli noti, marcata come parziale. */
+export const fmtTotaleModuli = (t: TotaleModuli) =>
+  t.mancanti === 0 ? fmt(t.totale) : `${fmt(t.totale)} (parziale: ${t.mancanti} senza corrispettivo)`;

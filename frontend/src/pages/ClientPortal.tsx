@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fmt } from '../utils';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
-import { escapeHtmlTesto } from '../../../src/util/htmlSanitizer';
 import { getStudioInfoForTenant } from '../utils/tenant';
 import { useToast } from '../components/ui/ToastProvider';
 import {
@@ -16,7 +14,8 @@ import {
 } from '../api/client';
 import type { DocumentoPortale } from '../api/client';
 import type { ModuloProposta, PortalTab } from '../components/portal/types';
-import { mapProjectToPortalModules } from '../components/portal/mapPortalModules';
+import { mapProjectToPortalModules, totaleModuli } from '../components/portal/mapPortalModules';
+import { tabellaModuliLetteraHtml } from '../components/portal/tabellaModuliLettera';
 import { mascheraIban, mascheraUbo } from '../components/portal/format';
 import {
   portalWrapperStyle,
@@ -243,7 +242,7 @@ export function ClientPortal() {
     void loadPortalData(clienteId);
   };
 
-  const totalValue = moduliProposti.reduce((acc, m) => acc + m.prezzo, 0);
+  const totaleProposta = totaleModuli(moduliProposti);
 
   /** Progetto attualmente scelto nel selettore, con l'avanzamento che il backend ha calcolato. */
   const progettoAttivo = clientProjects.find((p: any) => String(p.id) === String(selectedProjectId)) || clientProjects[0] || null;
@@ -364,34 +363,7 @@ export function ClientPortal() {
     const tmpl = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-engagement');
     const baseHtml = tmpl ? tmpl.contenutoHtml : '';
 
-    const modulesTableHtml = `
-      <div style="margin: 16px 0; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: left;">
-          <thead style="background: #f1f5f9; color: #1e1b4b; font-weight: 700; border-bottom: 1px solid #cbd5e1;">
-            <tr>
-              <th style="padding: 8px 12px;">Modulo Specialistico</th>
-              <th style="padding: 8px 12px;">Categoria</th>
-              <th style="padding: 8px 12px; text-align: center;">Ore Stimate</th>
-              <th style="padding: 8px 12px; text-align: right;">Corrispettivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${moduliProposti.map(m => `
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td style="padding: 8px 12px; font-weight: 600; color: #0f172a;">${escapeHtmlTesto(m.nome)}</td>
-                <td style="padding: 8px 12px; color: #475569;">${escapeHtmlTesto(m.cat)}</td>
-                <td style="padding: 8px 12px; text-align: center; color: #475569;">${escapeHtmlTesto(m.ore)}h</td>
-                <td style="padding: 8px 12px; text-align: right; font-weight: 700; color: #1e1b4b;">${escapeHtmlTesto(fmt(m.prezzo))}</td>
-              </tr>
-            `).join('')}
-            <tr style="background: #f8fafc; font-weight: 800;">
-              <td colspan="3" style="padding: 10px 12px; text-align: right; color: #1e1b4b;">TOTALE COMPLESSIVO MANDATO:</td>
-                <td style="padding: 10px 12px; text-align: right; color: #4338ca; font-size: 11pt;">${escapeHtmlTesto(fmt(totalValue))}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    `;
+    const modulesTableHtml = tabellaModuliLetteraHtml(moduliProposti, totaleProposta);
 
     const studio = getStudioInfoForTenant();
     return resolveDocumentTemplateHtml(baseHtml.replace('<!-- {{TABELLA_MODULI}} -->', modulesTableHtml), {
@@ -407,7 +379,8 @@ export function ClientPortal() {
         // Patrimoniale»: compariva dentro il testo che il cliente sottoscrive, riferito a un
         // incarico che non è il suo. Senza progetto resta la dizione generica.
         titolo: progettoAttivo?.nome || 'Incarico professionale',
-        totalePreventivo: totalValue,
+        // Totale parziale (moduli senza prezzo) → segnaposto: non si fa firmare un importo incompleto.
+        totalePreventivo: totaleProposta.mancanti === 0 ? totaleProposta.totale : null,
       },
       studio,
     });
@@ -584,7 +557,7 @@ export function ClientPortal() {
             eidasSeal={eidasSeal}
             clientName={clientName}
             moduliProposti={moduliProposti}
-            totalValue={totalValue}
+            totaleProposta={totaleProposta}
             addendumErrore={addendumErrore}
             nuovaRichiestaAddendum={nuovaRichiestaAddendum}
             setNuovaRichiestaAddendum={setNuovaRichiestaAddendum}

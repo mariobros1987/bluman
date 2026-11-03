@@ -1,5 +1,5 @@
 import { CatBadge } from '../ui/CatBadge';
-import { fmt } from '../../utils';
+import { fmtPrezzo } from './format';
 import { urlFileArchivio } from '../../api/client';
 import type { DocumentoPortale } from '../../api/client';
 import type { ModuloProposta } from './types';
@@ -43,7 +43,7 @@ export function DettaglioModuloModal({
             </div>
             <h2 id="dettaglio-modulo-titolo" style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{selectedModule.nome}</h2>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 4 }}>
-              Valore Operazione: <strong style={{ color: 'var(--indigo-l)' }}>{fmt(selectedModule.prezzo)}</strong> · Stima Ore: <strong>{selectedModule.ore}h</strong>
+              Valore Operazione: <strong style={{ color: 'var(--indigo-l)' }}>{fmtPrezzo(selectedModule.prezzo)}</strong> · Stima Ore: <strong>{selectedModule.ore}h</strong>
             </div>
           </div>
           <button

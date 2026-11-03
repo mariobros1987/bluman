@@ -1,7 +1,22 @@
 import type { DocumentoPortale } from '../../api/client';
 import type { CategoriaModulo } from '../../types';
-import type { ModuloDeliverable, ModuloPassaggio, ModuloProposta } from './types';
+import type { ModuloDeliverable, ModuloPassaggio, ModuloProposta, TotaleModuli } from './types';
 import { nomeFileLeggibile } from '../../utils';
+
+/**
+ * `ModuloProgetto.prezzo` è sempre in centesimi (Int a database): si divide sempre per 100.
+ * Assente o non numerico → null, non 0: il prezzo mancante si mostra come mancante.
+ */
+export function prezzoModuloEuro(centesimi: unknown): number | null {
+  return typeof centesimi === 'number' && Number.isFinite(centesimi) ? centesimi / 100 : null;
+}
+
+/** Totale dei moduli in euro: somma dei soli prezzi noti, `mancanti` > 0 se è parziale. */
+export function totaleModuli(moduli: ModuloProposta[]): TotaleModuli {
+  const noti = moduli.filter((m) => m.prezzo != null);
+  const centesimi = noti.reduce((acc, m) => acc + Math.round((m.prezzo as number) * 100), 0);
+  return { totale: centesimi / 100, mancanti: moduli.length - noti.length };
+}
 
 /**
  * Traduce i moduli REALI del progetto nella forma che il Portale Cliente mostra,
@@ -65,7 +80,7 @@ export function mapProjectToPortalModules(project: any, portalDocs: DocumentoPor
       id: m.id,
       nome: m.nome,
       cat,
-      prezzo: typeof m.prezzo === 'number' && m.prezzo > 0 ? (m.prezzo > 1000 ? m.prezzo / 100 : m.prezzo) : 0,
+      prezzo: prezzoModuloEuro(m.prezzo),
       ore: m.orePreventivate ?? 0,
       righeCount: passaggi.length,
       descrizione: m.descrizione || undefined,

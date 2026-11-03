@@ -1,13 +1,12 @@
 import { CatBadge } from '../ui/CatBadge';
-import { fmt } from '../../utils';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
 import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID, ANAGRAFICA_DA_COMPLETARE, ragioneSocialeDocumento } from '../../utils/tenant';
 import type { CanaleOtp, CanaleFirma, RichiestaAddendum } from '../../api/client';
-import type { ModuloProposta, BersaglioFirma } from './types';
-import { dataOraLeggibile } from './format';
+import type { ModuloProposta, BersaglioFirma, TotaleModuli } from './types';
+import { dataOraLeggibile, fmtPrezzo, fmtTotaleModuli } from './format';
 import { docBoxStyle } from './styles';
 
 export interface TabPropostaProps {
@@ -15,7 +14,7 @@ export interface TabPropostaProps {
   eidasSeal: any;
   clientName: string;
   moduliProposti: ModuloProposta[];
-  totalValue: number;
+  totaleProposta: TotaleModuli;
   addendumErrore: string | null;
   nuovaRichiestaAddendum: string;
   setNuovaRichiestaAddendum: (testo: string) => void;
@@ -57,7 +56,7 @@ export function TabProposta({
   eidasSeal,
   clientName,
   moduliProposti,
-  totalValue,
+  totaleProposta,
   addendumErrore,
   nuovaRichiestaAddendum,
   setNuovaRichiestaAddendum,
@@ -210,12 +209,12 @@ export function TabProposta({
               ) : moduliProposti.map((m, idx) => (
                 <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, background: 'rgba(0,0,0,0.2)', padding: '6px 12px', borderRadius: 6 }}>
                   <span>✓ {m.nome} ({m.cat})</span>
-                  <span style={{ fontWeight: 700 }}>{fmt(m.prezzo)}</span>
+                  <span style={{ fontWeight: 700 }}>{fmtPrezzo(m.prezzo)}</span>
                 </div>
               ))}
             </div>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--green)', textAlign: 'right' }}>
-              Valore Base Congelato: {fmt(totalValue)}
+              Valore Base Congelato: {fmtTotaleModuli(totaleProposta)}
             </div>
           </div>
 
@@ -402,7 +401,7 @@ export function TabProposta({
                           ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
                         </span>
                       )}
-                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(m.prezzo)}</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmtPrezzo(m.prezzo)}</div>
                     </div>
                   </div>
 
@@ -425,7 +424,7 @@ export function TabProposta({
               <div style={{ fontSize: 12, color: 'var(--indigo-l)', fontWeight: 600 }}>Valore Totale Complessivo Proposta d'Ordine</div>
               <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.8, marginTop: 2 }}>Nessun costo nascosto. Include assistenza fino al completamento.</div>
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800 }}>{fmt(totalValue)}</div>
+            <div style={{ fontSize: 26, fontWeight: 800 }}>{fmtTotaleModuli(totaleProposta)}</div>
           </div>
 
           {/* 📜 VISUALIZZATORE DOCUMENTALE ENGAGEMENT LETTER A4 */}

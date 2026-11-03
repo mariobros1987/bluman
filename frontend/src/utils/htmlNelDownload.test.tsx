@@ -73,7 +73,7 @@ describe('4.3 — i dati entrano nel download come testo', () => {
 
   it('il download della lettera nel portale usa l\'HTML sanificato della vista', async () => {
     const props: any = {
-      signed: false, eidasSeal: null, clientName: 'Cliente', moduliProposti: [], totalValue: 0,
+      signed: false, eidasSeal: null, clientName: 'Cliente', moduliProposti: [], totaleProposta: { totale: 0, mancanti: 0 },
       addendumErrore: null, nuovaRichiestaAddendum: '', setNuovaRichiestaAddendum: vi.fn(), progettoAttivo: null,
       inviaNuovaRichiestaAddendum: vi.fn(), invioAddendum: false, addendumMsg: null, addendums: [],
       moduleSignatures: {}, setSelectedModule: vi.fn(),
