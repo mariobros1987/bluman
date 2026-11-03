@@ -16,10 +16,11 @@ import { DocumentiTab } from '../components/projectDetail/DocumentiTab';
 import { CalendarioProgettoTab } from '../components/projectDetail/CalendarioProgettoTab';
 import { HeaderProgetto } from '../components/projectDetail/HeaderProgetto';
 import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiProgetto';
-import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, inviaComunicazioneApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
+import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
+import { inviaAvvisoModuloCompletato } from '../utils/avvisoModuloCompletato';
 import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
 import { creaEventoCalendario } from '../api/calendario';
 import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgetto, StatoModulo, Cliente, TeamMember } from '../types';
@@ -654,16 +655,10 @@ export function ProjectDetail() {
     const moduloPrima = project.mods.find(m => m.id === modId);
     const moduloDopo = newMods.find(m => m.id === modId);
     if (moduloDopo?.st === 'done' && moduloPrima?.st !== 'done') {
-      inviaComunicazioneApi(String(project.id), {
-        canale: 'whatsapp',
-        mittente: 'BlueCode Advisor Studio',
-        destinatario: project.cl,
-        direzione: 'uscita',
-        testo: `🔔 Avanzamento Pratica "${project.n}": il modulo "${moduloDopo.n}" è stato completato.`,
-      }).catch((err) => {
-        console.error('Avviso di modulo completato non inviato', err);
-        toast.errore(`Avviso al cliente sul modulo "${moduloDopo.n}" non inviato: ${err instanceof Error ? err.message : 'errore di rete'}.`);
-      });
+      void inviaAvvisoModuloCompletato(
+        { progettoId: String(project.id), nomeProgetto: project.n, nomeModulo: moduloDopo.n, destinatario: project.cl },
+        (messaggio) => toast.errore(messaggio),
+      );
     }
   };
 
