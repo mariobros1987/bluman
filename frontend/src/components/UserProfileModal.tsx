@@ -37,7 +37,10 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
           if (dbUser.specializzazione) setSpecializzazione(dbUser.specializzazione);
         }
       })
-      .catch(() => {});
+      .catch((err) => setProfileMsg({
+        text: `Profilo non letto dal server (${err?.message || 'errore di rete'}): i campi mostrano i dati della sessione.`,
+        type: 'error',
+      }));
   }, []);
 
   const handleSaveProfile = async (e: React.FormEvent) => {

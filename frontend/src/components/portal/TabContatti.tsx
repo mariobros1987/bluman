@@ -6,6 +6,7 @@ import { getStudioInfoForTenant, ANAGRAFICA_DA_COMPLETARE } from '../../utils/te
 import { SpunteStato } from '../SpunteStato';
 import { docBoxStyle } from './styles';
 import { useToast } from '../ui/ToastProvider';
+import { useErroreRipetuto } from '../../hooks/useErroreRipetuto';
 
 export interface TabContattiProps {
   contattiStudio: ContattiStudio | null;
@@ -37,6 +38,7 @@ export function TabContatti({
   progettoId,
 }: TabContattiProps) {
   const toast = useToast();
+  const errori = useErroreRipetuto();
   const [fileAllegato, setFileAllegato] = useState<{ nome: string; base64: string; sizeStr: string; mime: string } | null>(null);
   const [caricandoFile, setCaricandoFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,16 +81,19 @@ export function TabContatti({
             // Se ci sono messaggi inviati dallo studio non ancora letti dal cliente, li segna come letti
             const daLeggere = normalizzati.some((m: any) => m.direzione === 'uscita' && m.stato !== 'letto');
             if (daLeggere) {
-              segnaComunicazioniLetteApi(progettoId, 'uscita').catch(() => {});
+              segnaComunicazioniLetteApi(progettoId, 'uscita')
+                .then(() => errori.riuscito('segna-lette'))
+                .catch((err) => errori.fallito('segna-lette', 'Messaggi non segnati come letti', err));
             }
           }
+          errori.riuscito('lettura');
         })
-        .catch(() => {});
+        .catch((err) => errori.fallito('lettura', 'Messaggi non aggiornati', err));
     };
     aggiorna();
     const id = setInterval(aggiorna, 5000);
     return () => clearInterval(id);
-  }, [progettoId]);
+  }, [progettoId, errori]);
 
   useEffect(() => {
     if (!chatContainerRef.current || messaggi.length === 0) return;

@@ -25,12 +25,17 @@ vi.mock('../api/client', () => ({
   urlDocumentoAssoluto: (u: string) => u,
 }));
 
-import { fetchComunicazioniApi, fetchClienti, fetchInboundImapEmailsApi, apriStreamNotifiche } from '../api/client';
+import {
+  fetchComunicazioniApi, fetchClienti, fetchInboundImapEmailsApi, apriStreamNotifiche,
+  inviaComunicazioneApi, segnaComunicazioniLetteApi,
+} from '../api/client';
 
 const mockFetchComunicazioni = fetchComunicazioniApi as ReturnType<typeof vi.fn>;
 const mockFetchClienti = fetchClienti as ReturnType<typeof vi.fn>;
 const mockFetchImap = fetchInboundImapEmailsApi as ReturnType<typeof vi.fn>;
 const mockApriStream = apriStreamNotifiche as ReturnType<typeof vi.fn>;
+const mockInvia = inviaComunicazioneApi as ReturnType<typeof vi.fn>;
+const mockSegnaLette = segnaComunicazioniLetteApi as ReturnType<typeof vi.fn>;
 
 function mostra() {
   return render(
@@ -138,5 +143,59 @@ describe('ComunicazioniTab — nessuna conversazione inventata', () => {
       });
     });
     await waitFor(() => expect(screen.getByText(/Sono arrivati i documenti firmati\./)).toBeTruthy());
+  });
+});
+
+// 3.20 — le scritture automatiche della chat finivano in `.catch(() => {})`: se il server le
+// rifiutava, l'operatore credeva salvata un'email mai arrivata nel fascicolo, o letti messaggi
+// che per il server restavano da leggere.
+describe('ComunicazioniTab — le scritture automatiche fallite si dicono', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    mockFetchClienti.mockResolvedValue([]);
+  });
+
+  it("email in arrivo non salvata a database: l'errore compare", async () => {
+    mockFetchComunicazioni.mockResolvedValue([]);
+    mockFetchImap.mockResolvedValue({
+      ok: true,
+      email: [{ id: 'imap-1', from: 'cliente@esempio.test', text: 'Allego la visura.', date: 'oggi' }],
+    });
+    mockInvia.mockRejectedValue(new Error('Server non raggiungibile'));
+    mockSegnaLette.mockResolvedValue(undefined);
+
+    mostra();
+
+    await waitFor(() => expect(screen.getByText(/Email di cliente@esempio\.test non salvata nel fascicolo: Server non raggiungibile/)).toBeTruthy());
+  });
+
+  it("messaggi non segnati come letti: l'errore compare una volta sola", async () => {
+    mockFetchComunicazioni.mockResolvedValue([
+      {
+        id: 'com-9',
+        canale: 'email',
+        mittente: 'cliente@esempio.test',
+        destinatario: 'studio@esempio.test',
+        direzione: 'entrata',
+        testo: 'Domanda sul preventivo.',
+        createdAt: new Date().toISOString(),
+        stato: 'consegnato',
+      },
+    ]);
+    mockFetchImap.mockResolvedValue({ ok: true, email: [] });
+    mockSegnaLette.mockRejectedValue(new Error('Permesso insufficiente'));
+
+    mostra();
+
+    await waitFor(() => expect(screen.getByText(/Messaggi non segnati come letti: Permesso insufficiente/)).toBeTruthy());
+    // Un secondo giro (qui: il frame SSE della pratica) ritenta e fallisce ancora: nessun secondo toast.
+    const riceviFrame = mockApriStream.mock.calls[0][0] as (e: Record<string, string>) => void;
+    act(() => {
+      riceviFrame({ id: 'n', tipoEvento: 'messaggio_cliente', oggetto: 'x', corpo: 'x', link: '/projects/prog-1', createdAt: new Date().toISOString() });
+    });
+    await waitFor(() => expect(mockSegnaLette.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getAllByText(/Messaggi non segnati come letti/)).toHaveLength(1);
   });
 });

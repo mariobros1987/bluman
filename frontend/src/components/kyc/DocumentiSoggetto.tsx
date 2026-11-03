@@ -18,7 +18,11 @@ export function DocumentiSoggetto({ soggettoId, puoModificare }: { soggettoId: s
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const carica = () => { fetchDocumentiSoggetto(soggettoId).then((r) => setDocs(r.documenti)).catch(() => { /* non bloccante */ }); };
+  const carica = () => {
+    fetchDocumentiSoggetto(soggettoId)
+      .then((r) => setDocs(r.documenti))
+      .catch((e: any) => setErr(`Documenti d'identità non letti: ${e?.message || 'errore di rete'}`));
+  };
   useEffect(() => { if (soggettoId) carica(); /* eslint-disable-next-line */ }, [soggettoId]);
 
   const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {

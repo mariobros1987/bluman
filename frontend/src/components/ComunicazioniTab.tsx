@@ -16,6 +16,7 @@ import { etichettaOrigine } from '../utils/origineAbbinamento';
 import { recapitiDaAnagrafica } from '../utils/recapitiCliente';
 import type { Cliente } from '../types';
 import { useToast } from './ui/ToastProvider';
+import { useErroreRipetuto } from '../hooks/useErroreRipetuto';
 
 export interface MessaggioComunicazione {
   id: string;
@@ -111,6 +112,7 @@ export function cleanDisplayEmailText(raw: string): string {
 
 export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, cliente }: ComunicazioniTabProps) {
   const toast = useToast();
+  const errori = useErroreRipetuto();
   const [clientData, setClientData] = useState<Cliente | null>(cliente || null);
 
   // Le linee dello studio (numero, casella, bot) arrivano da `useCanaliStudio`: le legge anche il
@@ -300,7 +302,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               destinatario: (mail as any).to || targetEmail || "Casella dello studio",
               direzione: 'entrata',
               testo: mail.text,
-            }).catch(() => {});
+            })
+              .then(() => errori.riuscito(`email-${newInboundMsg.id}`))
+              .catch((err) => errori.fallito(`email-${newInboundMsg.id}`, `Email di ${mail.from} non salvata nel fascicolo`, err));
           }
         }
       }
@@ -312,7 +316,9 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
         // Segna automaticamente come letti i messaggi in entrata visualizzati dall'operatore
         const haDaLeggere = currentList.some(m => m.direzione === 'entrata' && m.stato !== 'letto');
         if (haDaLeggere) {
-          segnaComunicazioniLetteApi(String(progettoId), 'entrata').catch(() => {});
+          segnaComunicazioniLetteApi(String(progettoId), 'entrata')
+            .then(() => errori.riuscito('segna-lette'))
+            .catch((err) => errori.fallito('segna-lette', 'Messaggi non segnati come letti', err));
         }
       }
     } catch (err) {

@@ -660,7 +660,10 @@ export function ProjectDetail() {
         destinatario: project.cl,
         direzione: 'uscita',
         testo: `🔔 Avanzamento Pratica "${project.n}": il modulo "${moduloDopo.n}" è stato completato.`,
-      }).catch(() => {});
+      }).catch((err) => {
+        console.error('Avviso di modulo completato non inviato', err);
+        toast.errore(`Avviso al cliente sul modulo "${moduloDopo.n}" non inviato: ${err instanceof Error ? err.message : 'errore di rete'}.`);
+      });
     }
   };
 

@@ -228,7 +228,10 @@ export function ClientPortal() {
     setModuliProposti(foundProj ? mapProjectToPortalModules(foundProj) : []);
     fetchComunicazioniApi(pId).then(msgs => {
       if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
-    }).catch(() => {});
+    }).catch((err) => {
+      console.error('Messaggi del progetto non letti', err);
+      toast.errore(`Messaggi del progetto non letti: ${err instanceof Error ? err.message : 'errore di rete'}.`);
+    });
   };
 
   /**

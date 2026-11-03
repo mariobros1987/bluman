@@ -30,7 +30,7 @@ export function PannelloRischio({ fascicoloId, puoModificare }: { fascicoloId: s
         setLiv({ cliente: r.corrente.clienteLivello, geografia: r.corrente.geografiaLivello, prodotto: r.corrente.prodottoLivello, canale: r.corrente.canaleLivello });
         setMot({ cliente: r.corrente.clienteMotivazione || '', geografia: r.corrente.geografiaMotivazione || '', prodotto: r.corrente.prodottoMotivazione || '', canale: r.corrente.canaleMotivazione || '' });
       }
-    }).catch(() => { /* non bloccante */ });
+    }).catch((e: any) => setMsg(`Valutazione del rischio non letta: ${e?.message || 'errore di rete'}. I livelli qui sotto non sono quelli salvati.`));
   };
   useEffect(() => { if (fascicoloId) carica(); /* eslint-disable-next-line */ }, [fascicoloId]);
 

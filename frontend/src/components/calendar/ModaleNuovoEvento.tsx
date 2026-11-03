@@ -39,6 +39,8 @@ interface Props {
   /** Il giorno da cui parte il modulo: quello di oggi, o la casella su cui si è cliccato. */
   giornoIniziale: GiornoIso;
   clienti: ClienteSemplice[];
+  /** Motivo per cui l'anagrafica clienti non è stata letta: un errore non è «nessun cliente». */
+  erroreClienti?: string | null;
   team: TeamMember[];
   onChiudi: () => void;
   /** Chiamata dopo che il server ha confermato la scrittura: ricarica la griglia. */
@@ -48,7 +50,7 @@ interface Props {
 const CAMPO: CSSProperties = { width: '100%', fontSize: 12 };
 const ETICHETTA: CSSProperties = { fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 };
 
-export function ModaleNuovoEvento({ giornoIniziale, clienti, team, onChiudi, onCreato }: Props) {
+export function ModaleNuovoEvento({ giornoIniziale, clienti, erroreClienti, team, onChiudi, onCreato }: Props) {
   const [titolo, setTitolo] = useState('');
   const [giorno, setGiorno] = useState<GiornoIso>(giornoIniziale);
   // Vuoto significa «tutto il giorno», che è il caso normale di una scadenza: un'ora inventata a
@@ -155,7 +157,12 @@ export function ModaleNuovoEvento({ giornoIniziale, clienti, team, onChiudi, onC
               <option key={c.id} value={c.id}>{c.nome}</option>
             ))}
           </select>
-          {clienti.length === 0 && (
+          {erroreClienti && (
+            <span style={{ fontSize: 10, color: 'var(--pill-red-fg)' }}>
+              ⚠ Elenco clienti non letto: {erroreClienti}
+            </span>
+          )}
+          {!erroreClienti && clienti.length === 0 && (
             // Regola 7: l'assenza di clienti si dice. Un elenco vuoto senza spiegazione sembra un
             // campo rotto, e la prima ipotesi di chi lo vede è che l'app non funzioni.
             <span style={{ fontSize: 10, color: 'var(--muted)' }}>

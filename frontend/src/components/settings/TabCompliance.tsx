@@ -71,7 +71,8 @@ export function TabCompliance({ ruolo }: TabComplianceProps) {
   const caricaEventi = () => {
     fetchComplianceEvents()
       .then(r => { setEventi(r.eventi); setCatena(r.catena); })
-      .catch(() => { /* l'audit trail non è bloccante per la scheda */ });
+      // Non blocca la scheda, ma un registro non letto non è un registro vuoto.
+      .catch((err) => setErrore(`Registro eventi compliance non letto: ${err?.message || 'errore di rete'}`));
   };
 
   useEffect(() => {

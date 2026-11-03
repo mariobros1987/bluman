@@ -72,7 +72,7 @@ export const RegistraFatturaPassivaModal: React.FC<RegistraFatturaPassivaModalPr
             setContoBancarioId(res[0].id);
           }
         })
-        .catch(() => {});
+        .catch((err) => setErrore(`Conti bancari non letti: ${err?.message || 'errore di rete'}. Il pagamento non si potrà collegare a un conto.`));
     }
   }, [isOpen, selectedFornitoreId]);
 

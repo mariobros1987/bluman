@@ -833,7 +833,11 @@ SHA-256 del documento.
                   return [...vista, ...prev.filter((d) => !idsDb.has(d.id))];
                 });
               })
-              .catch(() => {});
+              .catch((err) => {
+                // La firma è registrata; è la rilettura dell'elenco a non essere riuscita.
+                console.error('Elenco documenti non riletto dopo la firma', err);
+                toast.errore(`Documento firmato, ma l'elenco non si è aggiornato: ${err instanceof Error ? err.message : 'errore di rete'}. Ricarica la scheda.`);
+              });
           }}
         />
       )}

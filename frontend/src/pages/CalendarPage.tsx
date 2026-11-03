@@ -69,6 +69,7 @@ export function CalendarPage() {
   const [eventi, setEventi] = useState<EventoCalendario[]>([]);
   const [categoriePermesse, setCategoriePermesse] = useState<CategoriaCalendario[]>([]);
   const [clienti, setClienti] = useState<ClienteSemplice[]>([]);
+  const [erroreClienti, setErroreClienti] = useState<string | null>(null);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState<string | null>(null);
 
@@ -121,7 +122,8 @@ export function CalendarPage() {
    * L'anagrafica dei clienti, per il modulo di creazione (B3).
    *
    * Una volta sola, e l'errore non è fatale: se l'anagrafica non risponde, il modulo resta senza
-   * elenco — e lo dice — invece di impedire di scrivere un promemoria che di clienti non ha bisogno.
+   * elenco — e dice che la lettura è fallita, non che i clienti non ci sono — invece di impedire
+   * di scrivere un promemoria che di clienti non ha bisogno.
    */
   useEffect(() => {
     let annullato = false;
@@ -134,8 +136,8 @@ export function CalendarPage() {
             .filter((c: any) => typeof c?.id === 'string' && typeof c?.nome === 'string')
             .map((c: any) => ({ id: c.id as string, nome: c.nome as string })),
         );
-      } catch {
-        // Silenzio deliberato: l'elenco vuoto è già un'informazione, e il modale la mostra.
+      } catch (err: any) {
+        if (!annullato) setErroreClienti(err?.message || 'errore di rete');
       }
     })();
     return () => { annullato = true; };
@@ -268,6 +270,7 @@ export function CalendarPage() {
         <ModaleNuovoEvento
           giornoIniziale={bozzaAperta.giorno}
           clienti={clienti}
+          erroreClienti={erroreClienti}
           team={team}
           onChiudi={() => setBozzaAperta(null)}
           onCreato={carica}

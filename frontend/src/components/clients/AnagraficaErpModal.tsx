@@ -154,6 +154,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [kycFasc, setKycFasc] = useState<FascicoloKyc | null>(null);
   const [kycBusy, setKycBusy] = useState(false);
   const [kycMsg, setKycMsg] = useState<string | null>(null);
+  // Dopo una modifica dei pannelli KYC si rilegge il fascicolo: se la rilettura fallisce lo si dice,
+  // perché a schermo resterebbe la versione di prima.
+  const ricaricaKycFascicolo = () =>
+    fetchKycFascicoloApi(client.id)
+      .then((r) => setKycFasc(r.fascicolo))
+      .catch((e: any) => setKycMsg(`Fascicolo KYC non riletto dopo la modifica: ${e?.message || 'errore di rete'}.`));
   // Il modulo Compliance/KYC può essere spento per lo studio: in tal caso la scheda non si mostra.
   const [kycModuloAttivo, setKycModuloAttivo] = useState(true);
   useEffect(() => {
@@ -815,13 +821,13 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 ))}
               </div>
               {kycMsg && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>{kycMsg}</div>}
-              {kycFasc && <PannelloSoggettoKyc fascicolo={kycFasc} puoModificare={true} onAggiornato={() => fetchKycFascicoloApi(client.id).then((r) => setKycFasc(r.fascicolo)).catch(() => {})} />}
+              {kycFasc && <PannelloSoggettoKyc fascicolo={kycFasc} puoModificare={true} onAggiornato={() => ricaricaKycFascicolo()} />}
               {kycFasc && <PannelloTitolariEffettivi fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloRischio fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloScreening fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloAnomalie fascicoloId={kycFasc.id} puoModificare={true} />}
               {kycFasc && <PannelloSegnalazioniFiau fascicoloId={kycFasc.id} puoModificare={true} />}
-              {kycFasc && <PannelloRetention fascicolo={kycFasc} puoModificare={true} onAggiornato={() => fetchKycFascicoloApi(client.id).then((r) => setKycFasc(r.fascicolo)).catch(() => {})} />}
+              {kycFasc && <PannelloRetention fascicolo={kycFasc} puoModificare={true} onAggiornato={() => ricaricaKycFascicolo()} />}
               {kycFasc && (
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
                   <button type="button" className="btn btn-sm btn-secondary" onClick={() => scaricaReportFascicoloPdf(kycFasc.id).catch((e) => setKycMsg(e?.message || 'Errore report'))}>
