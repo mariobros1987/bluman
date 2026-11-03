@@ -109,7 +109,7 @@ export async function generaVerbaleDiFirma(params: {
   clienteId: string;
   clienteNome: string;
   firma: FirmaPerVerbale;
-  /** Impronta SHA-256 del sigillo: è calcolata dal builder del sigillo, non dalla firma. */
+  /** Sigillo HMAC-SHA256: è calcolato dal builder del sigillo, non dalla firma. */
   sigilloDigest: string;
   ambito: string;
   riferimentoId: string | null;

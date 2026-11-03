@@ -234,7 +234,7 @@ describe('blocchiSalvati / haSlotFirma / righeAttestazione', () => {
     expect(righe[0]).toBe('Firmato elettronicamente da Luigi Bianchi');
     expect(righe[1]).toBe('Firma Elettronica Avanzata · 2026-08-29 18:04:06 UTC');
     expect(righe[2]).toBe('ID firma BLU-1');
-    expect(righe[3]).toContain('c'.repeat(64));
+    expect(righe[3]).toBe(`Sigillo HMAC-SHA256 ${'c'.repeat(64)}`);
     // Il valore legale non si gonfia: senza indicazione è firma semplice.
     const senzaValore = righeAttestazione({
       firmatarioNome: 'Anna Verdi',
@@ -254,7 +254,7 @@ describe('blocchiSalvati / haSlotFirma / righeAttestazione', () => {
       firmatoAt: new Date('2026-01-02T03:04:05.000Z'),
       sigilloDigest: null,
     });
-    expect(righe[3]).toBe('Sigillo SHA-256 non registrato');
+    expect(righe[3]).toBe('Sigillo HMAC-SHA256 non registrato');
   });
 });
 

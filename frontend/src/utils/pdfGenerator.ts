@@ -59,7 +59,7 @@ function htmlFirme(signatures: SignatureData[]): string {
             <div style="font-size: 8pt; color: #64748b; font-family: monospace; margin-top: 3px; line-height: 1.3;">
               Data/Ora: ${escapeHtmlTesto(sig.timestamp)}<br/>
               IP: ${sig.ipAddress || 'non registrato'}${sig.signatureId ? `<br/>Sigillo: ${sig.signatureId}` : ''}
-              ${sig.sha256Digest ? `<br/>SHA-256: ${sig.sha256Digest}` : ''}
+              ${sig.sha256Digest ? `<br/>Sigillo HMAC-SHA256: ${sig.sha256Digest}` : ''}
             </div>
           </div>
         `).join('')}

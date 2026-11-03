@@ -142,7 +142,7 @@ export function TabProposta({
                 {eidasSeal?.timestampIso ? (
                   <div style={{ fontSize: 11, color: 'var(--pill-green-fg)', marginTop: 4 }}>
                     Stipulato il: <strong>{new Date(eidasSeal.timestampIso).toLocaleString('it-IT')}</strong>
-                    {eidasSeal.sha256Digest && <> · Impronta SHA-256: <span style={{ fontFamily: 'monospace' }}>{String(eidasSeal.sha256Digest).slice(0, 16)}…</span></>}
+                    {eidasSeal.sha256Digest && <> · Sigillo HMAC-SHA256: <span style={{ fontFamily: 'monospace' }}>{String(eidasSeal.sha256Digest).slice(0, 16)}…</span></>}
                   </div>
                 ) : (
                   <div style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4 }}>

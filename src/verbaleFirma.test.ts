@@ -336,6 +336,9 @@ describe('Punto 2 — generaPdfVerbaleFirma (contenuto certificativo)', () => {
     expect(testo).toContain('VERIFICA CON CODICE OTP MONOUSO');
     expect(testo).toContain('ma***o@esempio.it'); // recapito mai in chiaro nel verbale
     expect(testo).toContain('b'.repeat(64));
+    // A12 — il sigillo è un HMAC con chiave, non un'impronta che chiunque può ricalcolare.
+    expect(testo).toContain('Sigillo HMAC-SHA256');
+    expect(testo).not.toContain('Impronta SHA-256 del sigillo');
   });
 
   it('manuale_scansionata senza OTP: la sezione OTP è omessa, non lasciata vuota', async () => {

@@ -89,7 +89,7 @@ async function runAllVerificationChecks() {
     'Generazione Sigillo Crittografico SES (prefisso SIGILLO-SES, mai "avanzato" per default)',
     seal.signatureId.startsWith('SIGILLO-SES-') && seal.sha256Digest.length === 64 &&
       !seal.standard.includes('Avanzata'),
-    `ID Sigillo: ${seal.signatureId} | SHA-256: ${seal.sha256Digest.slice(0, 16)}...`,
+    `ID Sigillo: ${seal.signatureId} | HMAC-SHA256: ${seal.sha256Digest.slice(0, 16)}...`,
   );
   assertTest(
     'Il sigillo cita il canale realmente usato, non una formula fissa',

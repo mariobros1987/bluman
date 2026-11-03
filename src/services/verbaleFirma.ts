@@ -63,7 +63,7 @@ export interface DatiVerbaleFirma {
   timestampIso: string;
   ipAddress: string | null;
   userAgent: string | null;
-  /** Impronta SHA-256 del sigillo: lega insieme tutti gli elementi del verbale. */
+  /** Sigillo HMAC-SHA256 (chiave del server): lega insieme tutti gli elementi del verbale. */
   sha256Digest: string;
   /** Presente solo se un codice OTP è stato effettivamente usato per questa firma. */
   otp?: DatiOtpVerbale | null;
@@ -256,7 +256,8 @@ export function generaPdfVerbaleFirma(dati: DatiVerbaleFirma): Promise<Buffer> {
     riga(doc, 'Sessione portale certificata', dati.sessionId);
     riga(doc, 'Momento del login del firmatario', formattaData(dati.loginAt));
   }
-  riga(doc, 'Impronta SHA-256 del sigillo', dati.sha256Digest.toLowerCase());
+  // A12 — il sigillo è un HMAC-SHA256 con la chiave del server, non un'impronta ricalcolabile.
+  riga(doc, 'Sigillo HMAC-SHA256', dati.sha256Digest.toLowerCase());
 
   // Marca temporale RFC 3161 — sezione presente solo se la richiesta è stata fatta.
   // Quando la TSA non ha risposto, il verbale lo dice: un'assenza dichiarata è un

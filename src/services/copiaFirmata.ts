@@ -94,7 +94,7 @@ export function righeAttestazione(params: {
     `Firmato elettronicamente da ${firmatarioNome}`,
     `${etichettaValore} · ${quando} UTC`,
     `ID firma ${signatureId}`,
-    `Sigillo SHA-256 ${sigilloDigest ?? 'non registrato'}`,
+    `Sigillo HMAC-SHA256 ${sigilloDigest ?? 'non registrato'}`,
   ];
 }
 
