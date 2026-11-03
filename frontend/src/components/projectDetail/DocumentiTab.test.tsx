@@ -3,7 +3,7 @@
 // 15/08/2026 e due marcati `firmato: true` («sottoscritti con Firma Elettronica Semplice»):
 // due documenti firmati che nessuno aveva firmato, dati da leggere come atti reali.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 vi.mock('react-router-dom', () => ({
   useNavigate: () => vi.fn(),
@@ -27,9 +27,11 @@ vi.mock('../ui/ConfirmProvider', () => ({
 }));
 
 vi.mock('../documenti/FirmaStudioModal', () => ({ FirmaStudioModal: () => null }));
+vi.mock('../../utils/pdfGenerator', () => ({ downloadRealPdf: vi.fn(), downloadRealWordDoc: vi.fn() }));
 
 import { DocumentiTab } from './DocumentiTab';
 import { listaDocumentiProgetto } from '../../api/client';
+import { downloadRealPdf } from '../../utils/pdfGenerator';
 
 function progetto(id: string) {
   return { id, cl: 'Holding Beta S.r.l.', n: 'Progetto Structuring Holding Malta', val: 5000 } as any;
@@ -53,5 +55,27 @@ describe('DocumentiTab — il vault contiene solo documenti che esistono', () =>
     expect(screen.queryByText(/Accordo di Riservatezza & Non Divulgazione \(NDA\)/)).toBeNull();
     expect(screen.queryByText(/15\/08\/2026/)).toBeNull();
     expect(screen.queryByText(/Sottoscritto con Firma Elettronica Semplice/)).toBeNull();
+  });
+});
+
+// 3.13 — il PDF di un documento del fascicolo, per uno studio di cui non si conosce il nome,
+// stampava «STUDIO PROFESSIONALE — ADVISORY SERVICES»: ora il segnaposto dice che manca.
+describe('DocumentiTab — PDF senza nome di studio inventato (3.13)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('bluman_user', JSON.stringify({ ruolo: 'advisor', tenantId: '00000000-0000-0000-0000-000000000002' }));
+    vi.mocked(downloadRealPdf).mockClear();
+  });
+
+  it('studio sconosciuto → [DATO MANCANTE: ragione sociale dello studio] nel PDF', async () => {
+    vi.mocked(listaDocumentiProgetto).mockResolvedValueOnce([{ id: 'doc-1', fileUrl: '', contenutoHtml: '<p>Atto</p>' }] as any);
+    render(<DocumentiTab project={progetto('prg-1')} />);
+    fireEvent.click(await screen.findByTitle('Scarica in formato PDF A4'));
+    await waitFor(() => expect(downloadRealPdf).toHaveBeenCalled());
+    const html = vi.mocked(downloadRealPdf).mock.calls[0][1] as string;
+    expect(html).toContain('[DATO MANCANTE: ragione sociale dello studio]');
+    // «Studio Professionale:» resta come etichetta del campo; il nome inventato no.
+    expect(html).not.toContain('STUDIO PROFESSIONALE');
+    expect(html).not.toContain('Studio Professionale •');
   });
 });

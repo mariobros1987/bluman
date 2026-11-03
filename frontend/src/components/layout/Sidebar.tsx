@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getModuliDisattivati } from '../../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getModuliDisattivati, ANAGRAFICA_DA_COMPLETARE } from '../../utils/tenant';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -78,7 +78,7 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
         {effectiveLogo ? (
           <img
             src={getFormattedLogoUrl(effectiveLogo)}
-            alt={studioInfo.ragioneSociale || 'Studio'}
+            alt={studioInfo.ragioneSociale || ANAGRAFICA_DA_COMPLETARE}
             style={{ height: 32, maxWidth: 160, objectFit: 'contain', display: 'block' }}
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
@@ -90,12 +90,12 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
               🏛
             </div>
             <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 125 }}>
-              {studioInfo.nomeBreve || 'Studio'}
+              {studioInfo.nomeBreve || ANAGRAFICA_DA_COMPLETARE}
             </div>
           </div>
         )}
         <div style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: 'var(--cat-societario)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          🏛 {studioInfo.nomeBreve || studioInfo.ragioneSociale || 'Studio Professionale'}
+          🏛 {studioInfo.nomeBreve || studioInfo.ragioneSociale || ANAGRAFICA_DA_COMPLETARE}
         </div>
       </div>
 

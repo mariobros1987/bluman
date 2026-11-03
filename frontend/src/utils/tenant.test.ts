@@ -8,6 +8,8 @@ import {
   getTenantStorageKey,
   isAdminStudio,
   getAllAvailableTenants,
+  getStudioInfoForTenant,
+  ragioneSocialeDocumento,
   BLUECODE_TENANT_ID,
 } from './tenant';
 
@@ -79,10 +81,10 @@ describe('getAllAvailableTenants — nessuno studio inventato nel selettore', ()
     expect(elenco[0].ragioneSociale).toBe('Bluecode LTD');
   });
 
-  it('senza nemmeno l\'anagrafica mostra il segnaposto, non un nome di fantasia', () => {
+  it('senza nemmeno l\'anagrafica dice che è da completare, non un nome di fantasia (3.13)', () => {
     localStorage.setItem('bluman_user', JSON.stringify({ ruolo: 'advisor', tenantId: TENANT_DUE }));
     const elenco = getAllAvailableTenants();
-    expect(elenco[0].ragioneSociale).toBe('Studio Professionale');
+    expect(elenco[0].ragioneSociale).toBe('Anagrafica studio da completare');
   });
 
   it('col registro admin in storage vince il registro', () => {
@@ -92,5 +94,22 @@ describe('getAllAvailableTenants — nessuno studio inventato nel selettore', ()
     expect(getAllAvailableTenants()).toEqual([
       { id: TENANT_DUE, ragioneSociale: 'Secondo Studio S.r.l.', giurisdizione: 'Italia' },
     ]);
+  });
+});
+
+// 3.13 — uno studio di cui non si sa nulla non si chiama «Studio Professionale».
+describe('getStudioInfoForTenant — studio sconosciuto senza nome inventato', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('ragione sociale e nome breve restano vuoti', () => {
+    const studio = getStudioInfoForTenant(TENANT_DUE);
+    expect(studio.ragioneSociale).toBe('');
+    expect(studio.nomeBreve).toBe('');
+  });
+
+  it('nei documenti il nome mancante è il segnaposto, anche in maiuscolo', () => {
+    expect(ragioneSocialeDocumento('')).toBe('[DATO MANCANTE: ragione sociale dello studio]');
+    expect(ragioneSocialeDocumento('', true)).toBe('[DATO MANCANTE: ragione sociale dello studio]');
+    expect(ragioneSocialeDocumento('Studio Vero Srl', true)).toBe('STUDIO VERO SRL');
   });
 });

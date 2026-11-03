@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { inviaComunicazioneApi, fetchComunicazioniApi, segnaComunicazioniLetteApi } from '../../api/client';
 import { uploadFileApi, urlDocumentoAssoluto } from '../../api/documenti';
 import type { ContattiStudio } from '../../api/client';
-import { getStudioInfoForTenant } from '../../utils/tenant';
+import { getStudioInfoForTenant, ANAGRAFICA_DA_COMPLETARE } from '../../utils/tenant';
 import { SpunteStato } from '../SpunteStato';
 import { docBoxStyle } from './styles';
 import { useToast } from '../ui/ToastProvider';
@@ -497,7 +497,7 @@ export function TabContatti({
           il ripiego locale solo se il backend non ha risposto. */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginTop: 18 }}>
         <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-          Sede Legale {contattiStudio?.studio || getStudioInfoForTenant().ragioneSociale}
+          Sede Legale {contattiStudio?.studio || getStudioInfoForTenant().ragioneSociale || ANAGRAFICA_DA_COMPLETARE}
         </div>
         <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
           {contattiStudio?.sedeLegale || getStudioInfoForTenant().sedeLegale || 'Sede in fase di configurazione'}<br />

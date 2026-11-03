@@ -4,7 +4,7 @@ import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
-import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../../utils/tenant';
+import { getStudioInfoForTenant, getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID, ANAGRAFICA_DA_COMPLETARE, ragioneSocialeDocumento } from '../../utils/tenant';
 import type { CanaleOtp, CanaleFirma, RichiestaAddendum } from '../../api/client';
 import type { ModuloProposta, BersaglioFirma } from './types';
 import { dataOraLeggibile } from './format';
@@ -160,12 +160,12 @@ export function TabProposta({
                     const rawLogo = localStorage.getItem(getTenantStorageKey('bluman_logo_url')) || (isBC ? `${window.location.origin}/logo.png` : '');
                     const logoHtml = rawLogo
                       ? `<img src="${rawLogo}" alt="Logo dello studio" style="max-height:55px;max-width:220px;object-fit:contain;margin-bottom:8px;display:block;" />`
-                      : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${studio.ragioneSociale.toUpperCase()}</div>`;
+                      : `<div style="font-size:20px;font-weight:800;color:#1e1b4b;margin-bottom:8px;">🏛 ${ragioneSocialeDocumento(studio.ragioneSociale, true)}</div>`;
                     const htmlContent = `
                       <div style="border-bottom:2px solid #0f172a;padding-bottom:15px;display:flex;justify-content:space-between;align-items:flex-start;">
                         <div>
                           ${logoHtml}
-                          <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY</div>
+                          <div style="font-size:20px;font-weight:800;color:#1e1b4b;">${ragioneSocialeDocumento(studio.ragioneSociale, true)} — ADVISORY</div>
                           <div style="font-size:11px;color:#475569;margin-top:2px;">${studio.sedeLegale}</div>
                         </div>
                         <div style="text-align:right;">
@@ -338,7 +338,7 @@ export function TabProposta({
               </div>
               <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Dettaglio Incarico Professionale & Moduli Spettanti</h2>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                Studio Erogante: <strong>{getStudioInfoForTenant().ragioneSociale}</strong> · Advisor Lead: <strong>{getStudioInfoForTenant().leadAdvisor}</strong>
+                Studio Erogante: <strong>{getStudioInfoForTenant().ragioneSociale || ANAGRAFICA_DA_COMPLETARE}</strong> · Advisor Lead: <strong>{getStudioInfoForTenant().leadAdvisor}</strong>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>

@@ -4,7 +4,7 @@ import { fmt, getFormattedLogoUrl } from '../../utils';
 import { emettiFatturaApi } from '../../api/client';
 import { downloadFatturaPdfServerApi } from '../../api/fatturazione';
 import { risolviAliquotaIva, calcolaTotaliFatturaRighe } from '../../utils/fatturazione';
-import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECODE_TENANT_ID } from '../../utils/tenant';
+import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECODE_TENANT_ID, ragioneSocialeDocumento } from '../../utils/tenant';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 import { useToast } from '../ui/ToastProvider';
@@ -435,11 +435,11 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                       />
                     ) : (
                       <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-d)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        🏛 {studio.ragioneSociale.toUpperCase()}
+                        🏛 {ragioneSocialeDocumento(studio.ragioneSociale, true)}
                       </div>
                     )}
                     <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--indigo-d)' }}>
-                      {studio.ragioneSociale}
+                      {ragioneSocialeDocumento(studio.ragioneSociale)}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                       {studio.sedeLegale}{studio.sedeLegale ? <br /> : null}

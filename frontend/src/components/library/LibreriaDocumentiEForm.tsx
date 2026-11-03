@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../ui/CatBadge';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { PREBUILT_TEMPLATES, exportTemplatesAsJson } from '../../utils/documentTemplates';
-import { getStudioInfoForTenant } from '../../utils/tenant';
+import { getStudioInfoForTenant, ragioneSocialeDocumento } from '../../utils/tenant';
 import { uploadFileApi, fetchClienti, fetchProgetti } from '../../api/client';
 // §41 — l'elenco dei modelli e i gesti su di essi passano dalla cartella dello studio
 // (database). Prima archiviazione ed eliminazione scrivevano in `localStorage`: valevano per
@@ -232,7 +232,7 @@ export function LibreriaDocumentiEForm() {
       <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #0f172a;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${studio.ragioneSociale.toUpperCase()} — ADVISORY SERVICES</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${ragioneSocialeDocumento(studio.ragioneSociale, true)} — ADVISORY SERVICES</div>
             <div style="font-size: 9pt; color: #64748b;">${studio.sedeLegale} · P.IVA ${studio.piva}</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
@@ -242,7 +242,7 @@ export function LibreriaDocumentiEForm() {
         </div>
         <div>${tmpl.contenutoHtml}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-          <span>${studio.ragioneSociale} • Modello Ufficiale Studio</span>
+          <span>${ragioneSocialeDocumento(studio.ragioneSociale)} • Modello Ufficiale Studio</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
       </div>

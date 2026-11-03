@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { cambiaPasswordStaffApi, fetchProfiloUtenteApi, aggiornaProfiloUtenteApi } from '../api/client';
-import { getCurrentTenantId, getStudioInfoForTenant } from '../utils/tenant';
+import { getCurrentTenantId, getStudioInfoForTenant, ANAGRAFICA_DA_COMPLETARE } from '../utils/tenant';
 import { TabSicurezza } from './settings/TabSicurezza';
 
 interface UserProfileModalProps {
@@ -581,7 +581,7 @@ export function UserProfileModal({ user, onClose, onUserUpdated }: UserProfileMo
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>🏛 Studio Professionale di Riferimento</div>
-                <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{studio.ragioneSociale}</div>
+                <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{studio.ragioneSociale || ANAGRAFICA_DA_COMPLETARE}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{studio.sedeLegale}</div>
                 <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--hint)', marginTop: 8 }}>
                   Tenant ID: {currentTenantId}

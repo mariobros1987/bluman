@@ -121,6 +121,15 @@ export function getTenantStorageKey(baseKey: string, tenantId?: string): string 
   return `${baseKey}_tenant_${tId}`;
 }
 
+/** 3.13 — nell'interfaccia, al posto del nome dello studio che manca. */
+export const ANAGRAFICA_DA_COMPLETARE = 'Anagrafica studio da completare';
+
+/** 3.13 — il nome dello studio in un documento, PDF o messaggio al cliente: mai inventato. */
+export function ragioneSocialeDocumento(ragioneSociale?: string | null, maiuscolo = false): string {
+  if (!ragioneSociale || !ragioneSociale.trim()) return '[DATO MANCANTE: ragione sociale dello studio]';
+  return maiuscolo ? ragioneSociale.toUpperCase() : ragioneSociale;
+}
+
 /**
  * Recupera i dati anagrafici dello Studio del tenant attivo
  */
@@ -147,7 +156,7 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
           base = {
             id: found.id,
             ragioneSociale: found.ragioneSociale,
-            nomeBreve: found.ragioneSociale ? found.ragioneSociale.split(' ')[0] : 'Studio',
+            nomeBreve: found.ragioneSociale ? found.ragioneSociale.split(' ')[0] : '',
             giurisdizione: found.giurisdizione || 'Italia',
             piva: found.pIva || '',
             codiceFiscale: found.pIva || '',
@@ -171,8 +180,9 @@ export function getStudioInfoForTenant(tenantId?: string): StudioInfo {
   if (!base) {
     base = {
       id: tId,
-      ragioneSociale: 'Studio Professionale',
-      nomeBreve: 'Studio',
+      // 3.13 — uno studio di cui non si sa nulla non ha un nome: era «Studio Professionale».
+      ragioneSociale: '',
+      nomeBreve: '',
       giurisdizione: 'Italia',
       piva: '',
       codiceFiscale: '',
@@ -313,11 +323,10 @@ export function getAllAvailableTenants(): { id: string; ragioneSociale: string; 
     }
   } catch {}
 
-  // Niente registro locale: l'unico studio di cui si sa qualcosa è quello attivo. Il nome può
-  // essere il segnaposto generico («Studio Professionale») se nemmeno l'anagrafica è arrivata —
-  // e un segnaposto dichiarato è meglio di un nome inventato che sembra vero.
+  // Niente registro locale: l'unico studio di cui si sa qualcosa è quello attivo. Se nemmeno
+  // l'anagrafica è arrivata il selettore lo dice («da completare»), senza un nome inventato.
   const studio = getStudioInfoForTenant();
-  return [{ id: studio.id, ragioneSociale: studio.ragioneSociale, giurisdizione: studio.giurisdizione }];
+  return [{ id: studio.id, ragioneSociale: studio.ragioneSociale || ANAGRAFICA_DA_COMPLETARE, giurisdizione: studio.giurisdizione }];
 }
 
 /**

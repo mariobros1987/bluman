@@ -7,7 +7,7 @@ import { SimpleZipBuilder } from '../../utils/zipBuilder';
 // proprio i documenti archiviati a database — il click lanciava ReferenceError. Il
 // typecheck del frontend non lo vedeva perché girava su zero file (vedi tsconfig.json).
 import { listaDocumentiProgetto, salvaDocumentoApi, eliminaDocumentoApi, archiviaDocumentoApi, scaricaDocumentoClient, scaricaDocumentoWordClient } from '../../api/client';
-import { getTenantStorageKey, getStudioInfoForTenant, isAdminStudio } from '../../utils/tenant';
+import { getTenantStorageKey, getStudioInfoForTenant, isAdminStudio, ragioneSocialeDocumento } from '../../utils/tenant';
 import { FoglioA4 } from '../documenti/FoglioA4';
 import { scomponiDocumento } from '../../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../../src/util/htmlSanitizer';
@@ -96,7 +96,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
           ${escapeHtmlTesto(doc.titolo || doc.nome)}
         </h1>
         <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 10pt;">
-          <strong>Studio Professionale:</strong> ${escapeHtmlTesto(studio.ragioneSociale)}<br/>
+          <strong>Studio Professionale:</strong> ${escapeHtmlTesto(ragioneSocialeDocumento(studio.ragioneSociale))}<br/>
           <strong>Cliente Committente:</strong> ${escapeHtmlTesto(project.cl)} (${escapeHtmlTesto(project.n)})<br/>
           <strong>Categoria Vault:</strong> ${escapeHtmlTesto(doc.cat || doc.categoria || 'Generale')}<br/>
           <strong>Stato Firma:</strong> ${doc.firmato ? 'Sottoscritto con Firma Elettronica Semplice (OTP verificata · art. 20 CAD)' : 'Bozza Documentale Studio'}
@@ -108,7 +108,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
       <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; line-height: 1.6; padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4338ca; padding-bottom: 14px; margin-bottom: 24px;">
           <div>
-            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${escapeHtmlTesto(studio.ragioneSociale.toUpperCase())} — ADVISORY SERVICES</div>
+            <div style="font-size: 16pt; font-weight: 800; color: #1e1b4b;">${escapeHtmlTesto(ragioneSocialeDocumento(studio.ragioneSociale, true))} — ADVISORY SERVICES</div>
             <div style="font-size: 9pt; color: #64748b;">${escapeHtmlTesto(studio.sedeLegale)} · P.IVA ${escapeHtmlTesto(studio.piva)}</div>
           </div>
           <div style="text-align: right; font-size: 8.5pt; color: #64748b;">
@@ -117,7 +117,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
         </div>
         <div>${rawContent}</div>
         <div style="margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; font-size: 8.5pt; color: #94a3b8;">
-          <span>${escapeHtmlTesto(studio.ragioneSociale)} • Pratica: ${escapeHtmlTesto(project.n)}</span>
+          <span>${escapeHtmlTesto(ragioneSocialeDocumento(studio.ragioneSociale))} • Pratica: ${escapeHtmlTesto(project.n)}</span>
           <span>Firma Elettronica Semplice • art. 20 CAD</span>
         </div>
       </div>
@@ -320,7 +320,7 @@ export function DocumentiTab({ project }: { project: Progetto }) {
               // Indice del fascicolo
               const studio = getStudioInfoForTenant();
               const indiceText = `================================================================================
-${studio.ragioneSociale.toUpperCase()} — ADVISORY PLATFORM
+${ragioneSocialeDocumento(studio.ragioneSociale, true)} — ADVISORY PLATFORM
 FASCICOLO COMMESSA: ${project.n}
 COMMITTENTE: ${project.cl}
 DATA EXPORT: ${new Date().toLocaleString('it-IT')}
