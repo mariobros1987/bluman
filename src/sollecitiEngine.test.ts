@@ -55,6 +55,20 @@ describe('🧪 Solleciti & Interessi di Mora ex D.Lgs. 231/2002 — Test Suite',
       expect(res.calcoloMora.speseForfettarieRecuperoCent).toBe(0);
     });
 
+    it('3.17 — senza ragione sociale dello studio non compone il testo (nessun nome di ripiego)', () => {
+      const dati = {
+        livello: '1_avviso_bonario' as const,
+        clienteNome: 'Holding Alpha S.r.l.',
+        numeroFattura: 'FT-2026/010',
+        dataEmissione: '2026-07-01',
+        dataScadenza: new Date(),
+        numeroRata: 1,
+        importoCapitaleCent: 250000,
+      };
+      expect(() => generaTestoSollecito({ ...dati, studioNome: '' })).toThrow(/Ragione sociale/);
+      expect(() => generaTestoSollecito({ ...dati, studioNome: '   ' })).toThrow(/Ragione sociale/);
+    });
+
     it('genera sollecito con mora (2° livello) con citazione D.Lgs. 231/2002 e spese forfettarie', () => {
       const res = generaTestoSollecito({
         livello: '2_sollecito_mora',

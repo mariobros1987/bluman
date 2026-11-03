@@ -21,6 +21,13 @@ const kyc = vi.hoisted(() => ({
 }));
 
 /**
+ * 3.17 — le righe Tenant del database finto. `GET /tenant/info` non ripiega più su una copia in
+ * memoria né crea lo studio: i test che lo leggono hanno bisogno della riga, e il PATCH la scrive
+ * qui, così «salva e rileggi» passa dal database come in produzione.
+ */
+const studi = vi.hoisted(() => new Map<string, Record<string, unknown>>());
+
+/**
  * Lo stato va riportato ai valori iniziali prima di **ogni** test del file, non solo di quelli del
  * gate: i mock sono condivisi, e un `letturaPreventivoFallisce` rimasto `true` dall'ultimo test del
  * gate faceva fallire le accettazioni dei test successivi — che col gate non c'entravano nulla.
@@ -33,6 +40,10 @@ beforeEach(() => {
   kyc.override = null;
   kyc.preventivo = { clienteId: 'cli-kyc' };
   kyc.letturaPreventivoFallisce = false;
+  studi.clear();
+  for (const id of ['00000000-0000-0000-0000-000000000001', 'aaaaaaaa-0000-4000-8000-00000000000a', 'bbbbbbbb-0000-4000-8000-00000000000b']) {
+    studi.set(id, { id, ragioneSociale: 'Studio di prova', piano: 'enterprise', stato: 'attivo' });
+  }
 });
 
 vi.mock('./util/prismaClient.js', async importOriginal => {
@@ -78,11 +89,17 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       if (sel.moduliConcessi === true && sel.moduliDisattivati === true) {
         return { moduliConcessi: kyc.moduliConcessi, moduliDisattivati: kyc.moduliDisattivati };
       }
+      // La riga intera, come la legge GET /tenant/info.
+      if (args?.select === undefined && typeof args?.where?.id === 'string') return studi.get(args.where.id) ?? null;
       return (reale.prisma as any).tenant.findUnique(args);
     },
     // PATCH /tenant/info: senza database la scrittura deve riuscire per finta, non ripiegare su una
     // copia in memoria (A6: un salvataggio fallito ora risponde 500).
-    upsert: async (args: any) => ({ id: args.where.id, ...args.create, ...args.update }),
+    upsert: async (args: any) => {
+      const riga = { ...(studi.get(args.where.id) ?? { id: args.where.id, ...args.create }), ...args.update };
+      studi.set(args.where.id, riga);
+      return riga;
+    },
   });
   const preventivo = delega((reale.prisma as any).preventivo, {
     findFirst: async (args: any) => {
@@ -612,8 +629,8 @@ describe('server — §23 rate limiting sugli endpoint di autenticazione', () =>
 });
 
 describe('server — §2bis isolamento tenant: header x-tenant-id', () => {
-  // UUID dedicati a questo blocco: lo store in-memory dei tenant è per processo,
-  // usare quelli di default renderebbe il test dipendente dall'ordine di esecuzione.
+  // UUID dedicati a questo blocco: le loro righe Tenant le prepara il `beforeEach` in testa
+  // al file (`studi`), così ogni test parte dagli stessi studi registrati.
   const TENANT_A = 'aaaaaaaa-0000-4000-8000-00000000000a';
   const TENANT_B = 'bbbbbbbb-0000-4000-8000-00000000000b';
   const TENANT_DEFAULT = '00000000-0000-0000-0000-000000000001';

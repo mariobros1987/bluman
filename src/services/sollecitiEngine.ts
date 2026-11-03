@@ -120,7 +120,9 @@ export function generaTestoSollecito(dati: DatiSollecitoInput): SollecitoGenerat
 
   const dataScadFmt = new Date(dati.dataScadenza).toLocaleDateString('it-IT');
   const importoCapFmt = `€${(dati.importoCapitaleCent / 100).toFixed(2)}`;
-  const studio = dati.studioNome || 'Studio Professionale BluMan';
+  // 3.17 — nessun nome di ripiego: le rotte rispondono 409 prima di arrivare qui.
+  const studio = dati.studioNome?.trim();
+  if (!studio) throw new Error('Ragione sociale dello studio mancante: il sollecito non si compone.');
   const iban = dati.ibanStudio ? `\nCoordinate Bancarie per il versamento (IBAN):\n${dati.ibanStudio}\n` : '';
 
   let oggettoEmail = '';

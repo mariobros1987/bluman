@@ -13,6 +13,11 @@ import {
 } from '../services/sollecitiEngine.js';
 import { InviaSollecitoSchema } from '../schemas/solleciti.schema.js';
 
+/** 3.17 — non si scrive al cliente a nome di uno studio inventato: senza ragione sociale, niente sollecito. */
+const ERRORE_RAGIONE_SOCIALE_MANCANTE =
+  'Ragione sociale dello studio mancante: completala in Impostazioni prima di inviare solleciti.';
+const ragioneSocialeStudio = (tenant: { ragioneSociale: string | null } | null) => tenant?.ragioneSociale?.trim() || null;
+
 export async function registraRotteSolleciti(server: FastifyInstance): Promise<void> {
   // GET /invoices/solleciti/insoluti — Lista partite aperte scadute con calcolo mora live
   server.get('/invoices/solleciti/insoluti', async (req, reply) => {
@@ -97,6 +102,8 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         }
 
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+        const studioNome = ragioneSocialeStudio(tenant);
+        if (!studioNome) return reply.code(409).send({ errore: ERRORE_RAGIONE_SOCIALE_MANCANTE });
 
         const importoIncassato = scadenza.registrazioniRegistrate.reduce(
           (acc, r) => acc + r.importoIncassatoCentesimi,
@@ -114,7 +121,7 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
           numeroRata: scadenza.numeroRata,
           importoCapitaleCent: capitaleResiduo,
           ibanStudio: scadenza.fattura.contoAccredito?.iban || null,
-          studioNome: tenant?.ragioneSociale || 'Studio Professionale BluMan',
+          studioNome,
           saggioInteresse,
         });
 
@@ -165,6 +172,8 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
         }
 
         const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+        const studioNome = ragioneSocialeStudio(tenant);
+        if (!studioNome) return reply.code(409).send({ errore: ERRORE_RAGIONE_SOCIALE_MANCANTE });
         const destinatario = emailDestinatario || scadenza.fattura.cliente.email;
 
         // W4: escalation stretta — non si salta a un livello senza aver inviato il precedente.
@@ -202,7 +211,7 @@ export async function registraRotteSolleciti(server: FastifyInstance): Promise<v
           numeroRata: scadenza.numeroRata,
           importoCapitaleCent: capitaleResiduo,
           ibanStudio: scadenza.fattura.contoAccredito?.iban || null,
-          studioNome: tenant?.ragioneSociale || 'Studio Professionale BluMan',
+          studioNome,
           saggioInteresse,
         });
 

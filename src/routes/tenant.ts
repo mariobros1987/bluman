@@ -173,38 +173,20 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
     return `configurato (${note.join('; ')})`;
   }
 
-  server.get('/tenant/info', async (req) => {
+  // 3.17 — una lettura non crea lo studio e non gli dà un nome: senza riga a database lo
+  // studio non è registrato (lo crea il super admin), e un database che non risponde è un
+  // errore, non un'anagrafica di ripiego. Permessi: la legge ogni utente dello studio (i
+  // composer ne usano i canali; il cliente del portale riceve 403 dal guard globale) e i
+  // segreti li toglie `tenantPubblico`.
+  server.get('/tenant/info', async (req, reply) => {
     const tenantId = req.tenantId;
-    const defaultNames: Record<string, string> = {
-      '00000000-0000-0000-0000-000000000001': 'Studio Advisory & Legal Partners',
-      '00000000-0000-0000-0000-000000000002': 'Advisory Italia S.r.l. (Milano)',
-      '00000000-0000-0000-0000-000000000003': 'Swiss Wealth Management SA (Lugano)',
-    };
-    const defaultName = defaultNames[tenantId] || 'Studio Professionale';
-
     try {
-      let tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-      if (!tenant) {
-        tenant = await prisma.tenant.create({
-          data: {
-            id: tenantId,
-            ragioneSociale: defaultName,
-            piano: 'enterprise',
-            stato: 'attivo',
-          },
-        });
-      }
+      const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+      if (!tenant) return reply.code(404).send({ errore: 'Studio non registrato' });
       return tenantPubblico(tenant);
-    } catch {
-      if (!inMemoryTenantStore.has(tenantId)) {
-        inMemoryTenantStore.set(tenantId, {
-          id: tenantId,
-          ragioneSociale: defaultName,
-          piano: 'enterprise',
-          stato: 'attivo',
-        });
-      }
-      return tenantPubblico(inMemoryTenantStore.get(tenantId));
+    } catch (err) {
+      req.log.error({ tenantId, err: err instanceof Error ? err.message : err }, 'GET /tenant/info — lettura fallita');
+      return reply.code(500).send({ errore: "Lettura dell'anagrafica dello studio non riuscita. Riprova." });
     }
   });
 
@@ -491,11 +473,9 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
         update: sanitizedData,
         create: {
           id: tenantId,
-          // Il ciclo qui sopra lascia i campi testuali così come arrivano (`unknown`): per la
-          // ragione sociale serve una stringa non vuota, o il default del seed.
-          ragioneSociale: typeof sanitizedData.ragioneSociale === 'string' && sanitizedData.ragioneSociale
-            ? sanitizedData.ragioneSociale
-            : 'Studio Professionale',
+          // Il ciclo qui sopra lascia i campi testuali così come arrivano (`unknown`). Senza una
+          // ragione sociale nel corpo resta vuota: il dato mancante si mostra come mancante.
+          ragioneSociale: typeof sanitizedData.ragioneSociale === 'string' ? sanitizedData.ragioneSociale : '',
           piano: 'enterprise',
           stato: 'attivo',
           ...sanitizedData,
