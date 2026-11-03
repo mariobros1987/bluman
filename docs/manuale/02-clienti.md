@@ -59,4 +59,4 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
   **revoca** è la cancellazione della riga.
 - **Schema** (`Cliente`): P.IVA, Codice Fiscale, Codice SDI, IBAN, rischio AML, UBO, `referentiJson`
   (segreti rimossi). Il `cliente` è passwordless (§23).
-- **Fonti**: `.agents/AGENTS.md`, `AUDIT_2026-09-27/01-sicurezza-multitenant.md`.
+- **Fonti**: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/01-sicurezza-multitenant.md`.

@@ -36,7 +36,7 @@ function puoSbloccareDocumentoFirmato(ruolo?: string): boolean {
  * documenti generico. Oggi l'insieme coincide con quello di `puoSbloccareDocumentoFirmato`,
  * ma sono due decisioni distinte (sbloccare un atto firmato / impegnare lo studio) e restano
  * due funzioni distinte: se domani una delle due cambia, l'altra non deve seguirla per caso.
- * Decisione del titolare del 03/10/2026 — `piano-firma-legale-ses-fea-feq.md` §8.2.
+ * Decisione del titolare del 03/10/2026 — `docs/storico/piano-firma-legale-ses-fea-feq.md` §8.2.
  */
 function puoFirmarePerLoStudio(ruolo?: string): boolean {
   return ruolo === 'advisor' || ruolo === 'super_admin';

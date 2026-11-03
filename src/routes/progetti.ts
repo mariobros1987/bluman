@@ -585,7 +585,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
   });
 
-  // §1.1 (PIANO_DI_MIGLIORAMENTO) — l'eliminazione transazionale esisteva già
+  // §1.1 (docs/storico/PIANO_DI_MIGLIORAMENTO.md) — l'eliminazione transazionale esisteva già
   // nell'adapter (PrismaApp.eliminaProgetto) ma non era esposta via HTTP: il frontend
   // chiamava DELETE /progetti/:id e riceveva 404. La rotta riusa quell'unica
   // implementazione (niente logica duplicata): progetto inesistente → 404, blocco in

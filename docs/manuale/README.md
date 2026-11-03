@@ -131,10 +131,10 @@ Ogni file `NN-*.md` segue questa struttura (così sono tutte uguali e complete):
 
 ## Fonti da cui attingere (già esistenti)
 - **`.agents/AGENTS.md`** — mappa tecnica completa (componenti, rotte, dominio, schema, RBAC, firma).
-- **`AUDIT_2026-09-27/01`–`08`** — per ogni area c'è una parte «come funziona & logica applicata».
+- **`docs/storico/AUDIT_2026-09-27/01`–`08`** — per ogni area c'è una parte «come funziona & logica applicata».
 - **Spec di dominio** — KYC (`bluman-kyc-compliance-specifica-v0.2.md`), firma
-  (`piano-firma-legale-ses-fea-feq.md`, `spec-portale-moduli-firma.md`), contabilità
-  (`piano-riforma-fatture-contabilita-openstamanager.md`), canali (`GUIDA_CONFIGURAZIONE_CANALI.md`).
+  (`docs/storico/piano-firma-legale-ses-fea-feq.md`, `spec-portale-moduli-firma.md`), contabilità
+  (`docs/storico/piano-riforma-fatture-contabilita-openstamanager.md`), canali (`GUIDA_CONFIGURAZIONE_CANALI.md`).
 - **Grafo** (`graphify-out/GRAPH_REPORT.md`) — struttura del codice e comunità: utile per la sezione
   «🔗 Collegamenti» e per non dimenticare pezzi.
 

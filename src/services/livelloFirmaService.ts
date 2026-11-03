@@ -1,5 +1,5 @@
 /**
- * Livelli di firma (piano-firma-legale-ses-fea-feq.md §3) — logica pura.
+ * Livelli di firma (docs/storico/piano-firma-legale-ses-fea-feq.md §3) — logica pura.
  *
  * Tre sono i livelli di valore legale che l'operatore può richiedere per un documento:
  * - `ses` — Firma Elettronica Semplice (art. 20 CAD, eIDAS art. 3 n. 10): il flusso OTP

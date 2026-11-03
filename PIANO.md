@@ -9,7 +9,7 @@ Riferimento: diagnosi del 02/11/2026 (codici A, F, D, M, N).
 - [x] 0.1 CI verificata: verde; la X rossa su GitHub è il deploy Vercel da push (bloccato per scelta)
 - [x] 0.2 Copia locale C:\Progetti\bluman allineata, typecheck/test/build verdi (02/11)
 - [ ] 0.3 CLAUDE.md, PIANO.md, .claude/settings.json — modello: Sonnet
-- [ ] 0.4 Verificare che il JWT_SECRET di produzione non sia quello di analisi.txt:310 (D2) — a mano
+- [ ] 0.4 Verificare che il JWT_SECRET di produzione non sia quello che era in docs/storico/analisi.txt:310 (D2; valore rimosso dal file, si legge con `git show 25237740:analisi.txt`) — a mano
 
 ## Fase 1 — Permessi
 - [ ] 1.1 PUT /tenant/utenti/:userId/permessi solo advisor/super_admin, body zod, transazione, audit completo (A1) — modello: Opus

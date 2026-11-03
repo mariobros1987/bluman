@@ -133,4 +133,4 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
   `PUT /progetti/:id/stato-completo` accetta **solo** le forme che il rendering sa disegnare — elenco di
   stringhe per i campi, oggetto di stringhe per le risposte — e un passaggio che non ne porta nessuna
   **non azzera** quelle che ha.
-- **Fonti**: `AUDIT_2026-09-27/03-progetti-motore-stato.md`, `.agents/AGENTS.md`.
+- **Fonti**: `docs/storico/AUDIT_2026-09-27/03-progetti-motore-stato.md`, `.agents/AGENTS.md`.

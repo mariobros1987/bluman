@@ -144,14 +144,14 @@ Completato il 16-17 settembre 2026 (il cliente aggancia la sua chat a una pratic
 Verifiche: `npx tsc --noEmit` in radice e `npm run typecheck` in `frontend/` verdi, `npx vitest run`
 verde (**83 file, 1005 test**). Deploy eseguito; il log di avvio del container del 17/09 alle 06:54
 UTC dice `36 migrations found` / `No pending migrations to apply.`, cioè le tre migrazioni del 16/09
-sono applicate in produzione (vedi `PIANO_DI_MIGLIORAMENTO.md` §1bis voce 3, ora chiusa).
+sono applicate in produzione (vedi `docs/storico/PIANO_DI_MIGLIORAMENTO.md` §1bis voce 3, ora chiusa).
 
 ⚠️ **Resta da provare a mano**, ed è il pezzo che il link esiste per servire: aprire il link di una
 pratica dal proprio telefono, controllare che la chat riceva la conferma, scrivere un messaggio e
 vederlo comparire nel fascicolo **di quella pratica** con una seconda pratica dello stesso cliente
 aperta in parallelo, poi scollegare e controllare che torni l'avviso «non archiviato». Il 17/09 è
 stato verificato solo il primo passo (premendo il pulsante del webhook il campo si è corretto da
-solo): vedi la voce 1 di `PIANO_DI_MIGLIORAMENTO.md` §1bis.
+solo): vedi la voce 1 di `docs/storico/PIANO_DI_MIGLIORAMENTO.md` §1bis.
 
 Completato il 2 Settembre 2026 (Ciclo Passivo, Fornitori ERP, LIPE, Solleciti e Validazione Zod):
 1. **Fornitori ERP & Ciclo Passivo (OpenSTAManager-grade)**:
@@ -200,13 +200,13 @@ Completato il 27 agosto 2026:
   backend, typecheck frontend REALE (`tsc -b --force` — il `tsc --noEmit` sul tsconfig del
   frontend con `"files": []` non verifica nulla) e build frontend; generato
   `frontend/package-lock.json` perché `npm ci` in CI funzionasse;
-- `analisi.txt` declassato a documento storico (fotografia delle fasi iniziali, non è più il
+- `docs/storico/analisi.txt` declassato a documento storico (fotografia delle fasi iniziali, non è più il
   piano operativo corrente).
 Verifiche: `npx tsc --noEmit` in radice verde, `npx tsc -b --force` in frontend/ verde,
 `npx vitest run` 281/281 in 22 file, `npm run build` verde.
-Restano aperte le voci non spuntate di `PIANO_DI_MIGLIORAMENTO.md` (0.1-0.5, 0.7, Fase 1+).
+Restano aperte le voci non spuntate di `docs/storico/PIANO_DI_MIGLIORAMENTO.md` (0.1-0.5, 0.7, Fase 1+).
 
-Completato il 27 agosto 2026 — secondo ciclo (Punto 3 del `piano-sviluppo-gap-firma-documenti.md`):
+Completato il 27 agosto 2026 — secondo ciclo (Punto 3 del `docs/storico/piano-sviluppo-gap-firma-documenti.md`):
 - fix produzione eliminazione moduli (DELETE `/progetti/:id/moduli/:moduloId` rispondeva 500):
   guard **409** se il modulo ha ore consuntivate o righe fattura collegate e transazione
   ordinata accessi → passaggi → microvoci → dipendenze → modulo;
@@ -228,11 +228,11 @@ Verifiche: `npx tsc --noEmit` in radice verde, `npx tsc -b --force` in frontend/
 (il Dockerfile esegue `prisma migrate deploy`).
 
 PIANO OPERATIVO STORICO (22 agosto 2026) — SUPERATO, conservato per memoria:
-Il piano per fasi in `analisi.txt` (Fase 0/1 chiuse, Fase 2 UI CORE tracking ore 2.1-2.5) è
+Il piano per fasi in `docs/storico/analisi.txt` (Fase 0/1 chiuse, Fase 2 UI CORE tracking ore 2.1-2.5) è
 una fotografia delle fasi iniziali: i task elencati sono stati nel frattempo completati o
-assorbiti dall'evoluzione dell'app. `analisi.txt` resta come documento storico; il piano
+assorbiti dall'evoluzione dell'app. `docs/storico/analisi.txt` resta come documento storico; il piano
 corrente è la sezione «DA DOVE RIPARTIRE» qui sopra più le voci aperte di
-`PIANO_DI_MIGLIORAMENTO.md`. Non aggiungere task nuovi in `analisi.txt`.
+`docs/storico/PIANO_DI_MIGLIORAMENTO.md`. Non aggiungere task nuovi in `docs/storico/analisi.txt`.
 
 Decisioni prese dal titolare (27 agosto 2026):
 1. Ricalcolo sulla riga divergente di "holding dibenedetto": LASCIARE COSÌ. Le letture
@@ -258,7 +258,7 @@ Decisioni prese dal titolare (27 agosto 2026):
 5. Documenti firmati: solo archiviabili, MAI eliminabili. L'hard delete di `Documento`
    firmato (o con firma/OTP pendente collegati) è vietato a tutti, admin inclusi (409);
    l'unica uscita è `PATCH /documenti/:id/archivia`.
-6. Ordine operativo del piano gap (`piano-sviluppo-gap-firma-documenti.md`): 3 → 2 → 1 → 4.
+6. Ordine operativo del piano gap (`docs/storico/piano-sviluppo-gap-firma-documenti.md`): 3 → 2 → 1 → 4.
 7. Punto 1 (export PDF+Word): due motori dallo stesso merge dati — **Docxtemplater** per il
    Word e **pdfkit** per il PDF. Niente LibreOffice su Railway. L'hash legale resta sul PDF.
 8. Punto 4 (notifiche): audit del cablaggio esistente + implementazione dei trigger mancanti

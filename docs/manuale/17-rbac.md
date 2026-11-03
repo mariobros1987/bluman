@@ -88,4 +88,4 @@ Regola **chi può fare cosa**. Due meccanismi:
   `components/settings/TabUsers.tsx`.
 - Schema: `PermessoModulo` (`tenantId`,`userId`,`moduloChiave`,`livello`), `User` (`ruolo`, `tenant_id`,
   `stato`), `PeriodoCollaborazione` (`dal`,`al` — vedi §16).
-- Fonti: `.agents/AGENTS.md` («Accesso & Gerarchia dei Ruoli»), `AUDIT_2026-09-27/01-sicurezza-multitenant.md`.
+- Fonti: `.agents/AGENTS.md` («Accesso & Gerarchia dei Ruoli»), `docs/storico/AUDIT_2026-09-27/01-sicurezza-multitenant.md`.

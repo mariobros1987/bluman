@@ -1,5 +1,5 @@
 /**
- * Livelli di firma (piano-firma-legale-ses-fea-feq.md §3) — regole pure.
+ * Livelli di firma (docs/storico/piano-firma-legale-ses-fea-feq.md §3) — regole pure.
  *
  * Il guasto che questi test presidiano: il livello richiesto da un documento non deve mai
  * essere cosmetico. Se un documento esige FEQ e il cliente tenta il flusso OTP, la firma si

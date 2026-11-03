@@ -316,7 +316,7 @@ export function descriviCanaleVerificato(record: {
  *
  * NB: resta da aggiungere una marca temporale qualificata (RFC 3161, TSA esterna) per la
  * data certa opponibile ai terzi; oggi il `timestampIso` è l'orologio del server. Richiede
- * un provider TSA: vedi piano-firma-legale-ses-fea-feq.md.
+ * un provider TSA: vedi docs/storico/piano-firma-legale-ses-fea-feq.md.
  */
 function risolviSegretoSigillo(): string {
   const segreto = process.env.SIGILLO_HMAC_SECRET || process.env.JWT_SECRET;

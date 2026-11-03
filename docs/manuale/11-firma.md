@@ -100,4 +100,4 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   quella firma, persistita perché la copia firmata ricomposta dopo la controfirma deve rileggere
   il sigillo della prima parte invece di prendere in prestito quello dell'evento in corso;
   migrazione `20261003120000_firma_parte_e_sigillo`).
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/05-documenti-firma.md`, `piano-firma-legale-ses-fea-feq.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/05-documenti-firma.md`, `docs/storico/piano-firma-legale-ses-fea-feq.md`.

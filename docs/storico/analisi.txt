@@ -307,7 +307,7 @@ PIANO_DI_MIGLIORAMENTO.md. NON aggiungere task nuovi in questo file.
   🔴 Fix Task 0.1 & 0.2 & 0.3 (Sicurezza)
   ⎿  Error: No such tool available: bash
   };
-  const JWT_SECRET = 'bluman-secret-key-change-in-production-2026';
+  const JWT_SECRET = '[RIMOSSO]';
   Impatto: Chiunque abbia accesso al repo vede le password di tutti gli utenti e il JWT secret. In produzione è una vulnerabilità
   critica.
   Fix: Rimuovere completamente, usare solo DB + bcrypt, generare JWT_SECRET da env vars random.

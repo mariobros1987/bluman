@@ -172,4 +172,4 @@ modulo (decisione a sé, non ancora presa).
   accesso pieno retto da una password che chi l'ha creato conosce. Per tutti gli altri il ritorno è
   `attivo`, ed è anche il ripiego per le righe nate prima che la colonna esistesse.
 - Presidio: `src/periodiCollaborazione.test.ts` (24 test).
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/01-sicurezza-multitenant.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/01-sicurezza-multitenant.md`.

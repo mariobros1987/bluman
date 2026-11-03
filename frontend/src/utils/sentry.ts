@@ -1,5 +1,5 @@
 // Integrazione Sentry per il frontend — speculare a src/plugins/sentry.ts del
-// backend (voce 6.2 del PIANO_DI_MIGLIORAMENTO).
+// backend (voce 6.2 di docs/storico/PIANO_DI_MIGLIORAMENTO.md).
 //
 // Opt-in per costruzione: senza VITE_SENTRY_DSN l'SDK non viene nemmeno caricato.
 // L'import è dinamico, quindi Vite lo mette in un chunk separato che il browser

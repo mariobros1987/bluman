@@ -3,7 +3,7 @@
 **Ultimo aggiornamento:** 22/10/2026. Fonte: verifica diretta nel codice, non nelle caselle dei piani.
 
 Questo è l'unico elenco da leggere prima di riprendere un lavoro. Se contraddice un altro file
-(`PIANO_DI_MIGLIORAMENTO.md`, `BluMan_analisi_professionale.md`, `.agents/BluMan_piano_di_sviluppo.md`),
+(`docs/storico/PIANO_DI_MIGLIORAMENTO.md`, `docs/storico/BluMan_analisi_professionale.md`, `docs/storico/agents/BluMan_piano_di_sviluppo.md`),
 vale questo: quegli altri sono vecchi e le loro caselle mentono in tutte e due le direzioni.
 Quando una voce è chiusa si toglie da qui e si annota in «Fatto, verificato» con data e commit.
 

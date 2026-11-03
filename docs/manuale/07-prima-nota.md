@@ -66,4 +66,4 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - Schema: `MovimentoPrimaNota` (`tipo`, `categoria`, `importoCentesimi`, FK `fattura`/`fatturaRicevuta`/
   `cliente`/`fornitore` a SetNull), `ContoBancario` (`saldoIniziale` è un dato, `saldoAttuale` una
   copia verificata).
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

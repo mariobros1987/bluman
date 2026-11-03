@@ -34,4 +34,4 @@ scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
   Motore: `services/sollecitiEngine.ts`. Modello `Sollecito` (storia, migrazione dedicata) con RLS.
 - Frontend: `pages/ScadenzarioPage.tsx`, `components/solleciti/InviaSollecitoModal.tsx`.
 - Schema: `ScadenzaIncasso` (`dataScadenza`, `stato`), `RegistrazioneIncasso`, `Sollecito`.
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

@@ -44,4 +44,4 @@ prospetto **F24**.
   `POST /liquidazione-iva/salva`, `POST /liquidazione-iva/:periodo/marca-versata` (→ movimento Prima Nota).
 - Frontend: `pages/LiquidazioneIvaPage.tsx`.
 - Schema: `LiquidazioneIva`.
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

@@ -1,4 +1,4 @@
-// Integrazione Sentry per il backend (voce 6.2 del PIANO_DI_MIGLIORAMENTO).
+// Integrazione Sentry per il backend (voce 6.2 di docs/storico/PIANO_DI_MIGLIORAMENTO.md).
 //
 // Opt-in per costruzione: senza SENTRY_DSN l'import stesso non fa niente di più di
 // un no-op — zero chiamate di rete, zero inizializzazioni, la suite di test e lo

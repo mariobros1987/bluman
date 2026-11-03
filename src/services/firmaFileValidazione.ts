@@ -12,7 +12,7 @@
  * - NON valida ancora la catena del certificato, la revoca (CRL/OCSP), né lo stato
  *   "qualificato" via EU Trust List. Quella verifica crittografica completa richiede una
  *   libreria/servizio dedicato (es. DSS eIDAS): è un passo successivo documentato in
- *   piano-firma-legale-ses-fea-feq.md. Finché non c'è, il verbale continua a dichiarare
+ *   docs/storico/piano-firma-legale-ses-fea-feq.md. Finché non c'è, il verbale continua a dichiarare
  *   che il certificato non è stato validato dalla piattaforma.
  *
  * Il controllo è volutamente conservativo: una firma qualificata reale (PAdES o CAdES)

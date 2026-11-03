@@ -40,8 +40,8 @@ const CARTELLE_DA_SALTARE = new Set(['node_modules', 'dist', 'build', '.git', 'g
  */
 const DOC_DA_ISPEZIONARE = [
   'README.md',
-  'BluMan_piano_di_sviluppo.md',
-  'BluMan_analisi_professionale.md',
+  'docs/storico/BluMan_piano_di_sviluppo.md',
+  'docs/storico/BluMan_analisi_professionale.md',
   'ISTRUZIONI_INSTALLAZIONE.md',
   'ISTRUZIONI_PER_IA.md',
   'GUIDA_CONFIGURAZIONE_CANALI.md',

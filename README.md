@@ -3,7 +3,7 @@
 Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisory. Integrazione end-to-end con **React 19 + Fastify + Prisma + PostgreSQL (Supabase)**.
 
 > 🤖 **Devi passare ad un altro PC?** Apri ed incolla il testo di **[`ISTRUZIONI_PER_IA.md`](ISTRUZIONI_PER_IA.md)** nella nuova IA per riprendere il lavoro in 1 secondo!  
-> 🗺️ **Piano di Sviluppo & Roadmap**: Consulta il documento completo **[`PIANO_SVILUPPO_COMPLETO.md`](PIANO_SVILUPPO_COMPLETO.md)** per la scaletta dettagliata di tutte le funzionalità e ottimizzazioni pianificate.
+> 🗺️ **Piano di Sviluppo & Roadmap**: Consulta il documento completo **[`docs/storico/PIANO_SVILUPPO_COMPLETO.md`](docs/storico/PIANO_SVILUPPO_COMPLETO.md)** per la scaletta dettagliata di tutte le funzionalità e ottimizzazioni pianificate.
 
 ---
 
@@ -180,7 +180,7 @@ graph TD
 3. **Sincronizzazione Schema Database (Prisma & Supabase)**:
    - Ad ogni cambio codice o nuova funzionalità, lo schema `prisma/schema.prisma` ed il database Supabase DEVONO essere istantaneamente aggiornati. Nessun dato viene perso o gestito solo volatile.
 4. **Allineamento Documentazione Markdown (`.md`)**:
-   - Tutti i file `.md` (`README.md`, `BluMan_piano_di_sviluppo.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
+   - Tutti i file `.md` (`README.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
 5. **Mappa Grafo (Graphify)**:
    - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
    - ⚠️ Grafo **STALE**: la CLI non è installata sulla postazione Windows delle correzioni di Fase 0 e 1. Va rigenerato sulla prima postazione che la ha.

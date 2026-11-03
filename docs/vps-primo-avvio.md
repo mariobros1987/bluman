@@ -267,7 +267,7 @@ miglioramento: senza, il backup che c'è non è un backup.
         rclone rinnova da sé l'access token di breve durata. Si passa al comando con `--config`
         (flag globale) oppure con `RCLONE_CONFIG` / `RCLONE_DROPBOX_TOKEN`.
       - Il **dominio non serve**, in nessuna delle due forme (vedi la riga **8-bis** di
-        `PIANO_DI_MIGLIORAMENTO.md` §1bis: vale anche per il form nel superadmin).
+        `docs/storico/PIANO_DI_MIGLIORAMENTO.md` §1bis: vale anche per il form nel superadmin).
       - **Perché il token va nel form e non a mano nel `rclone.conf`.** Il file si può sempre
         scrivere via SSH, ma il pannello valida prima di scrivere (rifiuta un token senza
         `refresh_token`, e rifiuta una config intera incollata al posto del token), e dichiara

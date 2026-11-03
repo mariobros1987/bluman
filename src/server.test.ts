@@ -978,7 +978,7 @@ describe('server — §36 libreria: creazione, modifica e disattivazione', () =>
   });
 });
 
-describe('server — DELETE /progetti/:id (§1.1 PIANO_DI_MIGLIORAMENTO)', () => {
+describe('server — DELETE /progetti/:id (§1.1 docs/storico/PIANO_DI_MIGLIORAMENTO.md)', () => {
   it('elimina un progetto esistente; la rilettura risponde 404', async () => {
     const { app, server } = nuovoServer();
     const cliente = await server.inject({ method: 'POST', url: '/clienti', payload: { nome: 'Da eliminare', tipo: 'individual' } });

@@ -32,4 +32,4 @@ Il **preventivo** raccoglie i moduli scelti per un cliente e, quando viene **acc
   `prismaApp.accettaPreventivoEIstanzia`. Rotte `POST /preventivi`, `POST /preventivi/:id/accetta`.
 - Frontend: `components/NewProjectWizard.tsx`, `api/progetti.ts` → `creaPreventivoEAccettaApi`.
 - Schema: `Preventivo` (`righeJson`, `stato`, `valoreTotale`).
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/03-progetti-motore-stato.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/03-progetti-motore-stato.md`.

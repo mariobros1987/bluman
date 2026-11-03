@@ -160,4 +160,4 @@ si usa il **`.exe` nativo** via `RAILWAY_BIN` (lo script lo supporta).
   quindi la saturazione vera il controllo health la vede già — un preavviso su una coda che si svuota
   da sola sarebbero solo falsi allarmi.
 - Fonti: `.agents/AGENTS.md`, `ISTRUZIONI_PER_IA.md` (regola 9), `PIANO_MIGRAZIONE_VPS.md`,
-  `AUDIT_2026-09-27/07-frontend-infra.md`.
+  `docs/storico/AUDIT_2026-09-27/07-frontend-infra.md`.

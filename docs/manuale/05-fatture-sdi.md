@@ -54,4 +54,4 @@ tracciato **XML SdI** (FatturaPA).
 - Frontend: `pages/InvoicesPage.tsx`.
 - Schema: `Fattura` (`tipoDocumento`, `serie`, `numeroProgressivoSerie`, `data`, `statoSdi`,
   `fatturaOrigineId`), `FatturaRiga`, `ScadenzaIncasso`.
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/04-contabilita-fatturazione.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/04-contabilita-fatturazione.md`.

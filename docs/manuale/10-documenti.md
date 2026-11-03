@@ -39,4 +39,4 @@ Word (WYSIWYG, foglio A4, export PDF) con i **Smart Tags** ERP.
   `components/documenti/ElencoDocumentiCartella.tsx`, `components/passaggio/TabDocumenti.tsx`.
 - Schema: `Documento` (`statoDoc`, `versione`, `documentoPadreId`, `isArchiviato`, `dataScadenzaDoc`),
   `ModelloDocumentoCustom`, `EngagementLetter`.
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/05-documenti-firma.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/05-documenti-firma.md`.

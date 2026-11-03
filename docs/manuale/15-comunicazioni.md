@@ -187,4 +187,4 @@ tengono onesto, e sono tutte necessarie:
 - Schema: `ComunicazioneProgetto`, `CollegamentoChatProgetto`, `ComunicazioneMicrovoce`,
   `ContestoMicrovoceChat` (con `progetto_id` denormalizzato: rende il controllo «la voce armata è di
   *questa* pratica?» un confronto fra due campi).
-- Fonti: `.agents/AGENTS.md`, `AUDIT_2026-09-27/06-comunicazioni-canali.md`, `GUIDA_CONFIGURAZIONE_CANALI.md`.
+- Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/06-comunicazioni-canali.md`, `GUIDA_CONFIGURAZIONE_CANALI.md`.

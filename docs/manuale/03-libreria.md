@@ -53,4 +53,4 @@ Flusso: crei/aggiorni qui articoli e moduli → in un **preventivo** (§04) sceg
 - **Anti-ciclo**: `src/services/dipendenzeModuli.ts` → `trovaCicloDipendenze`.
 - **Schema**: `Articolo`, `PassaggioTemplate`, `ModuloTemplate`, `RigaDistinta` (distinta base),
   `ModuloDipendenzaTemplate` (dipendenze), `Giurisdizione`.
-- **Fonti**: `.agents/AGENTS.md`, `AUDIT_2026-09-27/03-progetti-motore-stato.md`.
+- **Fonti**: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/03-progetti-motore-stato.md`.

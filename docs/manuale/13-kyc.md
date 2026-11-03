@@ -39,4 +39,4 @@ Il modulo **KYC/AML** gestisce l'adeguata verifica del cliente secondo l'impiant
   `FascicoloKyc`/`KycCase`, `SoggettoKyc`, `AnomaliaKyc`, `MlroDecisionLog`, `DocumentoKyc`.
 - Frontend: scheda Compliance in `AnagraficaErpModal`, `components/kyc/` (`PannelloSoggettoKyc`,
   `PannelloTitolariEffettivi`, `PannelloRetention`, anomalie), `TabCompliance`.
-- Fonti: `bluman-kyc-compliance-specifica-v0.2.md`, `AUDIT_2026-09-27/02-kyc-aml.md`, `.agents/AGENTS.md`.
+- Fonti: `bluman-kyc-compliance-specifica-v0.2.md`, `docs/storico/AUDIT_2026-09-27/02-kyc-aml.md`, `.agents/AGENTS.md`.
