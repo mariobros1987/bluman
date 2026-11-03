@@ -255,6 +255,31 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
     expect(indice).not.toContain('Partita IVA / VAT Number');
   });
 
+  it('senza ragione sociale: nome del file senza studio e dato dichiarato mancante nei file', async () => {
+    // 3.19 — prima il nome di ripiego era «Studio_Advisory», nello ZIP e dentro indice e LIPE.
+    (prisma.tenant.findUnique as unknown as Mock).mockResolvedValueOnce({
+      id: 'tenant-commercialista-test',
+      ragioneSociale: '   ',
+      piva: '01234567890',
+    });
+
+    const res = await generaFascicoloFiscaleZip({
+      tenantId: 'tenant-commercialista-test',
+      anno: 2026,
+      tipo: 'mensile',
+      mese: 3,
+    });
+
+    expect(res.nomeFile).toBe('Fascicolo_Fiscale_Mese_03_2026.zip');
+    const zip = new PizZip(res.buffer);
+    const indice = zip.file('00_INDICE_FASCICOLO_FISCALE.txt')?.asText() || '';
+    const lipe = zip.file('03_Liquidazione_IVA_LIPE/Prospetto_LIPE_F24_Mese_03_2026.txt')?.asText() || '';
+    for (const testo of [indice, lipe]) {
+      expect(testo).toContain('[DATO MANCANTE: ragione sociale dello studio]');
+      expect(testo).not.toContain('Studio_Advisory');
+    }
+  });
+
   it('risponde correttamente via API Fastify con token JWT autenticato', async () => {
     const mockApp = {} as any;
     const server = buildServer(mockApp);

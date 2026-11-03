@@ -99,7 +99,10 @@ async function raccogliDatiFascicolo(params: ParametriFascicoloFiscale) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },
   });
-  const studioNome = tenant?.ragioneSociale || 'Studio_Advisory';
+  // Senza ragione sociale il dato si dichiara mancante dentro i file e si omette dal nome dello
+  // ZIP: mai un nome di studio inventato (prima era «Studio_Advisory»).
+  const ragioneSociale = tenant?.ragioneSociale?.trim() || null;
+  const studioNome = ragioneSociale ?? '[DATO MANCANTE: ragione sociale dello studio]';
   const studioPiva = tenant?.piva || 'N/D';
   const studioCf = tenant?.codiceFiscale || 'N/D';
 
@@ -175,7 +178,8 @@ async function raccogliDatiFascicolo(params: ParametriFascicoloFiscale) {
 
   // Il nome del file si calcola qui perché anche l'anteprima lo mostra: una sola copia
   // della regola di sanificazione, così il nome annunciato è quello scaricato.
-  const nomeFile = `Fascicolo_Fiscale_${studioNome.replace(/[^a-zA-Z0-9_-]/g, '_')}_${etichettaPeriodo}.zip`;
+  const parteStudio = ragioneSociale ? `${ragioneSociale.replace(/[^a-zA-Z0-9_-]/g, '_')}_` : '';
+  const nomeFile = `Fascicolo_Fiscale_${parteStudio}${etichettaPeriodo}.zip`;
 
   return {
     dataInizio,

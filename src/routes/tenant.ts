@@ -1096,7 +1096,7 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       const tenant = await prisma.tenant.create({
         data: {
           id: b.id || undefined,
-          ragioneSociale: b.ragioneSociale || 'Nuovo Studio',
+          ragioneSociale: b.ragioneSociale,
           giurisdizione: b.giurisdizione,
           piva: b.pIva || b.piva,
           email: emailResponsabile || undefined,

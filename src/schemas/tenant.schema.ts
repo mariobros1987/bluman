@@ -15,11 +15,10 @@ export const PermessiUtenteSchema = z.object({
 const emailOpzionale = z.string().email('Formato email non valido').optional().nullable().or(z.literal(''));
 
 /**
- * `POST /admin/tenants` (super_admin). L'handler mappa i campi uno per uno con i propri default,
- * quindi lo schema è una guardia di forma al bordo: tipi e lunghezze, niente di più. Tutto
- * opzionale perché l'handler ha i suoi ripieghi. `.passthrough()` per non rompere chiavi extra.
+ * Campi di uno studio, come guardia di forma al bordo: tipi e lunghezze. `.passthrough()` per non
+ * rompere chiavi extra.
  */
-export const CreaTenantSchema = z.object({
+const CampiTenantSchema = z.object({
   id: z.string().max(100).optional().nullable(),
   ragioneSociale: z.string().max(255).optional().nullable(),
   giurisdizione: z.string().max(100).optional().nullable(),
@@ -39,8 +38,19 @@ export const CreaTenantSchema = z.object({
   moduliConcessi: z.array(z.string().max(40)).optional(),
 }).passthrough();
 
+/**
+ * `POST /admin/tenants` (super_admin). La ragione sociale è obbligatoria: senza, l'handler
+ * intestava lo studio a «Nuovo Studio», un nome inventato che finiva su documenti e solleciti.
+ */
+export const CreaTenantSchema = CampiTenantSchema.extend({
+  ragioneSociale: z.string({ error: 'La ragione sociale dello studio è obbligatoria' })
+    .trim()
+    .min(1, 'La ragione sociale dello studio è obbligatoria')
+    .max(255),
+});
+
 /** `PATCH /admin/tenants/:id`: stessi campi, tutti opzionali (aggiornamento parziale). */
-export const AggiornaTenantSchema = CreaTenantSchema.partial();
+export const AggiornaTenantSchema = CampiTenantSchema.partial();
 
 /**
  * `POST /audit-logs`. L'identità dell'attore viene dal token, non dal corpo (l'handler la impone):
