@@ -9,7 +9,11 @@
  * che finisce nel PDF, nel .doc e nel documento salvato. E siccome è HTML, l'operatore può
  * modificarlo (§39: doppio clic per sbloccare) e quello che modifica viene salvato — mentre da un
  * JSX non si poteva sbloccare niente.
+ *
+ * 3.18 — la ragione sociale mancante è il segnaposto di `ragioneSocialeDocumento`, mai un nome.
  */
+
+import { ragioneSocialeDocumento } from './tenant';
 
 export interface DatiIntestazioneStudio {
   ragioneSociale: string;
@@ -51,10 +55,10 @@ export function intestazioneStudioHtml(dati: DatiIntestazioneStudio): string {
     : `this.onerror=null; this.style.display='none';`;
   const marchio = dati.logo
     ? `<img src="${dati.logo}" alt="Logo studio" onerror="${onerror}" style="max-height: 45px; max-width: 180px; object-fit: contain;" />`
-    : `<div style="font-size: 16px; font-weight: 800; color: #1e1b4b;">🏛 ${(dati.ragioneSociale || 'STUDIO PROFESSIONALE').toUpperCase()}</div>`;
+    : `<div style="font-size: 16px; font-weight: 800; color: #1e1b4b;">🏛 ${ragioneSocialeDocumento(dati.ragioneSociale, true)}</div>`;
 
   const righe = [
-    `<strong style="color: #1e1b4b;">${dati.ragioneSociale || 'Studio Professionale'}</strong>`,
+    `<strong style="color: #1e1b4b;">${ragioneSocialeDocumento(dati.ragioneSociale)}</strong>`,
     dati.sedeLegale || '',
     [dati.piva ? `P.IVA: ${dati.piva}` : '', dati.telefono ? `Tel: ${dati.telefono}` : ''].filter(Boolean).join(' | '),
   ].filter(Boolean).join('<br/>');
@@ -80,7 +84,7 @@ export interface DatiPiedeStudio {
  */
 export function piedeStudioHtml(dati: DatiPiedeStudio): string {
   return `<div style="border-top: 1px solid #e2e8f0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 8.5px; color: #94a3b8;">
-  <span>${dati.ragioneSociale || 'Studio Professionale'} • Pratica: ${dati.pratica || 'Incarico Professionale'}</span>
+  <span>${ragioneSocialeDocumento(dati.ragioneSociale)} • Pratica: ${dati.pratica || 'Incarico Professionale'}</span>
   <span>${etichettaLivelloFirma(dati.livelloFirma)}</span>
 </div>`;
 }

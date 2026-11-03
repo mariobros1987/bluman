@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTemplateForVoce, resolveDocumentTemplateHtml } from './documentTemplates';
+import { getTemplateForVoce, resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from './documentTemplates';
 import { avvisoCampiMancanti } from '../api/documenti';
 
 // Aggancio dei modelli Malta «trasferimento residenza / guest» (modulo mod-r01) alle micro-voci.
@@ -58,5 +58,15 @@ describe('avvisoCampiMancanti', () => {
       ' Mancano: legale rappresentante del cliente, valore del progetto.',
     );
     expect(avvisoCampiMancanti([])).toBe('');
+  });
+});
+
+// 3.18 — nella lettera d'incarico il titolo del rappresentante dello studio era scritto a mano
+// («(Senior Partner Advisory)»): un ruolo inventato accanto al nome vero del lead advisor.
+describe('modello lettera d\'incarico — nessun titolo scritto a mano', () => {
+  it('«rappresentato da» porta solo il lead advisor dello studio', () => {
+    const lettera = PREBUILT_TEMPLATES.find((t) => t.id === 'tmpl-engagement');
+    expect(lettera?.contenutoHtml).toContain('rappresentato da {{studio.lead_advisor}}.');
+    expect(PREBUILT_TEMPLATES.some((t) => t.contenutoHtml.includes('Senior Partner Advisory'))).toBe(false);
   });
 });

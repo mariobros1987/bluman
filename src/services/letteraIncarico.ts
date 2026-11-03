@@ -23,7 +23,7 @@ import crypto from 'crypto';
  * loro, che è la verità di ciò che è stato firmato allora.
  */
 export const LETTERA_INCARICO_TESTO_SHA256 =
-  'c67d60ba0a4473a75befcfd8adc777042b104e58ca2c378f1e0fb9765db3342b';
+  'ef06b65bf6877013f5ef35f8b3e070f28adfb57d9db080f080011586e0cf1e8f';
 
 /** CRLF e LF sono lo stesso testo: si normalizza prima di improntare. */
 export function normalizzaFineRiga(testo: string): string {
