@@ -33,7 +33,8 @@ import {
   type Ruolo,
 } from './util/authorization.js';
 // Mappa rotta → chiave modulo per l'enforcement della Matrice Permessi (RBAC).
-import { moduloDellaRotta, permessoDefaultPerRuolo, rottaVietataAllEsterno, type LivelloPermesso } from './util/rbacModuli.js';
+import { moduloDellaRotta, rottaVietataAllEsterno } from './util/rbacModuli.js';
+import { livelloModuloUtente } from './util/permessiModulo.js';
 
 // Helper condivisi (costanti di sessione, audit, recapiti, IP reale): estratti in
 // src/util/serverHelpers.ts dallo split dei monoliti — stesse identiche implementazioni.
@@ -575,29 +576,7 @@ export function buildServer(app: AppPort): FastifyInstance {
     ) {
       const modulo = moduloDellaRotta(patternRotta);
       if (modulo) {
-        let livello: LivelloPermesso | undefined;
-        try {
-          const permesso = await prisma.permessoModulo.findUnique({
-            where: {
-              tenantId_userId_moduloChiave: {
-                tenantId,
-                userId: payload.userId,
-                moduloChiave: modulo,
-              },
-            },
-            select: { livello: true },
-          });
-          // Nessuna riga sulla matrice → default per ruolo, non più accesso pieno.
-          livello = (permesso?.livello as LivelloPermesso | undefined) ?? permessoDefaultPerRuolo(ruolo, modulo);
-        } catch (err) {
-          // Fail-closed: si ricade sul default per ruolo invece di lasciar passare (voce 5, 09/10/2026).
-          // Il log resta, e dice che il livello applicato è un *ripiego*, non una riga della matrice.
-          livello = permessoDefaultPerRuolo(ruolo, modulo);
-          console.error(
-            `Verifica permesso modulo fallita su '${modulo}': applico il default per ruolo '${livello}'.`,
-            err instanceof Error ? err.message : err,
-          );
-        }
+        const livello = await livelloModuloUtente(tenantId, payload.userId, ruolo, modulo);
         if (livello === 'denied' || (livello === 'read' && req.method !== 'GET' && req.method !== 'HEAD')) {
           return reply.code(403).send({
             errore: `Permesso insufficiente sul modulo '${modulo}' (livello: ${livello}).`,

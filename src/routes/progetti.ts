@@ -22,7 +22,9 @@ import { messaggioBloccoKyc, operativitaBloccataDaKyc } from '../services/kycGat
 import { notificaStudio } from '../services/notificheService.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
-import { ricercaGlobale } from '../services/ricercaGlobaleService.js';
+import { ricercaGlobale, MODULO_DEL_GRUPPO } from '../services/ricercaGlobaleService.js';
+import { livelloModuloUtente } from '../util/permessiModulo.js';
+import type { ModuloChiaveRbac } from '../util/rbacModuli.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
@@ -1711,7 +1713,19 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       return reply.code(400).send({ errore: 'Inserisci almeno 2 caratteri per la ricerca' });
     }
     try {
-      const gruppi = await ricercaGlobale(tenantId, q);
+      // La ricerca è fuori dalla mappa RBAC (team e calendario sono di tutto lo staff), quindi
+      // il filtro per modulo si fa qui: i gruppi dei moduli 'denied' non vengono interrogati.
+      const moduliNegati = new Set<ModuloChiaveRbac>();
+      if (req.ruolo !== 'super_admin') {
+        const userId = req.userId;
+        const moduli = [...new Set(Object.values(MODULO_DEL_GRUPPO))];
+        // Senza identità non c'è riga di matrice da leggere: si nega (fail-closed).
+        const livelli = await Promise.all(
+          moduli.map((m) => (userId ? livelloModuloUtente(tenantId, userId, req.ruolo, m) : 'denied')),
+        );
+        moduli.forEach((m, i) => { if (livelli[i] === 'denied') moduliNegati.add(m); });
+      }
+      const gruppi = await ricercaGlobale(tenantId, q, moduliNegati);
       const totale = gruppi.reduce((s, g) => s + g.risultati.length, 0);
       return reply.send({ query: q, totale, gruppi });
     } catch (err: any) {

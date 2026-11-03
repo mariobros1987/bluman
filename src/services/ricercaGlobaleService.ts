@@ -12,9 +12,13 @@
 //   richiesta: la ricerca non attraversa mai i confini dello studio.
 // • Niente dati finti — se una query fallisce l'errore risale al chiamante
 //   (la rotta risponde 500 con il messaggio reale).
+// • Matrice permessi — i gruppi dei moduli negati all'utente non vengono
+//   nemmeno interrogati (la rotta calcola `moduliNegati`): la ricerca non è
+//   una porta laterale su fatture o clienti che la matrice nasconde.
 // ─────────────────────────────────────────────────────────────────
 
 import { prisma } from '../util/prismaClient.js';
+import type { ModuloChiaveRbac } from '../util/rbacModuli.js';
 
 /** Singolo risultato della ricerca globale. */
 export interface RisultatoRicerca {
@@ -58,16 +62,35 @@ function dataIt(data: Date): string {
 }
 
 /**
+ * Modulo della matrice da cui dipende ciascun gruppo. Team e calendario non ci sono:
+ * sono visibili a tutto lo staff.
+ */
+export const MODULO_DEL_GRUPPO = {
+  clienti: 'clients',
+  progetti: 'projects',
+  fatture: 'invoices',
+  documenti: 'documents',
+  contratti: 'retainers',
+} as const satisfies Record<string, ModuloChiaveRbac>;
+
+/**
  * Esegue la ricerca globale su tutte le entità indicizzabili del tenant.
  * Le query viaggiano in parallelo: il costo totale è quello della più lenta.
+ * I gruppi il cui modulo è in `moduliNegati` restano fuori, query compresa.
  */
-export async function ricercaGlobale(tenantId: string, query: string): Promise<GruppoRicerca[]> {
+export async function ricercaGlobale(
+  tenantId: string,
+  query: string,
+  moduliNegati: ReadonlySet<ModuloChiaveRbac> = new Set(),
+): Promise<GruppoRicerca[]> {
   const q = query.trim();
   const contiene = { contains: escapeILIKE(q), mode: 'insensitive' as const };
+  const seConsentito = <T>(modulo: ModuloChiaveRbac, cerca: () => Promise<T[]>): Promise<T[]> =>
+    moduliNegati.has(modulo) ? Promise.resolve([]) : cerca();
 
   const [clienti, progetti, fatture, documenti, utenti, eventi, contratti] = await Promise.all([
     // 1. CLIENTI — nome, email, partita IVA, codice fiscale
-    prisma.cliente.findMany({
+    seConsentito(MODULO_DEL_GRUPPO.clienti, () => prisma.cliente.findMany({
       where: {
         tenantId,
         OR: [
@@ -79,10 +102,10 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
       },
       orderBy: { createdAt: 'desc' },
       take: RISULTATI_PER_TIPO,
-    }),
+    })),
 
     // 2. PROGETTI — nome, numero lettera d'incarico, nome cliente
-    prisma.progetto.findMany({
+    seConsentito(MODULO_DEL_GRUPPO.progetti, () => prisma.progetto.findMany({
       where: {
         tenantId,
         OR: [
@@ -94,10 +117,10 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
       include: { cliente: { select: { nome: true } } },
       orderBy: { createdAt: 'desc' },
       take: RISULTATI_PER_TIPO,
-    }),
+    })),
 
     // 3. FATTURE — numero documento ("FT-2026/001") e serie
-    prisma.fattura.findMany({
+    seConsentito(MODULO_DEL_GRUPPO.fatture, () => prisma.fattura.findMany({
       where: {
         tenantId,
         OR: [
@@ -108,10 +131,10 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
       include: { progetto: { select: { nome: true, cliente: { select: { nome: true } } } } },
       orderBy: { data: 'desc' },
       take: RISULTATI_PER_TIPO,
-    }),
+    })),
 
     // 4. DOCUMENTI — nome file (via fileUrl) e categoria
-    prisma.documento.findMany({
+    seConsentito(MODULO_DEL_GRUPPO.documenti, () => prisma.documento.findMany({
       where: {
         tenantId,
         OR: [
@@ -122,7 +145,7 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
       include: { progetto: { select: { nome: true } } },
       orderBy: { createdAt: 'desc' },
       take: RISULTATI_PER_TIPO,
-    }),
+    })),
 
     // 5. TEAM STUDIO — nome, email, specializzazione
     prisma.user.findMany({
@@ -147,7 +170,7 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
     }),
 
     // 7. CONTRATTI RETAINER — titolo e note
-    prisma.contrattoRicorrente.findMany({
+    seConsentito(MODULO_DEL_GRUPPO.contratti, () => prisma.contrattoRicorrente.findMany({
       where: {
         tenantId,
         OR: [
@@ -158,7 +181,7 @@ export async function ricercaGlobale(tenantId: string, query: string): Promise<G
       include: { cliente: { select: { nome: true } } },
       orderBy: { createdAt: 'desc' },
       take: RISULTATI_PER_TIPO,
-    }),
+    })),
   ]);
 
   const gruppi: GruppoRicerca[] = [];
