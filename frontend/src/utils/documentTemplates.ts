@@ -1,6 +1,7 @@
 import { REORGANIZATION_TEMPLATES } from './reorganizationTemplates';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant } from './tenant';
 import { escapeHtmlTesto } from '../../../src/util/htmlSanitizer';
+import { importoEuroTesto } from './datiDocumentoEditor';
 
 export interface DocumentTemplate {
   id: string;
@@ -845,7 +846,7 @@ export function resolveDocumentTemplateHtml(
   out = out.replace(/\{\{cliente\.indirizzo_alloggio\}\}/g, wrapTag(clientIndAllog));
 
   out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo));
-  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(projImporto == null ? mancante('valore del progetto') : `€ ${Number(projImporto).toLocaleString('it-IT')},00`));
+  out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(importoEuroTesto(projImporto)));
 
   out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale));
   out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva));

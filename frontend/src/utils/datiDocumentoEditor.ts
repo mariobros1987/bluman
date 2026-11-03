@@ -19,6 +19,7 @@ export function valoreProgettoEuro(p: any): number | null {
 
 /**
  * «€ 1.234,50», o il segnaposto se il valore non c'è. Zero è un dato e si stampa.
+ * Lo usa anche `resolveDocumentTemplateHtml` (3.15): un solo formato dell'importo nei documenti.
  * `useGrouping: 'always'`: per `it-IT` il separatore delle migliaia scatterebbe solo da 10.000.
  */
 export function importoEuroTesto(valore: number | null | undefined): string {

@@ -44,6 +44,12 @@ describe('resolveDocumentTemplateHtml — dati mancanti', () => {
     const zero = resolveDocumentTemplateHtml('{{progetto.importo_totale}}', { cliente: { nome: 'X' }, progetto: { nome: 'P', val: 0 } });
     expect(zero).toContain('€ 0,00');
   });
+
+  it('importo con decimali: due cifre e nessun «,00» in coda al numero già formattato (3.15)', () => {
+    const html = resolveDocumentTemplateHtml('{{progetto.importo_totale}}', { cliente: { nome: 'X' }, progetto: { nome: 'P', totalePreventivo: 1234.5 } });
+    expect(html).toContain('€ 1.234,50');
+    expect(html).not.toContain(',5,00');
+  });
 });
 
 describe('avvisoCampiMancanti', () => {
