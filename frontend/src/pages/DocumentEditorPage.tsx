@@ -3,7 +3,8 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi, salvaDocumentoApi } from '../api/client';
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
-import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getBrandLogoFallback } from '../utils/tenant';
+import { getCurrentTenantId, getTenantStorageKey, getBrandLogoFallback } from '../utils/tenant';
+import { datiStudioDocumento, importoEuroTesto, valoreProgettoEuro } from '../utils/datiDocumentoEditor';
 import { componiDocumento, scomponiDocumento } from '../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../src/util/htmlSanitizer';
 import { intestazioneStudioHtml, piedeStudioHtml } from '../utils/intestazioneStudio';
@@ -147,8 +148,6 @@ export function DocumentEditorPage() {
         console.warn('Caricamento remoto parziale:', err);
       }
 
-      const currentTenantId = getCurrentTenantId();
-
       // 1. Clienti: Unione DB + LocalStorage + Extracted from Projects
       const customClStr = localStorage.getItem(getTenantStorageKey('bluman_custom_clients'));
       const customCls: Cliente[] = customClStr ? JSON.parse(customClStr) : [];
@@ -203,7 +202,7 @@ export function DocumentEditorPage() {
           nome: title,
           cl: p.cl || p.cliente?.nome || 'Cliente Studio',
           clienteId: p.clienteId || p.cliente?.id,
-          totalePreventivo: p.totalePreventivo || p.val || (p.valoreCentesimi ? p.valoreCentesimi / 100 : 8500),
+          totalePreventivo: valoreProgettoEuro(p),
           stato: p.st || p.stato || 'in_progress',
         });
       });
@@ -250,27 +249,14 @@ export function DocumentEditorPage() {
         }
       }
 
+      // 3.14 — solo l'anagrafica letta (o la sua copia locale): senza, i campi dello studio
+      // restano mancanti e nel documento compare il segnaposto, mai lo studio dimostrativo.
       if (tnt) {
         setTenantInfo(tnt);
       } else {
         const local = localStorage.getItem(getTenantStorageKey('bluman_tenant_info'));
         if (local) {
-          setTenantInfo(JSON.parse(local));
-        } else {
-          // Fallback: popola tenantInfo dai dati di registrazione del tenant (SuperAdmin o TENANT_STUDIOS)
-          // Così il Document Studio ha SEMPRE un'identità corretta (nome, sede, piva) anche senza configurazione manuale
-          const studioFallback = getStudioInfoForTenant(currentTenantId);
-          setTenantInfo({
-            ragioneSociale: studioFallback.ragioneSociale || '',
-            piva: studioFallback.piva || '',
-            sedeLegale: studioFallback.sedeLegale || '',
-            sedeOperativa: studioFallback.sedeOperativa || '',
-            telefono: studioFallback.telefono || '',
-            email: studioFallback.email || '',
-            iban: studioFallback.iban || '',
-            codiceSdi: studioFallback.codiceSdi || '',
-            logoUrl: '',
-          });
+          try { setTenantInfo(JSON.parse(local)); } catch { /* copia locale illeggibile: resta mancante */ }
         }
       }
     };
@@ -294,17 +280,16 @@ export function DocumentEditorPage() {
    * salvato: prima erano tre HTML somiglianti scritti in tre punti diversi, ed è per questo che si
    * vedeva una cosa e si stampava un'altra.
    */
-  const studioCorrente = getStudioInfoForTenant(getCurrentTenantId());
-  const ragioneSocialeFoglio = tenantInfo?.ragioneSociale || studioCorrente.ragioneSociale || 'Studio Professionale';
+  const ragioneSocialeFoglio = datiStudioDocumento(tenantInfo).ragioneSociale;
   const logoFoglio = (() => {
     const raw = tenantInfo?.logoUrl || localStorage.getItem(getTenantStorageKey('bluman_logo_url'));
     return raw ? getFormattedLogoUrl(raw) : '';
   })();
   const intestazioneEffettiva = intestazionePropria ?? intestazioneStudioHtml({
     ragioneSociale: ragioneSocialeFoglio,
-    sedeLegale: tenantInfo?.sedeLegale || studioCorrente.sedeLegale || '',
-    piva: tenantInfo?.piva || studioCorrente.piva || '',
-    telefono: tenantInfo?.telefono || studioCorrente.telefono || '',
+    sedeLegale: tenantInfo?.sedeLegale || '',
+    piva: tenantInfo?.piva || '',
+    telefono: tenantInfo?.telefono || '',
     logo: logoFoglio,
     logoFallback: getBrandLogoFallback(getCurrentTenantId()),
   });
@@ -356,25 +341,14 @@ export function DocumentEditorPage() {
     const htmlSicuro = sanitizzaHtmlDocumento(htmlContent);
     if (tagDisplayMode === 'raw' && !isForPrintOrExport) return htmlSicuro;
 
-    const currentTenantId = getCurrentTenantId();
-    const studioInfo = getStudioInfoForTenant(currentTenantId);
-
     const refJson: any = activeCliente?.referentiJson && typeof activeCliente.referentiJson === 'object' ? activeCliente.referentiJson : {};
     const dataOggi = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
 
     const projTitolo = activeProgetto?.titolo || activeProgetto?.n || activeProgetto?.nome || 'Incarico Professionale';
-    const projImporto = activeProgetto?.totalePreventivo || activeProgetto?.val || 0;
+    const projImporto = valoreProgettoEuro(activeProgetto);
 
-    // Dati dinamici Studio del Tenant attivo (totalmente dinamici dallo studio, nessun valore fisso)
-    const studioRagioneSociale = tenantInfo?.ragioneSociale || studioInfo.ragioneSociale || 'Studio Professionale';
-    const studioPiva = tenantInfo?.piva || studioInfo.piva || '';
-    const studioSede = tenantInfo?.sedeLegale || studioInfo.sedeLegale || '';
-    const studioIban = tenantInfo?.iban || studioInfo.iban || '';
-    // §7 — il ripiego era `'Lead Senior Advisor'`, cioè un ruolo al posto di un nome (vedi
-    // `documentTemplates.ts`): senza il responsabile in anagrafica il campo resta vuoto.
-    const studioLeadAdvisor = studioInfo.leadAdvisor || '';
-    const studioTel = tenantInfo?.telefono || studioInfo.telefono || '';
-    const studioEmail = tenantInfo?.email || studioInfo.email || '';
+    // 3.14 — dati dello studio solo dall'anagrafica letta dal server; ciò che manca è un segnaposto.
+    const studio = datiStudioDocumento(tenantInfo);
 
     // Dati Cliente (se non selezionato, fallback su Smart Tags o etichette neutre)
     const clientNome = activeCliente?.nome || activeProgetto?.cl || 'Cliente Committente';
@@ -439,15 +413,15 @@ export function DocumentEditorPage() {
     out = out.replace(/\{\{cliente\.ubo\}\}/g, wrapTag(clientUbo, 'cliente.ubo'));
 
     out = out.replace(/\{\{progetto\.titolo\}\}/g, wrapTag(projTitolo, 'progetto.titolo'));
-    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(effImporto ? `€ ${Number(effImporto).toLocaleString('it-IT')},00` : '€ 0,00', 'progetto.importo_totale'));
+    out = out.replace(/\{\{progetto\.importo_totale\}\}/g, wrapTag(importoEuroTesto(effImporto), 'progetto.importo_totale'));
 
-    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studioRagioneSociale, 'studio.ragione_sociale'));
-    out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studioPiva, 'studio.piva'));
-    out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studioSede, 'studio.sede_legale'));
-    out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studioIban, 'studio.iban'));
-    out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studioLeadAdvisor, 'studio.lead_advisor'));
-    out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studioTel, 'studio.telefono'));
-    out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studioEmail, 'studio.email'));
+    out = out.replace(/\{\{studio\.ragione_sociale\}\}/g, wrapTag(studio.ragioneSociale, 'studio.ragione_sociale'));
+    out = out.replace(/\{\{studio\.piva\}\}/g, wrapTag(studio.piva, 'studio.piva'));
+    out = out.replace(/\{\{studio\.sede_legale\}\}/g, wrapTag(studio.sedeLegale, 'studio.sede_legale'));
+    out = out.replace(/\{\{studio\.iban\}\}/g, wrapTag(studio.iban, 'studio.iban'));
+    out = out.replace(/\{\{studio\.lead_advisor\}\}/g, wrapTag(studio.leadAdvisor, 'studio.lead_advisor'));
+    out = out.replace(/\{\{studio\.telefono\}\}/g, wrapTag(studio.telefono, 'studio.telefono'));
+    out = out.replace(/\{\{studio\.email\}\}/g, wrapTag(studio.email, 'studio.email'));
 
     return sanitizzaHtmlDocumento(out);
   };
