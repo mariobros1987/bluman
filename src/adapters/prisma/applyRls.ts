@@ -1,7 +1,8 @@
 // ⚠️ SUPERATO — non applicare più da qui.
 //
-// Questo script eseguiva `supabase/migrations/20260815_enable_rls.sql`, sostituito da
-// `20260819_rls_effettiva.sql`. Rieseguirlo sarebbe attivamente dannoso: le policy del
+// Questo script eseguiva `20260815_enable_rls.sql`, sostituito da
+// `20260819_rls_effettiva.sql` e ora archiviato in `docs/storico/20260815_enable_rls.sql`
+// (D1): fuori da supabase/migrations nessuno lo scambia per una migrazione da applicare. Rieseguirlo sarebbe attivamente dannoso: le policy del
 // file vecchio sono PERMISSIVE e senza destinatario, quindi si sommerebbero in OR a
 // `isolamento_tenant` vanificandola — l'isolamento tornerebbe inerte senza che nulla
 // segnali un errore.

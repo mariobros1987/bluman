@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -253,5 +253,27 @@ describe('🔐 docker-compose.prod.yml — segreti', () => {
         new RegExp(`\\$\\{${variabile}:\\?`),
       );
     }
+  });
+});
+
+describe('🛡️ RLS — lo script permissivo del 15/08 non è più fra quelli applicabili (D1)', () => {
+  // `20260815_enable_rls.sql` crea policy PERMISSIVE senza destinatario: rieseguito, si
+  // sommerebbe in OR a `isolamento_tenant` e l'isolamento tornerebbe inerte senza errori.
+  // Resta in docs/storico come traccia di cosa c'era, fuori dalla cartella delle migrazioni.
+  it('supabase/migrations contiene solo la RLS effettiva', () => {
+    expect(readdirSync(path.join(RADICE, 'supabase', 'migrations'))).toEqual(['20260819_rls_effettiva.sql']);
+    expect(existsSync(path.join(RADICE, 'docs', 'storico', '20260815_enable_rls.sql'))).toBe(true);
+  });
+
+  it('docker-compose.prod.yml monta solo rls_effettiva', () => {
+    const compose = leggi('docker-compose.prod.yml');
+    const montati = [...compose.matchAll(/^\s*-\s*([^\s:]+\.sql):/gm)].map((m) => m[1]);
+    expect(montati).toEqual(['./supabase/migrations/20260819_rls_effettiva.sql']);
+  });
+
+  it('applyRls.ts indica dove sta ora lo script superato', () => {
+    const script = leggi('src', 'adapters', 'prisma', 'applyRls.ts');
+    expect(script).toContain('docs/storico/20260815_enable_rls.sql');
+    expect(script).not.toContain('supabase/migrations/20260815_enable_rls.sql');
   });
 });
