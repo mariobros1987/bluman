@@ -3,7 +3,7 @@
 Piattaforma ERP per studi di consulenza societaria, wealth protection ed advisory. Integrazione end-to-end con **React 19 + Fastify + Prisma + PostgreSQL (Supabase)**.
 
 > 🤖 **Devi passare ad un altro PC?** Apri ed incolla il testo di **[`ISTRUZIONI_PER_IA.md`](ISTRUZIONI_PER_IA.md)** nella nuova IA per riprendere il lavoro in 1 secondo!  
-> 🗺️ **Piano di Sviluppo & Roadmap**: Consulta il documento completo **[`docs/storico/PIANO_SVILUPPO_COMPLETO.md`](docs/storico/PIANO_SVILUPPO_COMPLETO.md)** per la scaletta dettagliata di tutte le funzionalità e ottimizzazioni pianificate.
+> 🗺️ **Cosa resta da fare**: il backlog del titolare è in **[`LAVORO_RIMANENTE.md`](LAVORO_RIMANENTE.md)**, gli step in corso in **[`PIANO.md`](PIANO.md)**. I piani precedenti sono archiviati in `docs/storico/` e non fanno più fede.
 
 ---
 
@@ -93,7 +93,7 @@ graph TD
 ### 💶 Fatturazione & Note di Credito (Numerazione Sequenziale Distinta)
 - **Fatture VENDITA (Serie `FT`)**: Numerazione autonoma (es. `FT-2026/001`).
 - **Note di Credito (Serie `NC`)**: Numerazione autonoma (es. `NC-2026/001`) con causale di storno e riferimento fattura originale.
-- **Tracciato SDI Comped Servizi FPA**: Generazione ed associazione XML FatturaPA.
+- **Tracciato SDI Comped Servizi FPA** (trasmissione oggi manuale, vedi src/services/sdiService.ts): Generazione ed associazione XML FatturaPA.
 - **Configuratore Layout PDF (Admin)**: Upload Logo Studio, colore tema e note legali in piè di pagina con anteprima live.
 - **Gestionale Fatture (`/invoices`)**: Dashboard globale per il controllo pagamenti, scadenziario e filtri stato.
 
@@ -180,9 +180,9 @@ graph TD
 3. **Sincronizzazione Schema Database (Prisma & Supabase)**:
    - Ad ogni cambio codice o nuova funzionalità, lo schema `prisma/schema.prisma` ed il database Supabase DEVONO essere istantaneamente aggiornati. Nessun dato viene perso o gestito solo volatile.
 4. **Allineamento Documentazione Markdown (`.md`)**:
-   - Tutti i file `.md` (`README.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
+   - Tutti i file `.md` (`README.md`, `ISTRUZIONI_PER_IA.md`, `ISTRUZIONI_INSTALLAZIONE.md`, `.agents/AGENTS.md`) DEVONO essere tassativamente aggiornati dopo ogni modifica importante.
 5. **Mappa Grafo (Graphify)**:
-   - Mantenere aggiornato il grafo con `graphify extract . --code-only` e `graphify cluster-only .`.
+   - Mantenere aggiornato il grafo con `graphify update .` (incrementale, preserva i nodi dei documenti) e `graphify cluster-only .`, come nella regola 4 di `ISTRUZIONI_PER_IA.md`.
    - ⚠️ Grafo **STALE**: la CLI non è installata sulla postazione Windows delle correzioni di Fase 0 e 1. Va rigenerato sulla prima postazione che la ha.
 6. **Divieto Assoluto di Credenziali in Chiaro**:
    - Nessuna password, token o chiave API reale nel codice versionato o nei file `.md`. Le credenziali dello studio risiedono nella riga `Tenant` del database (`smtpPass`, `imapPass`) e si gestiscono via `PUT /tenant/settings`. Le password delle persone stanno solo come hash scrypt su `user.password_hash`.
@@ -263,8 +263,8 @@ non una tabella figlia filtrata per `tenant_id`, quindi le policy non le danno p
 `src/server.test.ts` verifica, rotta per rotta, 401 senza token e non-401 con un token
 valido; `src/gerarchiaRuoli.test.ts` presidia la gerarchia dei ruoli; `src/accessoCliente.test.ts`
 presidia il Magic Link e `GET /uploads/:filename`; `src/calcoloService.test.ts` presidia il
-motore di stato e ciò che il ricalcolo scrive a database (`npm test` → 58 file, 707 test
-nella verifica completa locale del 2026-09-12).
+motore di stato e ciò che il ricalcolo scrive a database. In tutto i test sono oltre 2.200
+(backend, frontend e quattro flussi end-to-end Playwright in `e2e/`).
 
 ### 🔑 Il portale cliente non si apre con una stringa qualsiasi
 
@@ -315,10 +315,6 @@ una riga che già lo è. Verifica prima di un rilascio:
 
 ## 🛡 Sicurezza & Architettura Enterprise
 
-> **Stato operativo (2026-09-12):** le difese P0 descritte di seguito sono implementate e
-> verificate localmente, ma questo batch non è ancora stato committato o distribuito e le
-> relative migrazioni Prisma non sono state applicate ad alcun database.
-
 1. **🔑 Autenticazione JWT, RBAC e Sessioni Revocabili**: firma JWT HMAC SHA-256 con confronto timing-safe, `JWT_SECRET` obbligatorio (minimo 32 caratteri) e protezione per difetto delle route. I JWT cliente hanno una allowlist esplicita metodo/route e restano soggetti ai controlli di ownership. `sessionVersion` viene verificata a ogni sessione e incrementata a cambio/reset password, invalidando i token precedenti.
 2. **🔗 Magic Link Monouso**: il token casuale è persistito solo come hash SHA-256, ha scadenza e viene consumato atomicamente al primo login; cambio/reset password revocano i link attivi. Emissione e reset cliente richiedono `advisor` del tenant o `super_admin`.
 3. **📨 Webhook Autenticati e Idempotenti**: WhatsApp verifica i byte raw con `X-Hub-Signature-256`; Telegram verifica `X-Telegram-Bot-Api-Secret-Token`. Tenant, mittente e progetto devono essere risolti senza ambiguità. `WebhookInbox` deduplica messaggi, status e update con vincolo persistente composto e transazione atomica.
@@ -327,7 +323,7 @@ una riga che già lo è. Verifica prima di un rilascio:
 6. **🛡 Row-Level Security (RLS) PostgreSQL**: isolamento multi-tenant imposto dal motore database. Il runtime usa il ruolo `bluman_app`, ogni richiesta imposta il contesto tenant e le tabelle tenant-scoped applicano RLS forzata. Le nuove migrazioni `sessionVersion` e `WebhookInbox` devono essere validate e applicate prima in staging.
 7. **📧 Provider Email SMTP Reale (Register.it / SendGrid / Nodemailer)**: suite email integrata per notifiche, Magic Link e comunicazioni transazionali.
 8. **📦 Storage Cloud (Supabase Storage / AWS S3)**: archiviazione documenti con accesso confinato agli origin e bucket configurati.
-9. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: generazione OTP a 6 cifre e sigillo digitale con SHA-256, timestamp UTC e IP certificato.
+9. **📜 Firma Elettronica Avanzata (FEA) eIDAS**: generazione OTP a 6 cifre e sigillo digitale HMAC-SHA256 con SIGILLO_HMAC_SECRET, timestamp UTC e IP certificato.
 10. **⏰ Worker Cron Disponibile**: il runner RLS-safe per le notifiche è implementato; la pianificazione come servizio Railway Cron separato non è ancora configurata.
 11. **🚀 Connettore SDI**: generazione e trasmissione dei tracciati XML FatturaPA con tracking esiti; il completamento fiscale verso provider e conservazione resta una fase separata.
 12. **📝 Studio Document Studio**: editor WYSIWYG con Smart Tags ERP ed esportazione PDF A4.

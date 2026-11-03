@@ -5,7 +5,7 @@
 // ⚠️ AGGIORNAMENTO 25/09/2026: `bluman-api` è ora **collegato a GitHub**
 // (repo mariobros1987/bluman, branch main, root /) dalla dashboard Railway →
 // Settings → Source. Da allora un `git push origin main` auto-deploya il
-// backend (regola 9 di AGENTS.md aggiornata). Il servizio `cron-notifiche`
+// backend (regola 9 di .agents/AGENTS.md aggiornata). Il servizio `cron-notifiche`
 // resta su `railway up -s cron-notifiche`.
 //
 // ⚠️⚠️ PRIMA DI QUALSIASI `railway config apply`: questo file NON dichiara
