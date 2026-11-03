@@ -280,6 +280,33 @@ describe('📦 Motore Fascicolo Fiscale ZIP per Commercialista', () => {
     }
   });
 
+  it('fattura passiva senza nome del fornitore: il file prende numero e data, nessun nome inventato', async () => {
+    // 3.22 — prima il ripiego era «Fornitore», nel nome del file XML e nella colonna del registro.
+    (prisma.fatturaRicevuta.findMany as unknown as Mock).mockResolvedValueOnce([
+      {
+        id: 'fp-2',
+        tenantId: 'tenant-commercialista-test',
+        numero: 'A/17',
+        data: new Date('2026-03-22'),
+        imponibileCentesimi: 10000,
+        ivaCentesimi: 2200,
+        totaleCentesimi: 12200,
+        esigibilitaIva: 'immediata',
+        pagata: false,
+        fornitore: { ragioneSociale: '', partitaIva: '33333333333' },
+        xmlSdiRaw: '<xml>passiva</xml>',
+      },
+    ]);
+
+    const res = await generaFascicoloFiscaleZip({ tenantId: 'tenant-commercialista-test', anno: 2026, tipo: 'mensile', mese: 3 });
+
+    const zip = new PizZip(res.buffer);
+    const passivi = Object.keys(zip.files).filter(f => f.startsWith('02_Fatture_Passive_Acquisti/Acquisto_'));
+    expect(passivi).toEqual(['02_Fatture_Passive_Acquisti/Acquisto_A_17_2026-03-22.xml']);
+    const registro = zip.file('02_Fatture_Passive_Acquisti/Registro_Fatture_Acquisti.csv')?.asText() || '';
+    expect(registro.split('\r\n')[1]).toBe('2026-03-22;"A/17";"";"33333333333";100.00;22.00;122.00;immediata;NO');
+  });
+
   it('risponde correttamente via API Fastify con token JWT autenticato', async () => {
     const mockApp = {} as any;
     const server = buildServer(mockApp);

@@ -341,7 +341,9 @@ export async function generaFascicoloFiscaleZip(
   let xmlPassiveAllegati = 0;
 
   for (const fp of fatturePassive) {
-    const nomeForn = fp.fornitore?.ragioneSociale || 'Fornitore';
+    // 3.22 — senza ragione sociale del fornitore la colonna resta vuota e il file prende la
+    // data della fattura: prima entrambi dicevano «Fornitore», un nome che non è di nessuno.
+    const nomeForn = fp.fornitore?.ragioneSociale?.trim() ?? '';
     const pivaForn = fp.fornitore?.partitaIva || fp.fornitore?.codiceFiscale || '';
     const imp = ((fp.imponibileCentesimi || 0) / 100).toFixed(2);
     const iva = ((fp.ivaCentesimi || 0) / 100).toFixed(2);
@@ -364,7 +366,7 @@ export async function generaFascicoloFiscaleZip(
     // documento che il fornitore ha trasmesso a SdI.
     if (fp.xmlSdiRaw) {
       zip.file(
-        `02_Fatture_Passive_Acquisti/Acquisto_${nomeFileSicuro(fp.numero, 30)}_${nomeFileSicuro(nomeForn, 20)}.xml`,
+        `02_Fatture_Passive_Acquisti/Acquisto_${nomeFileSicuro(fp.numero, 30)}_${nomeForn ? nomeFileSicuro(nomeForn, 20) : dataStr || nomeFileSicuro(fp.id, 40)}.xml`,
         fp.xmlSdiRaw,
       );
       xmlPassiveAllegati += 1;
