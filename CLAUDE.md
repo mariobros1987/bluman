@@ -59,6 +59,10 @@ Leggili solo se il prompt lo chiede: le regole operative sono qui.
   `railway`, `vercel`, `ssh`, `scripts/distribuisci.sh`.
 - Attenzione: un push su `main` fa partire il deploy automatico del backend su Railway e applica le
   migrazioni. Una migrazione committata non è inerte.
+- Ramo di lavoro: correzioni-diagnosi. Mai committare su main: main è la produzione e si aggiorna
+  solo unendo il ramo (merge = deploy Railway).
+- Su Windows i messaggi di commit si passano da file (git commit -F), perché PowerShell spezza le
+  virgolette.
 
 ## Documentazione
 - Durante il lavoro **non si toccano i file .md** (questo vale anche contro la regola 3 e 4 di
