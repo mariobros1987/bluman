@@ -1154,7 +1154,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       await recordAudit({
         tenantId: tenant.id,
-        ruolo: 'super_admin',
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'TENANT_CREATO',
         entita: tenant.ragioneSociale,
         dettagli: `Studio registrato con responsabile ${emailResponsabile || '(nessuno)'}`,
@@ -1191,6 +1192,17 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
           // Nessuna scrittura di password qui: per rigenerarla c'è
           // POST /admin/tenants/:id/reset-password, che ne salva solo l'hash.
         }
+      });
+      // 3.23 — sospendere uno studio o cambiargli piano è un atto del super_admin: prima non
+      // lasciava traccia. Nei dettagli solo i nomi dei campi toccati, non i valori.
+      await recordAudit({
+        tenantId: id,
+        userId: req.userId,
+        ruolo: req.ruolo,
+        azione: 'TENANT_AGGIORNATO',
+        entita: updated.ragioneSociale,
+        dettagli: `Campi aggiornati: ${Object.keys(b).join(', ') || '(nessuno)'}`,
+        ipAddress: req.ip,
       });
       return reply.send(senzaSegreti(updated));
     } catch (err: any) {
@@ -1255,7 +1267,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
 
       await recordAudit({
         tenantId: id,
-        ruolo: 'super_admin',
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'PASSWORD_RESPONSABILE_RIGENERATA',
         entita: tenant.ragioneSociale,
         dettagli: `Nuova password temporanea emessa per ${emailResponsabile}`,
@@ -1315,7 +1328,8 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       // a livello di piattaforma (tenant di default), come atto del super_admin.
       await recordAudit({
         tenantId: TENANT_DEFAULT,
-        ruolo: 'super_admin',
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'TENANT_ELIMINATO',
         entita: tenant.ragioneSociale,
         dettagli: `Studio "${tenant.ragioneSociale}" (${id}) eliminato definitivamente. Righe rimosse: ${JSON.stringify(conteggi)}`,
