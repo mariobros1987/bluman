@@ -47,6 +47,14 @@ const DOC_DA_ISPEZIONARE = [
   'GUIDA_CONFIGURAZIONE_CANALI.md',
   'GUIDA_META_WHATSAPP_INTEGRAZIONE.md',
   '.agents/AGENTS.md',
+  // I documenti dello Standard (17/11/2026): regole, diario, deploy, adozione.
+  'CLAUDE.md',
+  'DIARIO.md',
+  'DEPLOY.md',
+  'ARCHITECTURE.md',
+  '.claude/rules/90-progetto.md',
+  'docs/adozione-standard.md',
+  'docs/project-instructions.md',
 ];
 
 /**

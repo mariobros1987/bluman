@@ -37,8 +37,10 @@ openstamanager-reference/
 scratch/
 *.log
 
-# Configurazione locale dell'assistente CLI
-.claude/
+# Configurazione locale dell'assistente CLI. settings.json, rules/ e hooks/ sono
+# versionati (Standard, 17/11/2026): si ignora solo cio' che e' di questa macchina.
+.claude/settings.local.json
+.claude/worktrees/
 
 # Bundle e file della migrazione da Bluecode (esportaDaBluecode.ts → importaInBluecode.ts):
 # contiene documenti e anagrafiche di clienti reali, mai nel repo. Gli script invece si

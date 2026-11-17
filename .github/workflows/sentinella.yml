@@ -1,0 +1,50 @@
+# Sentinella: ogni mezz'ora guarda le PR aperte (scripts/sentinella.sh) e fa
+# ripartire da sola ciò che il sistema sa sistemare: prove annullate o scadute
+# (rilancio), prove rosse o correzioni mai partite (correttore), il resto passa da
+# automerge.sh (merge, conflitti). Avvisa su Telegram solo ciò che serve a Fabio:
+# prove ferme in coda (PC spento) o interrotte anche dopo i rilanci (10-11/11).
+# Sul runner del server, sempre acceso: avvisa anche col PC spento.
+# schedule: gira con il file del ramo predefinito.
+# BluMan: gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository in ogni
+# job): con la pubblicazione questo file arriva anche nel repo del titolare, dove non
+# ci sono runner né secret nostri (docs/adozione-standard.md).
+name: sentinella
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sentinella
+  cancel-in-progress: false
+
+permissions:
+  contents: write      # automerge.sh: merge
+  pull-requests: write
+  issues: write
+  actions: write       # automerge.sh lancia deploy.yml e fix.yml
+  checks: read
+
+jobs:
+  sentinella:
+    if: github.repository == 'wolftradesystem-tech/bluman'
+    runs-on: [self-hosted, "ci"]
+    timeout-minutes: 15
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - uses: actions/checkout@v6
+        with:
+          ref: "main"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+        run: |
+          [[ -f scripts/sentinella.sh ]] || { echo "sentinella.sh non ancora in produzione"; exit 0; }
+          bash scripts/sentinella.sh

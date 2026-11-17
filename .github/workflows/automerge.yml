@@ -1,0 +1,158 @@
+# Merge automatico e deploy (scripts/automerge.sh), SEMPRE con il file e gli
+# script di PRODUZIONE: workflow_run e pull_request_target girano con il file del
+# ramo predefinito e qui si scarica solo main, il codice della PR non
+# viene mai eseguito (analisi critica del 04/11 sul pilota). Per questo
+# main DEVE essere il ramo predefinito del repo (setup-github.sh).
+#
+#   ci finita verde (workflow_run) → automerge.sh
+#   etichetta ok-fabio (messa su richiesta di Fabio) → avviso Telegram + automerge.sh
+#   ci finita rossa (workflow_run) → ci-rossa.sh: correttore, poi serve-fabio e avviso
+#   commit nuovo → toglie gli esiti: valevano per il codice di prima
+# L'etichetta del revisore e il primo tentativo di merge li fa review.yml, anche
+# lui su pull_request_target dal 04/11.
+# BluMan: gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository in ogni
+# job): con la pubblicazione questo file arriva anche nel repo del titolare, dove non
+# ci sono runner né secret nostri (docs/adozione-standard.md).
+name: automerge
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+  pull_request_target:
+    branches: ["main"]
+    types: [labeled, synchronize]
+
+# Niente concurrency a livello di workflow: GitHub tiene un solo run in coda per
+# gruppo e cancella gli altri, così una review-label in coda poteva sparire dietro
+# un'etichetta di Fabio (revisione indipendente del 04/11). Due merge in parallelo
+# li gestisce automerge.sh (il secondo vede la PR già mergiata e si ferma).
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+  checks: read
+
+jobs:
+  # Un commit nuovo azzera TUTTI gli esiti: valevano per il codice di prima.
+  # Togliere solo ok-fabio lasciava review-ok, e se la CI del commit nuovo finiva
+  # prima della sua revisione la PR si mergiava senza revisione (revisione
+  # indipendente del 04/11). L'etichetta nuova la rimette review-label.sh.
+  reset:
+    if: github.repository == 'wolftradesystem-tech/bluman' && github.event_name == 'pull_request_target' && github.event.action == 'synchronize'
+    runs-on: [self-hosted, "ci"]
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          for l in ok-fabio review-ok review-da-correggere serve-fabio; do
+            gh api -X DELETE "repos/$GH_REPO/issues/$PR/labels/$l" >/dev/null 2>&1 || true   # 404 = non c'era
+          done
+
+  # Ogni ok-fabio si vede su Telegram: la mette una sessione di Claude quando
+  # Fabio scrive «mergia la #N», e se ne compare una che Fabio non ha chiesto se
+  # ne accorge subito (Fabio, 04/11). Avvisa e basta: il merge lo fa il job sotto.
+  avviso-ok-fabio:
+    if: github.repository == 'wolftradesystem-tech/bluman' && github.event_name == 'pull_request_target' && github.event.action == 'labeled' && github.event.label.name == 'ok-fabio'
+    runs-on: [self-hosted, "ci"]
+    timeout-minutes: 6
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - env:
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+          # Come variabili, mai interpolati nello script: il titolo lo scrive chi apre la PR.
+          PR: ${{ github.event.pull_request.number }}
+          TITOLO: ${{ github.event.pull_request.title }}
+          URL: ${{ github.event.pull_request.html_url }}
+          CHI: ${{ github.event.sender.login }}
+        run: |
+          [[ -n "${CI_TELEGRAM_TOKEN:-}" && -n "${CI_TELEGRAM_CHAT:-}" ]] || { echo "Telegram non configurato"; exit 0; }
+          curl -fsS --max-time 10 "https://api.telegram.org/bot$CI_TELEGRAM_TOKEN/sendMessage" -d chat_id="$CI_TELEGRAM_CHAT" -d disable_web_page_preview=true \
+            --data-urlencode text="🟡 bluman: #$PR sbloccata con ok-fabio (da $CHI). Se non l'hai chiesto tu, scrivilo in chat."$'\n'"${TITOLO:0:120}"$'\n'"$URL" >/dev/null || echo "avviso Telegram non partito"
+
+  # Prove rosse: il correttore le guarda (scripts/ci-rossa.sh), poi serve-fabio e
+  # avviso. Prima del 10/11 una PR con le prove rosse restava ferma senza dirlo a
+  # nessuno (sul pilota).
+  prove-rosse:
+    if: >-
+      github.repository == 'wolftradesystem-tech/bluman' && github.event.workflow_run.head_repository.full_name == github.repository
+      && github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.name == 'ci' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: [self-hosted, "ci"]
+    timeout-minutes: 6
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - uses: actions/checkout@v6
+        with:
+          ref: "main"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+          PR_RUN: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          pr="${PR_RUN:-}"
+          if [[ -z "$pr" ]]; then
+            pr="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main")][0].number // empty')"
+          fi
+          [[ "$pr" =~ ^[0-9]+$ ]] || { echo "nessuna PR aperta per questo run"; exit 0; }
+          [[ -f scripts/ci-rossa.sh ]] || { echo "ci-rossa.sh non ancora in produzione"; exit 0; }
+          bash scripts/ci-rossa.sh "$pr" "$RUN"
+
+  merge:
+    if: >-
+      github.repository == 'wolftradesystem-tech/bluman' && (
+        (github.event_name == 'pull_request_target' && github.event.action == 'labeled')
+        || (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+            && github.event.workflow_run.head_repository.full_name == github.repository
+            && github.event.workflow_run.name == 'ci' && github.event.workflow_run.conclusion == 'success')
+      )
+    runs-on: [self-hosted, "ci"]
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - uses: actions/checkout@v6
+        with:
+          ref: "main"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+          PR_ETICHETTA: ${{ github.event.pull_request.number }}
+          PR_RUN: ${{ github.event.workflow_run.pull_requests[0].number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          pr="${PR_ETICHETTA:-$PR_RUN}"
+          if [[ -z "$pr" && -n "$HEAD_SHA" ]]; then
+            # workflow_run.pull_requests a volte arriva vuoto: si cerca dal commit.
+            pr="$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open" and .base.ref == "main")][0].number // empty')"
+          fi
+          [[ "$pr" =~ ^[0-9]+$ ]] || { echo "nessuna PR aperta per questo evento: niente da fare"; exit 0; }
+          bash scripts/automerge.sh "$pr"

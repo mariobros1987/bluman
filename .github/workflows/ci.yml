@@ -1,70 +1,188 @@
-name: BluMan CI / Automated Verification
+# CI sulle PR: typecheck, lint, build; poi le prove secondo il LIVELLO della PR
+# (scripts/livello.sh e .github/livelli.txt, letti dal ramo di produzione):
+#   leggero   → niente prove
+#   normale   → le prove collegate ai file toccati
+#   sensibile → la suite intera, divisa in parti che girano in parallelo
+# (Fabio, 10/11: «la suite completa solo se serve, una volta per giro»). Una PR
+# si apre a giro finito, quindi la suite gira una volta per giro, non per modifica.
+# Il job `test` riassume le prove: è il nome che aspettano automerge e deploy.
+#
+# BluMan: nel fork (wolftradesystem-tech/bluman) tutto gira sui runner «ci» del PC
+# (server/ci-runner.ps1 dello Standard). Lo stesso file arriva al repo del titolare
+# (mariobros1987/bluman) con ogni pubblicazione: lì non ci sono runner nostri e la CI
+# gira sulle macchine di GitHub, coi minuti del suo account, com'era prima dell'adozione.
+# Per questo è l'unico workflow SENZA la guardia sul repository (docs/adozione-standard.md).
+# Le prove non vogliono un database: vitest.setup.ts punta a un URL irraggiungibile e i
+# test che toccano il DB lo simulano (era già così nella CI di prima).
+name: ci
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-
+  # Nel fork i job girano sui runner «ci» del PC; mai sulle macchine di GitHub (i
+  # minuti gratuiti finiscono e non si pagano, 09/11). Fuori dal fork (repo del
+  # titolare) non ci sono runner nostri: macchine di GitHub. Col PC spento i job
+  # del fork restano in coda.
+  dove:
+    runs-on: ${{ github.repository == 'wolftradesystem-tech/bluman' && fromJSON('["self-hosted","ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      runner: ${{ steps.d.outputs.runner }}
+      livello: ${{ steps.l.outputs.livello }}
+      parti: ${{ steps.l.outputs.parti }}
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - id: d
+        env:
+          NEL_FORK: ${{ github.repository == 'wolftradesystem-tech/bluman' }}
+        run: |
+          if [[ "$NEL_FORK" == true ]]; then
+            echo 'runner=["self-hosted","ci"]' >> "$GITHUB_OUTPUT"; echo 'gira su: il runner «ci» del PC'
+          else
+            echo 'runner=["ubuntu-latest"]' >> "$GITHUB_OUTPUT"; echo 'gira su: le macchine di GitHub (fuori dal fork)'
+          fi
+      # Sul PC la cartella di lavoro è in comune fra i job del repo, e la CI esegue
+      # codice delle PR: si svuota tutta, .git compreso, prima del checkout. Su una
+      # macchina di GitHub la cartella è nuova a ogni run.
+      - name: cartella di lavoro pulita
+        run: |
+          case "$GITHUB_WORKSPACE" in
+            */_work/*) find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} + ;;
+            *) echo "macchina di GitHub: cartella nuova, niente da svuotare" ;;
+          esac
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      # Script e aree dal ramo di PRODUZIONE: una PR non sceglie il proprio livello.
+      # Senza (workflow_dispatch, o file non ancora in produzione) livello.sh dice sensibile.
+      - id: l
+        env:
+          BASE: ${{ github.base_ref }}
+        run: |
+          base="${BASE:-main}"
+          git show "origin/$base:scripts/livello.sh" > "$RUNNER_TEMP/livello.sh" 2>/dev/null || echo 'echo sensibile' > "$RUNNER_TEMP/livello.sh"
+          git show "origin/$base:.github/livelli.txt" > "$RUNNER_TEMP/livelli.txt" 2>/dev/null || : > "$RUNNER_TEMP/livelli.txt"
+          if [[ -n "$BASE" ]]; then git diff --name-status "origin/$base...HEAD" > "$RUNNER_TEMP/file.txt"; else : > "$RUNNER_TEMP/file.txt"; fi
+          livello="$(bash "$RUNNER_TEMP/livello.sh" "$RUNNER_TEMP/livelli.txt" < "$RUNNER_TEMP/file.txt")"
+          case "$livello" in
+            sensibile) parti='[1,2,3]';;
+            *) parti='[1]';;
+          esac
+          echo "livello=$livello" >> "$GITHUB_OUTPUT"
+          echo "parti=$parti" >> "$GITHUB_OUTPUT"
+          echo "livello: $livello ($(wc -l < "$RUNNER_TEMP/file.txt") file)"
 
-      - name: Setup Node.js 20
-        uses: actions/setup-node@v4
+  check:
+    needs: dove
+    runs-on: ${{ fromJSON(needs.dove.outputs.runner) }}
+    timeout-minutes: 20
+    steps:
+      - name: cartella di lavoro pulita
+        run: |
+          case "$GITHUB_WORKSPACE" in
+            */_work/*) find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} + ;;
+            *) echo "macchina di GitHub: cartella nuova, niente da svuotare" ;;
+          esac
+      - uses: actions/checkout@v4
+      # Node 22: dentro engines (>=20 <23) e la versione che lo Standard vuole per le prove.
+      # Niente cache scaricata da GitHub: la cache di npm resta sul disco del runner.
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            frontend/package-lock.json
-
-      - name: Install Root Dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      # Presidio 1: il backend deve superare il controllo tipi PRIMA dei test.
-      - name: Backend Typecheck
+          node-version: "22"
+      - run: npm ci
+      # Il client Prisma serve al typecheck e alla build del backend (`npx --no-install`: mai Prisma 8).
+      - run: npx --no-install prisma generate
+      - name: typecheck backend
         run: npx tsc --noEmit
-
-      # Presidio 2: suite completa (regole, servizi, rotte, credenziali.test).
-      # Non servono credenziali DB reali: i test che toccano il database lo
-      # simulano o usano il client amministrativo isolato.
-      - name: Backend & Domain Tests
-        run: npx vitest run
-
-      # Presidio 2b: anche l'emissione del compilato deve riuscire.
-      - name: Backend Build
+      - name: build backend
         run: npm run build
-
-      - name: Install Frontend Dependencies
-        run: npm ci
+      - run: npm ci
         working-directory: frontend
-
-      # Presidio 3b: lint (oxlint con regole react) — configurato da sempre in
-      # frontend/.oxlintrc.json ma mai eseguito dalla CI prima di questo step.
-      - name: Frontend Lint (oxlint)
+      - name: lint frontend (oxlint)
         run: npm run lint
         working-directory: frontend
-
-      # Presidio 3c: unit e component test del frontend (Vitest + Testing Library,
-      # jsdom). Runner separato da quello backend: vedi frontend/vite.config.ts.
-      - name: Frontend Tests (Vitest)
-        run: npm test
-        working-directory: frontend
-
-      # Presidio 3: il frontend si valida con `tsc -b` (project references),
-      # NON con `tsc --noEmit` che sul tsconfig con "files": [] non verifica nulla.
-      - name: Frontend Typecheck
+      # `tsc -b` (project references), NON `tsc --noEmit`, che sul tsconfig con "files": [] non verifica nulla.
+      - name: typecheck frontend
         run: npx tsc -b --force
         working-directory: frontend
-
-      - name: Build Frontend
+      - name: build frontend
         run: npm run build
         working-directory: frontend
+
+  prove:
+    needs: dove
+    if: needs.dove.outputs.livello != 'leggero'
+    strategy:
+      fail-fast: true
+      matrix:
+        parte: ${{ fromJSON(needs.dove.outputs.parti) }}
+    runs-on: ${{ fromJSON(needs.dove.outputs.runner) }}
+    timeout-minutes: 40
+    env:
+      NODE_ENV: test
+    steps:
+      - name: cartella di lavoro pulita
+        run: |
+          case "$GITHUB_WORKSPACE" in
+            */_work/*) find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} + ;;
+            *) echo "macchina di GitHub: cartella nuova, niente da svuotare" ;;
+          esac
+      - uses: actions/checkout@v4
+        # Tutta la storia: le prove collegate confrontano col ramo di produzione.
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npx --no-install prisma generate
+      - run: npm ci
+        working-directory: frontend
+      # sensibile: la suite intera (backend e frontend), parte $PARTE (es. 2/3).
+      # normale: solo le prove collegate ai file toccati (vitest segue gli import; se
+      # nessuna, verde), più le prove «sempre» del file delle aree di PRODUZIONE, che
+      # leggono i sorgenti dal disco e --changed non vede.
+      - name: prove
+        env:
+          LIVELLO: ${{ needs.dove.outputs.livello }}
+          PARTE: ${{ matrix.parte }}/${{ needs.dove.outputs.livello == 'sensibile' && '3' || '1' }}
+          BASE: origin/${{ github.base_ref || 'main' }}
+        run: |
+          echo "livello $LIVELLO, parte $PARTE"
+          if [[ "$LIVELLO" == sensibile ]]; then
+            npx vitest run --shard="$PARTE" --reporter=dot
+            (cd frontend && npx vitest run --shard="$PARTE" --reporter=dot)
+          else
+            npx vitest run --changed "$BASE" --passWithNoTests --reporter=dot
+            (cd frontend && npx vitest run --changed "$BASE" --passWithNoTests --reporter=dot)
+            sempre="$(git show "$BASE:.github/livelli.txt" 2>/dev/null | awk '$1 == "sempre" { print $2 }')"
+            if [[ -n "$sempre" ]]; then npx vitest run $sempre --reporter=dot; fi
+          fi
+
+  # Il riassunto delle prove, col nome che aspettano automerge.sh e deploy.yml.
+  # Verde solo se il livello è stato letto e le prove del livello sono verdi
+  # (leggero: nessuna prova da fare).
+  test:
+    needs: [dove, prove]
+    # Non always(): una CI annullata da un commit nuovo non deve dire «rosso».
+    if: ${{ !cancelled() }}
+    runs-on: ${{ github.repository == 'wolftradesystem-tech/bluman' && fromJSON('["self-hosted","ci"]') || 'ubuntu-latest' }}
+    timeout-minutes: 2
+    steps:
+      - env:
+          DOVE: ${{ needs.dove.result }}
+          LIVELLO: ${{ needs.dove.outputs.livello }}
+          PROVE: ${{ needs.prove.result }}
+        run: |
+          echo "livello: ${LIVELLO:-?} · prove: $PROVE"
+          [[ "$DOVE" == success && -n "$LIVELLO" ]] || { echo "livello non letto"; exit 1; }
+          if [[ "$LIVELLO" == leggero ]]; then [[ "$PROVE" == skipped ]] && exit 0; fi
+          [[ "$PROVE" == success ]]
+
+  # Il merge automatico non sta qui: lo fa automerge.yml quando questo workflow
+  # finisce (workflow_run), con il file e gli script di PRODUZIONE. Qui girerebbe
+  # la versione della PR, che potrebbe cambiare le regole che la riguardano.
