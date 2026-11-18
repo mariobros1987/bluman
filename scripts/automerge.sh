@@ -73,7 +73,9 @@ LC_ALL=C; [[ "$via" > "$ci_dal" ]] || { log "il via libera ($via) è del commit 
 # ferma qui e riprova il prossimo evento.
 mergeable=null
 for _ in 1 2 3 4 5 6; do
-  mergeable="$(leggi "repos/$GH_REPO/pulls/$PR" --jq '.mergeable // "null"')"
+  # Non «.mergeable // "null"»: in jq «//» scarta anche false, e un conflitto vero
+  # diventava «non ancora calcolato» per sempre (Match #76 ferma dal 17/11).
+  mergeable="$(leggi "repos/$GH_REPO/pulls/$PR" --jq 'if .mergeable == null then "null" else (.mergeable | tostring) end')"
   [[ "$mergeable" != null ]] && break
   sleep 5
 done
