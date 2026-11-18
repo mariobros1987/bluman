@@ -1,7 +1,7 @@
 // Rotte Fornitori e Ciclo Passivo (Fatture d'Acquisto / Ricevute, Import XML SDI, Pagamento e Prima Nota).
 
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../util/prismaClient.js';
+import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import {
   CreaFornitoreSchema,
@@ -11,6 +11,12 @@ import {
 } from '../schemas/fornitori.schema.js';
 import { parseXmlFatturaPassiva } from '../services/fatturaPassivaParser.js';
 import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
+import {
+  FatturaPassivaGiaSaldata,
+  cercaDoppioneFatturaPassiva,
+  messaggioDoppione,
+  saldaFatturaPassiva,
+} from '../services/fatturaPassiva.js';
 
 export async function registraRotteFornitori(server: FastifyInstance): Promise<void> {
   // ─── ANAGRAFICA FORNITORI ──────────────────────────────────────────
@@ -226,6 +232,11 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         return reply.code(404).send({ errore: 'Fornitore non trovato per questo tenant' });
       }
 
+      const doppione = await cercaDoppioneFatturaPassiva(prisma, { tenantId, fornitoreId, numero, data });
+      if (doppione) {
+        return reply.code(409).send({ errore: messaggioDoppione(doppione.numero, fornitore.ragioneSociale, doppione.data) });
+      }
+
       const fatturaRicevuta = await prisma.fatturaRicevuta.create({
         data: {
           tenantId,
@@ -326,6 +337,18 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         });
       }
 
+      // La stessa fattura non entra due volte: costi e IVA a credito raddoppierebbero (anche in LIPE).
+      const dataDocumento = new Date(datiEstratti.documento.data);
+      const doppione = await cercaDoppioneFatturaPassiva(prisma, {
+        tenantId,
+        fornitoreId: fornitore.id,
+        numero: datiEstratti.documento.numero,
+        data: dataDocumento,
+      });
+      if (doppione) {
+        return reply.code(409).send({ errore: messaggioDoppione(doppione.numero, fornitore.ragioneSociale, doppione.data) });
+      }
+
       // Creiamo la fattura ricevuta collegata
       const fatturaRicevuta = await prisma.fatturaRicevuta.create({
         data: {
@@ -382,32 +405,23 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         return reply.code(409).send({ errore: 'Fattura passiva già saldata' });
       }
 
-      // 1. Aggiorniamo stato fattura passiva
-      const aggiornata = await prisma.fatturaRicevuta.update({
-        where: { id: req.params.id },
-        data: {
-          pagata: true,
-          dataPagamento,
-        },
+      // Saldo e uscita in Prima Nota sono un atto solo: o entrambi, o nessuno dei due.
+      const movimentoPrimaNota = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, () =>
+          saldaFatturaPassiva(tx, {
+            tenantId,
+            fattura,
+            dataPagamento,
+            contoBancarioId,
+            metodoPagamento,
+            riferimentoTransazione,
+            note,
+          }),
+        ),
+      );
+      const aggiornata = await prisma.fatturaRicevuta.findFirst({
+        where: { id: fattura.id, tenantId },
         include: { fornitore: true },
-      });
-
-      // 2. Creiamo registrazione di uscita in Prima Nota, e insieme muoviamo il saldo del conto
-      const movimentoPrimaNota = await creaMovimentoConSaldo(prisma, {
-        data: {
-          tenantId,
-          fatturaRicevutaId: fattura.id,
-          fornitoreId: fattura.fornitoreId,
-          contoBancarioId: contoBancarioId || null,
-          data: dataPagamento,
-          tipo: 'uscita',
-          categoria: 'pagamento_fornitore',
-          descrizione: `Saldo fattura passiva n. ${fattura.numero} (${fattura.fornitore.ragioneSociale})`,
-          importoCentesimi: fattura.totaleCentesimi,
-          metodoPagamento,
-          riferimentoTransazione,
-          note,
-        },
       });
 
       await recordAudit({
@@ -426,6 +440,9 @@ export async function registraRotteFornitori(server: FastifyInstance): Promise<v
         movimentoPrimaNota,
       });
     } catch (err: any) {
+      if (err instanceof FatturaPassivaGiaSaldata) {
+        return reply.code(409).send({ errore: err.message });
+      }
       return reply.code(500).send({ errore: err?.message || 'Errore registrazione pagamento fattura passiva' });
     }
   });

@@ -1,7 +1,7 @@
 # 06 · Scadenzario incassi & Solleciti
 
 ## 👤 Cosa fa e come si usa
-Lo **Scadenzario** (`/invoices/scadenzario`) tiene le **rate di incasso** generate dalle fatture:
+Lo **Scadenzario** (`/scadenzario`) tiene le **rate di incasso** generate dalle fatture:
 scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
 - **Registrare un incasso**: da una rata → importo, metodo, conto → registra il pagamento (e crea in
   automatico il movimento di Prima Nota, §07). Il conto scelto è quello che riceve il denaro: se non

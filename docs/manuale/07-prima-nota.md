@@ -1,7 +1,7 @@
 # 07 · Prima Nota & Riconciliazione bancaria
 
 ## 👤 Cosa fa e come si usa
-La **Prima Nota** (`/prima-nota`) è il registro dei movimenti di **cassa e banca** dello studio:
+La **Prima Nota** (`/primanota`) è il registro dei movimenti di **cassa e banca** dello studio:
 entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - **Movimenti automatici**: quando registri un incasso nello Scadenzario (§06) o versi un F24 dalla
   LIPE (§08), il movimento entra qui **da solo**.

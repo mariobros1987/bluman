@@ -87,6 +87,32 @@ beforeEach(() => {
 });
 
 describe('server — enforcement della Matrice Permessi (RBAC)', () => {
+  it('fornitori, fatture d\'acquisto e liquidazione IVA sono chiusi a chi non ha invoices', async () => {
+    // Il 403 arriva dall'hook, prima della rotta: nessuna lettura né scrittura parte.
+    const server = await serverDiTest();
+    const headers = { authorization: `Bearer ${token('collaboratore_interno')}` };
+    for (const [method, url] of [
+      ['GET', '/fornitori'],
+      ['GET', '/fatture-ricevute'],
+      ['POST', '/fatture-ricevute/abc/paga'],
+      ['POST', '/liquidazione-iva/salva'],
+    ] as const) {
+      const res = await server.inject({ method, url, headers, payload: method === 'POST' ? {} : undefined });
+      expect(`${method} ${url} → ${res.statusCode}`).toBe(`${method} ${url} → 403`);
+    }
+    await server.close();
+  });
+
+  it('le giurisdizioni si leggono fuori matrice ma si scrivono solo con library=write', async () => {
+    const server = await serverDiTest();
+    const headers = { authorization: `Bearer ${token('collaboratore_interno')}` };
+    // Default del collaboratore interno su library: read → la scrittura è negata.
+    const negata = await server.inject({ method: 'DELETE', url: '/giurisdizioni/abc', headers });
+    expect(negata.statusCode).toBe(403);
+    expect(permessiTest.viste).toContainEqual({ tenantId: TENANT_TEST, userId: 'usr-collab', moduloChiave: 'library' });
+    await server.close();
+  });
+
   it('senza riga sulla matrice si applica il default per ruolo, non l\'accesso pieno', async () => {
     // collaboratore_interno NON ha invoices nel suo default (né write né read): senza riga
     // sulla matrice l'API ora nega, come fa il frontend. Prima qui passava (buco: un

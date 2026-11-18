@@ -34,9 +34,9 @@ function senzaCodice(html: string): string {
 }
 
 describe('📖 il manuale — i file veri si convertono tutti', () => {
-  it('trova le 19 schede e il README', () => {
+  it('trova le 31 schede e il README', () => {
     // Se questo numero cambia, è cambiato il manuale: il test è il posto dove accorgersene.
-    expect(SCHEDE).toHaveLength(19);
+    expect(SCHEDE).toHaveLength(31);
     expect(FILE_MANUALE).toContain('README.md');
   });
 
@@ -157,12 +157,13 @@ describe('✂️ il filtro per ruolo', () => {
     expect(testoDi(superAdmin, '05-fatture-sdi')).toContain('contabilitaRegistro.ts');
   });
 
-  it('il collaboratore non vede la scheda riservata, il super admin sì — e sono 18 contro 19', async () => {
+  it('il collaboratore non vede la scheda riservata, il super admin sì — e sono 29 contro 31', async () => {
     const collaboratore = await indiceManuale('advisor');
     const superAdmin = await indiceManuale('super_admin');
-    expect(superAdmin.schede).toHaveLength(19);
-    expect(collaboratore.schede).toHaveLength(18);
+    expect(superAdmin.schede).toHaveLength(31);
+    expect(collaboratore.schede).toHaveLength(29);
     expect(collaboratore.schede.map(s => s.slug)).not.toContain('19-infra-deploy');
+    expect(collaboratore.schede.map(s => s.slug)).not.toContain('31-multi-tenant-admin');
   });
 
   it('nessun testo indicizzato contiene la sintassi del markdown', async () => {
@@ -188,7 +189,7 @@ describe('🧭 l’indice', () => {
     const numeri = indice.schede.map(s => s.numero);
     expect(numeri).toEqual([...numeri].sort());
     expect(numeri[0]).toBe('01');
-    expect(numeri[numeri.length - 1]).toBe('19');
+    expect(numeri[numeri.length - 1]).toBe('31');
     // Il titolo viene dal primo `#` del file, non da una tabella scritta a mano: l'indice non è una
     // seconda copia del manuale, e non deve poter divergere da quello che le schede dicono.
     expect(indice.schede[4]?.titolo).toBe('05 · Fatture / Note di Credito & SDI');

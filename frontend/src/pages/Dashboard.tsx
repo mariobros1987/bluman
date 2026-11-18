@@ -23,6 +23,8 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
   const [searchTerm, setSearchTerm] = useState('');
+  // Quanti progetti ha il periodo sul server: se sono più di quelli letti, i contatori sono parziali.
+  const [totaleServer, setTotaleServer] = useState(0);
 
   // F5 — se l'API non risponde la Dashboard lo dice («Riprova») e resta vuota: niente copie
   // locali né progetti di seed mostrati come se venissero dal database.
@@ -113,6 +115,7 @@ export function Dashboard() {
       // altrimenti un progetto rimasto solo in localStorage comparirebbe qui e non in
       // Progetti. Stessa regola della pagina Progetti.
       combined = dbProjs;
+      setTotaleServer(remote.meta.totale);
     } catch (err) {
       console.warn('Dashboard: lettura progetti non riuscita', err);
       combined = [];
@@ -131,10 +134,13 @@ export function Dashboard() {
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
   const isSuperAdminOrAdvisor = ['super_admin', 'advisor'].includes(currentUser.ruolo);
 
-  const active   = projectList.filter(p => p.st === 'in_progress').length;
-  const alerts   = projectList.filter(p => p.delay).length;
-  const totalVal = projectList.reduce((a, p) => a + p.val, 0);
-  const avgPct   = Math.round(projectList.reduce((a, p) => a + p.pct, 0) / (projectList.length || 1));
+  // I contatori riguardano i progetti NON archiviati, come la scheda «Progetti in Corso» qui sotto:
+  // prima «Progetti attivi» contava anche l'archivio.
+  const nonArchiviati = projectList.filter(p => p.st !== 'archived');
+  const active   = nonArchiviati.filter(p => p.st === 'in_progress').length;
+  const alerts   = nonArchiviati.filter(p => p.delay).length;
+  const totalVal = nonArchiviati.reduce((a, p) => a + p.val, 0);
+  const avgPct   = Math.round(nonArchiviati.reduce((a, p) => a + p.pct, 0) / (nonArchiviati.length || 1));
 
   const delayedProjects = projectList.filter(p => {
     const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed' || m.rischio);
@@ -226,12 +232,6 @@ export function Dashboard() {
             >
               🔄 Riprova
             </button>
-            <button
-              onClick={() => window.open('mailto:admin@bluecode.advisory?subject=Errore%20Database%20BluMan', '_blank')}
-              className="btn btn-secondary"
-            >
-              📧 Contatta Amministratore
-            </button>
           </div>
         </div>
       </div>
@@ -250,11 +250,18 @@ export function Dashboard() {
 
       {/* KPI */}
       <div className={styles.kpiGrid}>
-        <KpiCard icon="📁" iconBg="var(--pill-indigo-bg)" value={projectList.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
+        <KpiCard icon="📁" iconBg="var(--pill-indigo-bg)" value={nonArchiviati.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
         <KpiCard icon="⚠️" iconBg="var(--pill-amber-bg)" value={alerts} label="Ritardi attivi" sub="Richiedono attenzione" valueColor={alerts > 0 ? 'var(--amber)' : undefined} />
         <KpiCard icon="💶" iconBg="var(--pill-green-bg)" value={fmt(totalVal)} label="Valore portafoglio" sub="Progetti in corso" />
         <KpiCard icon="📈" iconBg="var(--pill-indigo-bg)" value={`${avgPct}%`} label="Avanzamento medio" sub="Tutti i progetti" />
       </div>
+
+      {totaleServer > projectList.length && (
+        <div role="status" style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, marginBottom: 14 }}>
+          I contatori qui sopra riguardano i {projectList.length} progetti più recenti su {totaleServer} del periodo.
+          Per il quadro completo apri la pagina Progetti o restringi il Periodo.
+        </div>
+      )}
 
       {/* Alert banner */}
       {alertRows.length > 0 && (

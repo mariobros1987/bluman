@@ -28,6 +28,8 @@ export const LiquidazioneIvaPage: React.FC = () => {
   const [errore, setErrore] = useState<string | null>(null);
   const [messaggioSuccesso, setMessaggioSuccesso] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  // Storico non letto ≠ nessuna liquidazione salvata.
+  const [erroreStorico, setErroreStorico] = useState<string | null>(null);
 
   // Modal versamento
   const [isModalVersamentoOpen, setIsModalVersamentoOpen] = useState(false);
@@ -38,11 +40,13 @@ export const LiquidazioneIvaPage: React.FC = () => {
     tipoPeriodo === 'trimestrale' ? `${anno}-Q${trimestre}` : `${anno}-${String(mese).padStart(2, '0')}`;
 
   const caricaStorico = async () => {
+    setErroreStorico(null);
     try {
       const res = await fetchLiquidazioniIvaApi();
       setStorico(res);
     } catch (err) {
       console.error('Errore recupero storico LIPE:', err);
+      setErroreStorico(err instanceof Error ? err.message : 'Errore di rete');
     }
   };
 
@@ -493,7 +497,13 @@ export const LiquidazioneIvaPage: React.FC = () => {
           <span>📚</span> Storico Liquidazioni IVA Salvate
         </h3>
 
-        {storico.length === 0 ? (
+        {erroreStorico ? (
+          <div role="alert" style={{ textAlign: 'center', padding: '20px', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile leggere lo storico delle liquidazioni.</div>
+            <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreStorico}</div>
+            <button type="button" className="btn" onClick={() => void caricaStorico()}>Riprova</button>
+          </div>
+        ) : storico.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
             Nessuna liquidazione IVA ancora consolidata per questo tenant. Seleziona un periodo sopra e premi "Salva LIPE".
           </div>

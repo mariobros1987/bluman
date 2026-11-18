@@ -3,14 +3,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
-const { errore } = vi.hoisted(() => ({ errore: vi.fn() }));
+const { errore, successo } = vi.hoisted(() => ({ errore: vi.fn(), successo: vi.fn() }));
 vi.mock('../api/client', () => ({
   fetchScadenzarioIncassiApi: vi.fn(),
   registraIncassoApi: vi.fn(),
   fetchClienti: vi.fn(),
 }));
 vi.mock('../components/ui/ToastProvider', () => ({
-  useToast: () => ({ successo: vi.fn(), errore, info: vi.fn(), attenzione: vi.fn() }),
+  useToast: () => ({ successo, errore, info: vi.fn(), attenzione: vi.fn() }),
+}));
+
+vi.mock('../components/solleciti/InviaSollecitoModal', () => ({
+  InviaSollecitoModal: (p: { isOpen: boolean; scadenzaId: string | null }) =>
+    p.isOpen ? <div data-testid="modale-sollecito">{p.scadenzaId}</div> : null,
 }));
 
 import { PaymentsPage } from './PaymentsPage';
@@ -67,5 +72,15 @@ describe('2.2 — data dell’incasso nella modale', () => {
 
     expect(errore).toHaveBeenCalledWith(expect.stringMatching(/mai futura/));
     expect(registraIncassoApi).not.toHaveBeenCalled();
+  });
+});
+
+describe('Sollecita — niente conferma finta', () => {
+  it('apre il modale di invio per quella rata e non dichiara nessun invio', async () => {
+    successo.mockClear();
+    render(<PaymentsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: /Sollecita/ }));
+    expect(screen.getByTestId('modale-sollecito')).toHaveTextContent('scad-1');
+    expect(successo).not.toHaveBeenCalled();
   });
 });

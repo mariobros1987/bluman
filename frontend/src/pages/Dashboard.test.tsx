@@ -47,3 +47,37 @@ describe('Dashboard — API non raggiungibile (F5)', () => {
     expect(fetchProgetti).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('Dashboard — contatori', () => {
+  const progetto = (id: string, stato: string) => ({
+    id, nome: `Pratica ${id}`, tenantId: BLUECODE_TENANT_ID, stato, moduli: [],
+    avanzamento: { stato, percentuale: 40, moduli: [] },
+  });
+
+  it('«Progetti attivi» non conta gli archiviati', async () => {
+    vi.mocked(fetchProgetti).mockResolvedValue({
+      data: [progetto('a', 'in_progress'), progetto('b', 'archived')],
+      meta: { page: 1, limit: 50, totale: 2, pagine: 1 },
+    } as any);
+    render(<Dashboard />);
+    const etichetta = await screen.findByText('Progetti attivi');
+    expect(etichetta.parentElement).toHaveTextContent('1');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('se il periodo ha più progetti di quelli letti, lo dice', async () => {
+    vi.mocked(fetchProgetti).mockResolvedValue({
+      data: [progetto('a', 'in_progress')],
+      meta: { page: 1, limit: 50, totale: 120, pagine: 3 },
+    } as any);
+    render(<Dashboard />);
+    expect(await screen.findByRole('status')).toHaveTextContent('1 progetti più recenti su 120');
+  });
+
+  it('nell\'errore non c\'è più l\'indirizzo email scritto a mano', async () => {
+    vi.mocked(fetchProgetti).mockRejectedValue(new Error('rete giù'));
+    render(<Dashboard />);
+    await screen.findByRole('button', { name: /Riprova/ });
+    expect(screen.queryByText(/Contatta Amministratore/)).toBeNull();
+  });
+});
