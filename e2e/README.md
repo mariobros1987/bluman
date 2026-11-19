@@ -10,6 +10,8 @@ un messaggio del cliente alla micro-voce di cui parla.
 L'unico database che esiste fuori da questi test è quello **reale** su Supabase.
 Gli E2E non lo toccano mai: girano su un container Postgres 16 usa-e-getta
 (`bluman-e2e-pg`, porta **5433**), creato e popolato da `scripts/e2e/prepara.mjs`.
+Se la 5433 è occupata da un altro progetto, la porta si sposta con `E2E_DB_PORT` (stesso valore
+per `prepara.mjs` e `avvia-backend.mjs`): in PowerShell `$env:E2E_DB_PORT="5434"`.
 Il database va svuotato con `docker rm -f bluman-e2e-pg` quando non serve più.
 
 Le protezioni, in ordine:

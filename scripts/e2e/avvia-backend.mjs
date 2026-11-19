@@ -11,7 +11,11 @@
 // qui sotto vincono su qualunque valore di produzione sia nel file.
 import { spawn } from 'node:child_process';
 
-const URL_DB_E2E = 'postgresql://bluman:bluman_dev_password@localhost:5433/bluman_e2e?schema=public';
+// La porta è 5433, salvo E2E_DB_PORT: sul PC possono girare i database di altri progetti (il
+// 18/11 la 5433 era del container di un altro gestionale), e fermarli per provare BluMan non
+// è una soluzione. L'host resta cablato su localhost: la variabile sposta solo la porta.
+const PORTA_DB_E2E = /^\d{2,5}$/.test(process.env.E2E_DB_PORT || '') ? process.env.E2E_DB_PORT : '5433';
+const URL_DB_E2E = `postgresql://bluman:bluman_dev_password@localhost:${PORTA_DB_E2E}/bluman_e2e?schema=public`;
 
 // Segreto di test: serve solo che sia stabile (≥32 caratteri) perché i token
 // sopravvivano ai riavvii del server durante una sessione di test.
