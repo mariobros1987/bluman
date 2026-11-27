@@ -102,6 +102,7 @@ export function GrafoModuliProgettoView({
   };
 
   const completedModsCount = project.mods.filter(m => m.st === 'done' || m.pct === 100).length;
+  const livelliUsati = [...new Set(project.mods.map((m) => m.livello ?? 0))].sort((x, y) => x - y);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -109,16 +110,16 @@ export function GrafoModuliProgettoView({
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--indigo-l)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>🕸 Mappa Grafo Moduli & Workflow Dipendenze</span>
+            <span>🕸 Moduli del progetto e ordine di lavoro</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
-            Visualizzazione dei moduli acquistati dal cliente, delle dipendenze sbloccate e dell'avanzamento live
+            I moduli acquistati dal cliente, in che ordine vanno lavorati e a che punto sono
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{ fontSize: 11, background: 'var(--card2)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: 20, fontWeight: 600 }}>
-            📊 Moduli Ultimati: <span style={{ color: 'var(--green)' }}>{completedModsCount} / {project.mods.length}</span>
+            📊 Moduli completati: <span style={{ color: 'var(--green)' }}>{completedModsCount} / {project.mods.length}</span>
           </div>
           <button
             onClick={() => setAddModalOpen(true)}
@@ -132,21 +133,35 @@ export function GrafoModuliProgettoView({
       {/* Visual Flow / Grafo Moduli con Frecce */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, minHeight: 300, display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Flusso Operativo Progetto & Avanzamento Live:
+          Ordine di lavoro e avanzamento
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, overflowX: 'auto', paddingBottom: 10 }}>
-          {project.mods.map((m, idx) => {
+        {/* Una colonna per livello di dipendenza: nella prima i moduli che non attendono nessuno,
+            nelle successive quelli che vengono dopo. Prima le frecce collegavano le schede
+            nell'ordine dell'elenco, cioè una sequenza che poteva essere il contrario di quella vera. */}
+        {livelliUsati.length <= 1 && project.mods.length > 1 && (
+          <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            Tra questi moduli non ci sono dipendenze: si possono lavorare in qualsiasi ordine.
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, overflowX: 'auto', paddingBottom: 10 }}>
+          {livelliUsati.map((livello, idxLivello) => (
+            <React.Fragment key={livello}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {livelliUsati.length > 1 && (
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                    {idxLivello === 0 ? '1 · Si possono iniziare subito' : `${idxLivello + 1} · Dopo i precedenti`}
+                  </div>
+                )}
+                {project.mods.filter((m) => (m.livello ?? 0) === livello).map((m) => {
             const isDone = m.st === 'done' || m.pct === 100;
             const isInProgress = m.st === 'in_progress' || (m.pct > 0 && m.pct < 100);
 
-            // Sblocco dallo STATO REALE del modulo, non dall'adiacenza nell'array: un modulo è
-            // bloccato solo se è davvero `attesa_dipendenza` (prima il lock era posizionale e mostrava
-            // «bloccato da X / sbloccato» inventati dal modulo precedente — regola 7 sul tab dipendenze).
+            // Bloccato dallo STATO REALE del modulo, calcolato dal server.
             const isLocked = m.st === 'attesa_dipendenza';
 
             const statusColor = isDone ? 'var(--green)' : isLocked ? 'var(--amber)' : isInProgress ? 'var(--indigo-l)' : 'var(--muted)';
-            const lockBadgeText = isDone ? '✓ Ultimato' : isLocked ? '🔒 In attesa di dipendenze' : isInProgress ? '⚡ In Lavorazione' : '🔓 Eseguibile';
+            const lockBadgeText = isDone ? '✓ Completato' : isLocked ? '🔒 In attesa' : isInProgress ? '⚡ In corso' : '🔓 Da iniziare';
 
             return (
               <React.Fragment key={m.id}>
@@ -168,7 +183,7 @@ export function GrafoModuliProgettoView({
                     transition: 'all .2s',
                     opacity: isLocked ? 0.82 : 1,
                   }}
-                  title={isLocked ? 'Modulo in attesa del completamento delle dipendenze' : "Clicca per aprire la scheda dettagliata del modulo"}
+                  title={m.wdn || (isLocked ? 'Modulo in attesa del completamento di un altro modulo' : 'Clicca per aprire la scheda dettagliata del modulo')}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
                     <CatBadge cat={m.cat} />
@@ -192,21 +207,34 @@ export function GrafoModuliProgettoView({
                     <ProgressBar value={m.pct} color={statusColor} height={5} />
                   </div>
 
+                  {/* Le dipendenze vere, lette dal server: da quali moduli attende, e se sono chiusi. */}
+                  {(m.dipendeDa?.length ?? 0) > 0 && (
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.5 }}>
+                      <span style={{ fontWeight: 700 }}>Viene dopo:</span>{' '}
+                      {m.dipendeDa!.map((d, i) => (
+                        <span key={d.dbId} style={{ color: d.fatto ? 'var(--green)' : 'var(--pill-amber-fg)', fontWeight: 600 }}>
+                          {i > 0 ? ', ' : ''}{d.fatto ? '✓' : '⏳'} {d.nome}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10, color: 'var(--muted)' }}>
                     <span>⏱ {m.a}/{m.h}h</span>
                     <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmt(m.p)}</span>
                   </div>
                 </div>
-
-                {/* Connettore visivo tra i moduli (l'ordine dell'elenco, non una dipendenza reale) */}
-                {idx < project.mods.length - 1 && (
-                  <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center', color: 'var(--muted)' }}>
-                    <div style={{ fontSize: 20, fontWeight: 800 }}>➔</div>
-                  </div>
-                )}
               </React.Fragment>
             );
-          })}
+                })}
+              </div>
+              {idxLivello < livelliUsati.length - 1 && (
+                <div style={{ display: 'flex', flexShrink: 0, alignItems: 'center', alignSelf: 'center', color: 'var(--muted)' }} aria-hidden="true">
+                  <div style={{ fontSize: 20, fontWeight: 800 }}>➔</div>
+                </div>
+              )}
+            </React.Fragment>
+          ))}
         </div>
       </div>
 

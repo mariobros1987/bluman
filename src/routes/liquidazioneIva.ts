@@ -115,6 +115,17 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
     try {
       const periodoFiscale = determinaPeriodoFiscale(periodo);
 
+      // Una liquidazione già versata non si ricalcola: l'upsert qui sotto ne riscriverebbe gli
+      // importi, e resterebbe un versamento registrato per una cifra diversa da quella salvata
+      // (segnalato dal revisore sulla #6: da due schede aperte poteva succedere).
+      const esistente = await prisma.liquidazioneIva.findFirst({
+        where: { tenantId, periodo: periodoFiscale.codicePeriodo },
+        select: { versata: true },
+      });
+      if (esistente?.versata) {
+        return reply.code(409).send({ errore: 'La liquidazione IVA di questo periodo è già versata: non si può ricalcolare.' });
+      }
+
       const fattureAttive = await prisma.fattura.findMany({
         where: {
           tenantId,

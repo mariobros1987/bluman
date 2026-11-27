@@ -25,6 +25,8 @@ export function Dashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   // Quanti progetti ha il periodo sul server: se sono più di quelli letti, i contatori sono parziali.
   const [totaleServer, setTotaleServer] = useState(0);
+  /** L'istante dell'ultima lettura riuscita: è ciò che la riga in alto dichiara. */
+  const [lettoAlle, setLettoAlle] = useState<Date | null>(null);
 
   // F5 — se l'API non risponde la Dashboard lo dice («Riprova») e resta vuota: niente copie
   // locali né progetti di seed mostrati come se venissero dal database.
@@ -116,6 +118,7 @@ export function Dashboard() {
       // Progetti. Stessa regola della pagina Progetti.
       combined = dbProjs;
       setTotaleServer(remote.meta.totale);
+      setLettoAlle(new Date());
     } catch (err) {
       console.warn('Dashboard: lettura progetti non riuscita', err);
       combined = [];
@@ -240,12 +243,18 @@ export function Dashboard() {
 
   return (
     <>
-      {/* DB Connection Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
-          🟢 Enterprise Cloud Database Collegato
-        </div>
+      {/* Quando sono stati letti i dati a schermo, con il modo di rileggerli. Prima qui c'era una
+          scritta fissa («Enterprise Cloud Database Collegato») che non dipendeva da niente. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 11, color: 'var(--muted)' }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
+        <span>
+          {lettoAlle
+            ? `Dati aggiornati alle ${lettoAlle.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
+            : 'Dati letti dal server'}
+        </span>
+        <button type="button" className="btn btn-sm btn-secondary" onClick={loadProjects} disabled={loading}>
+          ↻ Aggiorna
+        </button>
       </div>
 
       {/* KPI */}

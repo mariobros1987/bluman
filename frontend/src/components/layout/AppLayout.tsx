@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { etichettaNotificheNonLette } from '../../utils/etichettaNotifiche';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { GlobalSearch } from './GlobalSearch';
@@ -22,15 +23,23 @@ const TITLES: Record<string, string> = {
   '/calendar':  'Calendario',
   '/library':   'Libreria moduli',
   '/settings':  'Impostazioni',
-  '/invoices':  'Fatture & Pagamenti',
-  '/documents': 'Document Studio (Word & Contratti)',
+  '/invoices':  'Fatture & SDI',
+  '/documents': 'Document Studio',
   '/modelli':   'Cartella Modelli dello Studio',
   '/archivio':  'Archivio Documentale',
-  '/audit':     'Log Audit Studio',
-  '/timesheet': 'Timesheet Settimanale Ore',
+  '/audit':     'Log Audit',
+  '/timesheet': 'Timesheet ore',
   // Senza questa riga la barra in alto direbbe «BluMan», cioè il nome dell'app al posto del nome
   // della pagina.
   '/aiuto':     'Aiuto',
+  // Le pagine di contabilità e le altre che mancavano: in alto compariva «BluMan».
+  '/fornitori': 'Fornitori e acquisti',
+  '/liquidazione-iva': 'Liquidazione IVA',
+  '/scadenzario': 'Scadenzario incassi',
+  '/primanota': 'Prima Nota',
+  '/banks':     'Banche e conti',
+  '/retainers': 'Contratti Retainer',
+  '/reports':   'Report',
 };
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
@@ -51,6 +60,11 @@ const TIPO_PER_EVENTO: Record<string, NotificationItem['type']> = {
   // un ritardo, cioè con l'icona che dice «aspetta», su una cosa che chiede di agire.
   messaggio_non_instradabile: 'blocked',
   chat_collegata_progetto: 'system',
+  // Eventi che il server emette e che qui non avevano una voce: ricadevano nell'euristica e
+  // venivano contati come ritardi.
+  risposta_proposta_dati: 'system',
+  risposta_addendum: 'system',
+  documento_sbloccato: 'system',
 };
 
 function mapNotificaBackend(n: any): NotificationItem {
@@ -353,9 +367,16 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                 <span>🚪</span> Esci
               </button>
             )}
+            {/* Il numero è quello delle notifiche non lette, di qualunque tipo: prima la pillola le
+                chiamava tutte «ritardi», anche un «progetto avviato» o una firma apposta. */}
             {unreadCount > 0 && (
-              <div className={styles.alertPill} onClick={() => setNotifOpen(true)} style={{ cursor: 'pointer' }}>
-                ⚠ {unreadCount} ritard{unreadCount === 1 ? 'o' : 'i'}
+              <div
+                className={styles.alertPill}
+                onClick={() => setNotifOpen(true)}
+                style={{ cursor: 'pointer' }}
+                title="Apri le notifiche non lette"
+              >
+                {etichettaNotificheNonLette(unreadCount, notifications.filter((n) => !n.read && n.type === 'delay').length)}
               </div>
             )}
             <button

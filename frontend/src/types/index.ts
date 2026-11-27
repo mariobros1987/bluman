@@ -172,6 +172,10 @@ export interface ModuloProgetto {
   dn?: string;
   waitDep?: boolean;
   wdn?: string;
+  /** I moduli da cui questo dipende, letti dal server (`modulo.dipendenze`), con il loro esito. */
+  dipendeDa?: Array<{ dbId: string; nome: string; fatto: boolean }>;
+  /** 0 = non dipende da nessuno; n = viene dopo i moduli di livello n-1 (`utils/dipendenzeModuli`). */
+  livello?: number;
   /**
    * §16.1 — segnale di rischio alzato dal motore di stato: almeno una micro-voce attiva ha
    * consuntivato oltre il preventivo. È distinto da `delay`, che è un ritardo di calendario

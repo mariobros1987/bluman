@@ -84,8 +84,11 @@ describe('AiutoPage — l’indice', () => {
     renderPagina('/aiuto/05-fatture-sdi');
 
     const indice = await attendiIndice();
-    expect(indice.getByText('05 · Fatture / Note di Credito & SDI')).toBeInTheDocument();
-    expect(indice.getByText('01 · Progetti & Motore di Stato')).toBeInTheDocument();
+    // Il numero sta nel suo riquadro e il titolo segue senza ripeterlo: prima l'indice stampava
+    // «05 05 · Fatture…», e questo test — che cercava il titolo col numero — lo confermava.
+    const voce = indice.getByRole('button', { name: /Fatture \/ Note di Credito & SDI/ });
+    expect(voce.textContent?.replace(/\s+/g, ' ').trim()).toBe('05 Fatture / Note di Credito & SDI');
+    expect(indice.getByRole('button', { name: /Progetti & Motore di Stato/ }).textContent?.replace(/\s+/g, ' ').trim()).toBe('01 Progetti & Motore di Stato');
   });
 
   it('la scheda riservata porta il lucchetto', async () => {
@@ -104,7 +107,7 @@ describe('AiutoPage — l’indice', () => {
       html: '<h1>01 · Progetti & Motore di Stato</h1><p>Un progetto è una pratica.</p>',
     });
 
-    await userEvent.click(indice.getByText('01 · Progetti & Motore di Stato'));
+    await userEvent.click(indice.getByRole('button', { name: /Progetti & Motore di Stato/ }));
 
     await waitFor(() => expect(mockScheda).toHaveBeenCalledWith('01-progetti-motore-stato'));
     expect(await screen.findByText('Un progetto è una pratica.')).toBeInTheDocument();
@@ -139,7 +142,7 @@ describe('AiutoPage — la ricerca', () => {
       schede: [{ slug: '01-progetti-motore-stato', numero: '01', titolo: '01 · Progetti', riservata: false, testo: 'Le attività della micro-voce.' }],
     });
     renderPagina('/aiuto/01-progetti-motore-stato');
-    await screen.findByText('01 · Progetti');
+    await screen.findByRole('button', { name: /01\s+Progetti/ });
 
     await userEvent.type(screen.getByLabelText(/Cerca nel manuale/i), 'attivita');
     expect(await screen.findByText(/1 scheda per «attivita»/i)).toBeInTheDocument();

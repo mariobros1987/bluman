@@ -108,6 +108,7 @@ modulo (decisione a sé, non ancora presa).
 - **Fatture** (§05): il Configuratore PDF e i dati studio finiscono in fattura.
 
 ## ⚠️ Stati limite & errori
+- **Gestione Team, pulsanti**: «Nuova password» e «Archivia» compaiono solo sulle persone che si possono davvero gestire. Il responsabile dello studio non li vede sui super admin della piattaforma.
 - Modifica impostazioni studio da un collaboratore → **403** (solo advisor/super_admin).
 - Un canale con credenziali errate → messaggi di configurazione mirati (non un fallimento muto).
 - Archiviazione o riattivazione da un ruolo che non sia advisor/super_admin → **403**; da un advisor su

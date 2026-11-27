@@ -21,6 +21,7 @@ import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
 import { SPIEGAZIONE_VALORE_DA_MODULI, valoreProgettoEuroDaServer, valoreProgettoModificabile } from '../utils/valoreProgetto';
+import { fraseAttesa, livelliPerDipendenza } from '../utils/dipendenzeModuli';
 import { inviaAvvisoModuloCompletato } from '../utils/avvisoModuloCompletato';
 import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
 import { creaEventoCalendario } from '../api/calendario';
@@ -354,6 +355,10 @@ export function ProjectDetail() {
         const av = dbRes.avanzamento;
         const avModuli = new Map<string, any>((av?.moduli || []).map((m: any) => [m.id, m]));
 
+        // Le dipendenze fra moduli come stanno a database: livello di ciascuno e nomi dei moduli
+        // da cui attende. Solo per mostrarle — se un modulo è bloccato lo decide il server.
+        const livelliModuli = livelliPerDipendenza(dbRes.moduli || []);
+        const moduliPerId = new Map<string, any>((dbRes.moduli || []).map((m: any) => [m.id, m]));
         let finalMods: ModuloProgetto[] = (dbRes.moduli || []).map((m: any, mIdx: number): ModuloProgetto => {
           const localMod = localSavedProj?.mods?.find((lm: any) => lm.n.toLowerCase() === (m.nome || '').toLowerCase() || lm.id === (mIdx + 100));
 
@@ -422,6 +427,16 @@ export function ProjectDetail() {
           // Il ripiego `[1, 2]` faceva comparire due persone mai assegnate sul modulo.
           const assignedTeam = localMod?.team || m.team || [];
           const avM = avModuli.get(m.id);
+          const dipendeDa = (m.dipendenze || [])
+            .map((d: any) => moduliPerId.get(d.dipendeDaModuloProgettoId))
+            .filter(Boolean)
+            .map((dipM: any) => ({
+              dbId: dipM.id,
+              nome: dipM.nome,
+              fatto: (avModuli.get(dipM.id)?.stato || dipM.stato) === 'done',
+            }));
+          const moduloChiuso = (avM?.stato || m.stato) === 'done';
+          const attesa = fraseAttesa(dipendeDa);
 
           return {
             // `id` resta l'indice sintetico perché tutta la pagina confronta numeri
@@ -440,6 +455,11 @@ export function ProjectDetail() {
             a: m.oreConsuntivate || 0,
             p: m.prezzo ? m.prezzo / 100 : 0,
             team: assignedTeam,
+            livello: livelliModuli.get(m.id) ?? 0,
+            dipendeDa,
+            // «In attesa di: «Analisi»»: solo se il modulo non è chiuso e manca davvero qualcosa.
+            waitDep: !moduloChiuso && Boolean(attesa),
+            wdn: !moduloChiuso && attesa ? attesa : undefined,
             delay: avM ? avM.stato === 'delayed' || avM.stato === 'blocked' : false,
             // §16.1 — lo stesso segnale che la Dashboard mostra nel banner: se lì un modulo
             // risulta in allarme per ore sforate, qui deve risultarlo pure, altrimenti chi
@@ -490,7 +510,7 @@ export function ProjectDetail() {
         const firmaLettera = dbRes.firmaLettera ?? null;
         const statoFirma: 'in_attesa' | 'completata' = firmaLettera ? 'completata' : 'in_attesa';
         const firmatoAt = firmaLettera?.firmatoAt
-          ? new Date(firmaLettera.firmatoAt).toLocaleDateString()
+          ? new Date(firmaLettera.firmatoAt).toLocaleDateString('it-IT')
           : null;
 
         setProject({
@@ -502,8 +522,10 @@ export function ProjectDetail() {
           // Prima qui c'era `dbRes.percentualeAvanzamento`, un campo che il backend non ha mai
           // prodotto: la barra di avanzamento del progetto è stata ferma a 0 da sempre.
           pct: av?.percentuale ?? 0,
-          start: new Date(dbRes.createdAt).toLocaleDateString(),
-          due: '30 giorni',
+          start: new Date(dbRes.createdAt).toLocaleDateString('it-IT'),
+          // La scadenza del progetto, se c'è. Prima qui c'era la costante «30 giorni», mostrata
+          // nell'intestazione come se fosse la scadenza dell'incarico.
+          due: dbRes.dataScadenza ? new Date(dbRes.dataScadenza).toLocaleDateString('it-IT') : '',
           val: calculatedVal,
           delay:
             (av?.moduli || []).some((m: any) => m.stato === 'delayed' || m.stato === 'blocked') ||

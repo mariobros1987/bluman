@@ -90,3 +90,48 @@
 
 .userName { font-size: 12px; font-weight: 500; }
 .userRole  { font-size: 10px; color: var(--muted); }
+
+/* Aree a tendina del menu */
+.area { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+
+.areaTitolo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--t);
+}
+
+.areaTitolo:hover { background: var(--card); }
+.areaTitolo:focus-visible { outline: 2px solid var(--indigo); outline-offset: 1px; }
+.areaCorrente { color: var(--indigo-l); }
+
+.areaConta {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.areaFreccia { font-size: 11px; color: var(--muted); transition: transform var(--t); }
+.areaFrecciaAperta { transform: rotate(90deg); }
+
+.areaVoci {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 10px;
+  padding-left: 6px;
+  border-left: 1px solid var(--border);
+}

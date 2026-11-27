@@ -1,5 +1,5 @@
 // F5 — quando l'API non risponde la Dashboard non mostra dati di prova come reali: niente
-// progetti di seed né copie locali, niente «Database Collegato». Mostra l'errore con «Riprova».
+// progetti di seed né copie locali, nessuna riga «Dati aggiornati». Mostra l'errore con «Riprova».
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
@@ -25,17 +25,17 @@ beforeEach(() => {
 });
 
 describe('Dashboard — API non raggiungibile (F5)', () => {
-  it('mostra l’errore con «Riprova», nessun progetto e niente «Database Collegato»', async () => {
+  it('mostra l’errore con «Riprova», nessun progetto e nessuna riga «Dati aggiornati»', async () => {
     vi.mocked(fetchProgetti).mockRejectedValue(new Error('rete giù'));
     render(<Dashboard />);
 
     expect(await screen.findByText(/I progetti non sono stati caricati: rete giù/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Riprova/ })).toBeInTheDocument();
-    expect(screen.queryByText(/Database Collegato/)).toBeNull();
+    expect(screen.queryByText(/Dati aggiornati alle/)).toBeNull();
     expect(screen.queryByText('Pratica Solo Locale')).toBeNull();
   });
 
-  it('«Riprova» rilegge e, con il server che risponde, mostra «Database Collegato»', async () => {
+  it('«Riprova» rilegge e, con il server che risponde, mostra quando ha letto i dati', async () => {
     vi.mocked(fetchProgetti)
       .mockRejectedValueOnce(new Error('rete giù'))
       .mockResolvedValueOnce({ data: [], meta: { page: 1, limit: 50, totale: 0, pagine: 0 } } as any);
@@ -43,7 +43,8 @@ describe('Dashboard — API non raggiungibile (F5)', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Riprova/ }));
 
-    expect(await screen.findByText(/Database Collegato/)).toBeInTheDocument();
+    // Non una scritta fissa: l'ora dell'ultima lettura riuscita (prima: «Enterprise Cloud Database Collegato»).
+    expect(await screen.findByText(/Dati aggiornati alle \d{2}:\d{2}/)).toBeInTheDocument();
     expect(fetchProgetti).toHaveBeenCalledTimes(2);
   });
 });

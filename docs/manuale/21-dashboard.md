@@ -20,6 +20,8 @@ La **Dashboard** (`/`) è la prima schermata dopo l'accesso: dà il quadro del p
 - **Progetti** (§01), **Clienti** (§02), **Preventivi** (§04), **Periodo** (§18).
 
 ## ⚠️ Stati limite & errori
+- **Dati aggiornati alle…**: in cima alla pagina si legge l'ora dell'ultima lettura riuscita, con **Aggiorna** per rileggere.
+- **Pillola in alto a destra**: conta le **notifiche non lette** di ogni tipo; i ritardi veri sono indicati a parte (per esempio «🔔 3 notifiche da leggere · ⚠ 1 ritardo»).
 - Se il server non risponde, la pagina mostra l'errore con il pulsante **Riprova**, senza dati sostitutivi.
 - Senza progetti, un messaggio invita a creare il primo.
 

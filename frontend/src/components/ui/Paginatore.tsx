@@ -26,13 +26,13 @@ export function Paginatore({ meta, onPageChange, onLimitChange }: PaginatoreProp
             {[25, 50, 100, 200].map((limit) => <option key={limit} value={limit}>{limit}</option>)}
           </select>
         </label>
-        <button type="button" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
+        <button type="button" className="btn btn-sm btn-secondary" disabled={meta.page <= 1} onClick={() => onPageChange(meta.page - 1)}>
           ← Precedente
         </button>
-        <span style={{ minWidth: 90, textAlign: 'center', fontSize: 12 }}>
+        <span style={{ minWidth: 90, textAlign: 'center', fontSize: 12, color: 'var(--text)' }}>
           Pagina {meta.pagine === 0 ? 0 : meta.page} di {meta.pagine}
         </span>
-        <button type="button" disabled={meta.pagine === 0 || meta.page >= meta.pagine} onClick={() => onPageChange(meta.page + 1)}>
+        <button type="button" className="btn btn-sm btn-secondary" disabled={meta.pagine === 0 || meta.page >= meta.pagine} onClick={() => onPageChange(meta.page + 1)}>
           Successiva →
         </button>
       </div>

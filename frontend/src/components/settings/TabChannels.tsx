@@ -249,7 +249,11 @@ export function TabChannels({
               <strong>2. Associazione per Indirizzo Email (Email Inbound):</strong><br />
               Le email ricevute nella casella configurata qui sopra vengono collegate al progetto del mittente. Includendo il codice dell'incarico nell'oggetto si forza l'assegnazione a uno specifico progetto.<br /><br />
               <strong>3. Associazione Telegram:</strong><br />
-              Avviene tramite l'<strong>identificativo numerico della chat</strong> (es. <code>123456789</code>), quello che il bot riceve quando il cliente gli scrive: Telegram accetta uno <code>@nomeutente</code> solo per i canali pubblici, e su un cliente non funziona. Si legge da <code>getUpdates</code> dopo che il cliente ha scritto al bot: <strong>non</strong> è l'identificativo che risponde <code>getMe</code>, che è quello del bot, e usarlo dà «the bot can't send messages to the bot».<br /><br />
+              <strong>Il modo semplice:</strong> apri il progetto, premi il pulsante Telegram in alto e manda al cliente il link che compare (via email o WhatsApp). Il cliente lo apre, preme <strong>Avvia</strong> e da quel momento i suoi messaggi entrano in quel progetto. Non serve conoscere nessun codice.<br />
+              <details style={{ marginTop: 6 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Per chi configura a mano (dettagli tecnici)</summary>
+                In alternativa si scrive nella scheda del cliente l'<strong>identificativo numerico della chat</strong> (es. <code>123456789</code>), quello che il bot riceve quando il cliente gli scrive: Telegram accetta uno <code>@nomeutente</code> solo per i canali pubblici, e su un cliente non funziona. Si legge da <code>getUpdates</code> dopo che il cliente ha scritto al bot: <strong>non</strong> è l'identificativo che risponde <code>getMe</code>, che è quello del bot, e usarlo dà «the bot can't send messages to the bot».
+              </details><br />
               <strong>4. Canale interno dell'app (Portale Riservato):</strong><br />
               Non passa da nessun servizio esterno e non ha credenziali: il messaggio resta nella piattaforma e il cliente lo legge nel suo portale, se ha un accesso attivo.
             </div>

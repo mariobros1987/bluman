@@ -21,6 +21,7 @@
 // sezioni e le tabelle stanno in `AiutoPage.module.css`, e sono lì per questo.
 
 import { useEffect, useMemo, useState } from 'react';
+import { titoloSenzaNumero } from '../utils/titoloScheda';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   fetchIndiceManualeApi,
@@ -179,7 +180,7 @@ export function AiutoPage() {
                 onClick={() => apri(s.slug)}
               >
                 <span className={styles.voceTitolo}>
-                  <span className={styles.numero}>{s.numero}</span> {s.titolo}
+                  <span className={styles.numero}>{s.numero}</span> {titoloSenzaNumero(s.numero, s.titolo)}
                   {s.riservata && <span className={styles.lucchetto} title="Riservata all'amministratore della piattaforma">🔒</span>}
                 </span>
                 <span className={styles.estratto}>{riga}</span>
@@ -197,7 +198,7 @@ export function AiutoPage() {
                 aria-current={s.slug === slug ? 'page' : undefined}
               >
                 <span className={styles.voceTitolo}>
-                  <span className={styles.numero}>{s.numero}</span> {s.titolo}
+                  <span className={styles.numero}>{s.numero}</span> {titoloSenzaNumero(s.numero, s.titolo)}
                   {s.riservata && <span className={styles.lucchetto} title="Riservata all'amministratore della piattaforma">🔒</span>}
                 </span>
               </button>

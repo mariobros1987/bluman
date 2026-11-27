@@ -68,11 +68,18 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
 
 ### Dipendenze tra moduli
 Le dipendenze sono **tra moduli** (non tra articoli/micro-voci): «il modulo A dipende dal modulo B».
-Si impostano nel **costruttore modulo in Libreria** (§03) → campo **«🔗 Dipende da (moduli)»** (multi-
-selezione degli altri moduli); il backend rifiuta i **cicli** (400). Un progetto istanziato eredita le
+Si impostano nel **costruttore modulo in Libreria** (§03) → campo **«🔗 Dipende da (moduli)»** (si possono
+scegliere più moduli); il backend rifiuta i **cicli** (400). Un progetto istanziato eredita le
 dipendenze dei suoi template. Finché il modulo «da cui dipende» non è `done`, le micro-voci del
 dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalcolo le **sblocca**
-(`attesa_dipendenza → pending`). Il grafo nella scheda progetto mostra il vero stato delle dipendenze.
+(`attesa_dipendenza → pending`).
+
+Nella scheda progetto le dipendenze si leggono così: i moduli sono elencati **in ordine di dipendenza**
+(prima quelli da cui gli altri attendono); sotto il nome di un modulo in attesa compare **«⏳ In attesa
+di: «nome del modulo»»**; la scheda **Grafo** mette i moduli in colonne («1 · Si possono iniziare
+subito», «2 · Dopo i precedenti») e su ogni modulo dice **«Viene dopo: …»** con ✓ se quel modulo è
+chiuso e ⏳ se non lo è. Le etichette di stato: **«Da iniziare»** (si può lavorare) e **«In attesa di
+un altro modulo»** (bloccata finché l'altro non si chiude).
 
 ## 🔗 Collegamenti
 - **Preventivi / Libreria** (§03–04): i moduli nascono dall'istanziazione dei template (distinta base).

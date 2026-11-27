@@ -3,7 +3,7 @@
 // che il modulo è acceso, la toglie quando dice che è spento, e la lascia quando non si sa:
 // un errore di lettura non è un modulo spento.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { fetchModuliTenant } from '../../api/kyc';
@@ -57,5 +57,67 @@ describe('Sidebar — la voce Coda KYC segue il modulo dello studio (F6)', () =>
     mockModuli.mockResolvedValue({ concessi: ['kyc'], disattivati: [], attivi: ['kyc'] });
     window.dispatchEvent(new Event(EVENTO_MODULI_CAMBIATI));
     await waitFor(() => expect(voceKyc()).toBeTruthy());
+  });
+});
+
+// Le venti voci del menu stanno in quattro aree a tendina (Fabio, 27/11): Dashboard e Aiuto restano
+// sempre visibili, l'area della pagina corrente è sempre aperta, le altre si ricordano.
+describe('Sidebar — aree a tendina', () => {
+  const apriIn = (percorso: string, utente: any = UTENTE) =>
+    render(<MemoryRouter initialEntries={[percorso]}><Sidebar user={utente} /></MemoryRouter>);
+  const area = (nome: RegExp) => screen.getByRole('button', { name: nome });
+  const link = (nome: RegExp) => screen.queryByRole('link', { name: nome });
+
+  beforeEach(() => {
+    mockModuli.mockResolvedValue({ concessi: ['kyc'], disattivati: [], attivi: ['kyc'] });
+  });
+
+  it('alla prima visita: Dashboard e Aiuto visibili, «Lavoro» aperta, le altre aree chiuse', () => {
+    apriIn('/');
+    expect(link(/Dashboard/)).toBeTruthy();
+    expect(link(/Aiuto/)).toBeTruthy();
+    expect(area(/Lavoro/).getAttribute('aria-expanded')).toBe('true');
+    expect(link(/Progetti/)).toBeTruthy();
+    expect(area(/Contabilità/).getAttribute('aria-expanded')).toBe('false');
+    expect(link(/Prima Nota/)).toBeNull();
+  });
+
+  it('l’area della pagina in cui ci si trova è aperta da sola', () => {
+    apriIn('/primanota');
+    expect(area(/Contabilità/).getAttribute('aria-expanded')).toBe('true');
+    expect(link(/Prima Nota/)).toBeTruthy();
+  });
+
+  it('un clic apre e chiude un’area, e la scelta si ricorda alla visita successiva', () => {
+    const { unmount } = apriIn('/');
+    fireEvent.click(area(/Documenti/));
+    expect(link(/Cartella Modelli/)).toBeTruthy();
+    fireEvent.click(area(/Lavoro/));
+    expect(link(/Progetti/)).toBeNull();
+    unmount();
+
+    apriIn('/');
+    expect(link(/Cartella Modelli/)).toBeTruthy();
+    expect(link(/Progetti/)).toBeNull();
+  });
+
+  it('l’area corrente non si chiude: chi è in Prima Nota non resta senza la sua voce', () => {
+    apriIn('/primanota');
+    fireEvent.click(area(/Contabilità/));
+    expect(link(/Prima Nota/)).toBeTruthy();
+  });
+
+  it('ogni voce di prima c’è ancora, in una e una sola area', () => {
+    // Il super admin le vede tutte, compresa la sua («Multi-Tenant Admin», nell'area Studio).
+    apriIn('/', { ...UTENTE, ruolo: 'super_admin' });
+    for (const nome of [/Contabilità/, /Documenti/, /Studio/]) fireEvent.click(area(nome));
+    const voci = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(voci).toEqual([
+      '/', '/projects', '/clients', '/compliance', '/calendar', '/timesheet',
+      '/invoices', '/fornitori', '/liquidazione-iva', '/scadenzario', '/primanota', '/banks', '/retainers',
+      '/documents', '/modelli', '/archivio',
+      '/reports', '/library', '/audit', '/settings', '/admin/tenants',
+      '/aiuto',
+    ]);
   });
 });

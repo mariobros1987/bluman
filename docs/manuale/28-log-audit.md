@@ -19,7 +19,7 @@ Il **Log Audit** (`/audit`) è il registro delle azioni eseguite nello studio: s
 ## ⚠️ Stati limite & errori
 - Se la lettura non riesce, l'errore compare sopra la tabella.
 
-- La ricerca vale per tutto il registro, mentre i filtri per **ruolo** e **categoria** agiscono **solo sulla pagina visualizzata** (lo dicono le loro etichette). Per un controllo completo conviene aumentare le righe per pagina o scorrere tutte le pagine.
+- Ricerca, **ruolo** e **categoria** valgono per **tutto il registro**: il conteggio in alto è quello delle righe che corrispondono ai filtri. La categoria non è un dato scritto nella riga: si ricava dalle parole dell'azione (per esempio «FATTURA» → Fatture e contabilità), con la stessa regola per il filtro e per il badge.
 
 ## 🔧 Nota tecnica
 - Frontend: `pages/AuditLogPage.tsx`. Rotta `GET /audit-logs`, chiave RBAC `audit`.

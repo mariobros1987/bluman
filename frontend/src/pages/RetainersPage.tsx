@@ -118,7 +118,7 @@ export function RetainersPage() {
         <div>
           <h2 style={{ margin: 0 }}>🔄 Contratti Ricorrenti & Retainer Studio</h2>
           <p style={{ color: 'var(--muted)', margin: '4px 0 0 0', fontSize: 14 }}>
-            Pianificazione canoni continuativi di assistenza, fatturazione automatica periodica e scadenzario rate
+            Canoni continuativi di assistenza: il gestionale tiene la prossima data di fatturazione, la fattura del periodo la generi tu con un clic
           </p>
         </div>
 
@@ -167,7 +167,7 @@ export function RetainersPage() {
           <div style={{ fontSize: 48, marginBottom: 12 }}>🔄</div>
           <h3 style={{ margin: '0 0 8px 0' }}>Nessun contratto ricorrente attivo</h3>
           <p style={{ color: 'var(--muted)', fontSize: 14, margin: '0 0 1.5rem 0' }}>
-            Attiva contratti di assistenza e retainer mensili o trimestrali per automatizzare l'emissione delle parcelle periodiche.
+            Registra qui i contratti di assistenza con canone mensile o trimestrale. A ogni scadenza troverai il pulsante per generare la fattura del periodo: non parte da sola.
           </p>
           <button
             onClick={() => setShowModal(true)}

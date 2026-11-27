@@ -892,6 +892,7 @@ export function SettingsPage() {
           setCopiedResetPass={setCopiedResetPass}
           onArchivia={(persona, verso) => setArchiviaModal({ persona, verso })}
           puoGestire={currentRuolo === 'super_admin' || currentRuolo === 'advisor'}
+          ruoloCorrente={currentRuolo}
         />
       )}
 

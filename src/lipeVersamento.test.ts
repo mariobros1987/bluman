@@ -51,7 +51,10 @@ vi.mock('./util/prismaClient.js', () => {
       liquidazioneIva: {
         findFirst: vi.fn(async () => stato.lipe),
         update: async () => { stato.eventi.push('update-fuori-transazione'); return {}; },
+        upsert: async () => { stato.eventi.push('upsert'); return { ...stato.lipe }; },
       },
+      fattura: { findMany: async () => [] },
+      fatturaRicevuta: { findMany: async () => [] },
       movimentoPrimaNota: { create: async () => { stato.eventi.push('movimento-fuori-transazione'); return {}; } },
       contoBancario: { update: async () => ({}) },
       auditLog: { create: vi.fn(async () => ({})) },
@@ -121,5 +124,34 @@ describe('POST /liquidazione-iva/:periodo/marca-versata', () => {
     const res = await versa();
     expect(res.statusCode).toBe(409);
     expect(stato.eventi).toEqual([]);
+  });
+});
+
+// Segnalato dal revisore sulla #6: «Salva LIPE» non guardava se la liquidazione era già versata, e
+// l'upsert ne riscriveva gli importi.
+describe('POST /liquidazione-iva/salva', () => {
+  async function salva() {
+    const { buildServer } = await import('./server.js');
+    const { signJwt } = await import('./util/jwt.js');
+    const server = buildServer({} as any);
+    await server.ready();
+    const token = signJwt({ userId: 'admin-1', tenantId: 't-1', ruolo: 'advisor', email: 'ada@studio.it', sessionVersion: 0 });
+    return server.inject({
+      method: 'POST', url: '/liquidazione-iva/salva', headers: { authorization: `Bearer ${token}` },
+      payload: { periodo: '2026-Q4', creditoPrecedenteCent: 0 },
+    });
+  }
+
+  it('liquidazione già versata → 409, e gli importi salvati non si toccano', async () => {
+    stato.lipe.versata = true;
+    const res = await salva();
+    expect(res.statusCode).toBe(409);
+    expect(stato.eventi).not.toContain('upsert');
+  });
+
+  it('liquidazione non versata → si salva come prima', async () => {
+    const res = await salva();
+    expect(res.statusCode, res.body).toBe(200);
+    expect(stato.eventi).toContain('upsert');
   });
 });

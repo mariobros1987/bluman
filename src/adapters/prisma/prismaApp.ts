@@ -358,6 +358,9 @@ export class PrismaApp implements AppPort {
                 condivisioni: { select: { moduloProgettoId: true } },
               },
             },
+            // Da quali moduli dipende questo modulo: serve alla scheda progetto per dire DA COSA
+            // si attende («In attesa di: Analisi patrimoniale») e per ordinare i moduli. Sola lettura.
+            dipendenze: { select: { dipendeDaModuloProgettoId: true } },
             // Micro-voci condivise da altri moduli: contano per l'avanzamento di questo modulo.
             microvociCondivise: { include: { microvoceProgetto: { include: { passaggi: true } } } },
           },

@@ -1,4 +1,5 @@
 import styles from '../../pages/Settings.module.css';
+import { personaGestibileDa } from '../../utils/gestioneTeam';
 
 interface TabUsersProps {
   setProfileModalOpen: (v: boolean) => void;
@@ -14,6 +15,8 @@ interface TabUsersProps {
   onArchivia: (persona: any, verso: 'archivia' | 'riattiva') => void;
   /** Vero per i ruoli che possono archiviare: super admin e responsabile dello studio. */
   puoGestire: boolean;
+  /** Il ruolo di chi guarda: decide su quali persone compaiono i pulsanti (vedi `personaGestibileDa`). */
+  ruoloCorrente?: string;
 }
 
 /** `AAAA-MM-GG` o istante ISO → `GG/MM/AAAA`, riletto nel fuso locale (vedi il modale). */
@@ -57,6 +60,7 @@ export function TabUsers({
   setCopiedResetPass,
   onArchivia,
   puoGestire,
+  ruoloCorrente,
 }: TabUsersProps) {
   // Gli archiviati non sono più persone dello studio: restano leggibili (i progetti a cui hanno
   // lavorato li citano, ed è la ragione per cui non si cancellano) ma stanno in una sezione
@@ -98,7 +102,8 @@ export function TabUsers({
                 const aperto = periodoAperto(u);
                 // Un super admin di piattaforma non appartiene a nessuno studio (`tenantId`
                 // nullo): non ha periodi e non si archivia da qui.
-                const archiviabile = puoGestire && u.tenantId !== null;
+                const gestibile = puoGestire && personaGestibileDa(ruoloCorrente, u);
+                const archiviabile = gestibile && u.tenantId !== null;
                 return (
                   <div
                     key={u.id}
@@ -111,12 +116,17 @@ export function TabUsers({
                       {(u.nome || u.name || 'U').substring(0, 2).toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span>{u.nome || u.name}</span>
+                      <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.nome || u.name}>{u.nome || u.name}</span>
                         <span style={{ fontSize: 10, color: 'var(--indigo-l)' }}>🔍</span>
                       </div>
-                      <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600, marginTop: 1 }}>{u.specializzazione || (u.ruolo === 'super_admin' ? 'Senior Partner & Lead Advisor' : 'Collaboratore')}</div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{u.email}</div>
+                      {/* La specializzazione si mostra se c'è. Prima, mancando, compariva «Collaboratore»
+                          (o «Senior Partner & Lead Advisor»): un secondo ruolo sotto il badge, inventato. */}
+                      {u.specializzazione && (
+                        <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.specializzazione}</div>
+                      )}
+                      {/* Un'email lunga si accorcia con i puntini (intera nel title): prima finiva sotto i pulsanti. */}
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.email}>{u.email}</div>
                       {aperto && (
                         <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
                           In forza dal {inItaliano(aperto.dal)}
@@ -127,6 +137,7 @@ export function TabUsers({
                       <span className={styles.roleBadge} style={{ background: (u.ruolo || u.role || '').includes('super') ? 'var(--pill-indigo-bg)' : 'var(--surface-1)', color: (u.ruolo || u.role || '').includes('super') ? 'var(--purple)' : 'var(--indigo-l)', whiteSpace: 'nowrap' }}>
                         {u.ruolo === 'super_admin' ? '👑 Super Admin' : u.ruolo === 'advisor' ? '👨‍💼 Advisor' : '👷 Operatore'}
                       </span>
+                      {gestibile && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -151,8 +162,9 @@ export function TabUsers({
                         }}
                         title="Rigenera password temporanea con cambio obbligatorio al 1° login"
                       >
-                        <span>🔄</span> Reset Pass
+                        <span>🔄</span> Nuova password
                       </button>
+                      )}
                       {archiviabile && (
                         <button
                           type="button"
