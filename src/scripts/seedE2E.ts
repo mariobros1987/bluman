@@ -19,6 +19,9 @@ function urlValidoPerE2E(url: string): boolean {
   }
 }
 
+/** Il conto dei dati di prova: il nome dice che cos'è, così non si confonde con un conto vero. */
+const CONTO_DI_PROVA = 'Conto operativo (dati di prova)';
+
 async function main(): Promise<void> {
   const urlE2E = process.env.E2E_DATABASE_URL;
   if (!urlE2E) {
@@ -102,6 +105,51 @@ async function main(): Promise<void> {
     data: { email: 'jp.belfort@belfort-sa.lu' },
   });
   console.log(`✓ Cliente ${belfort.nome}: email ${belfort.email}`);
+
+  // 3bis. Dati che servono a provare il percorso dei soldi fino in fondo (analisi del 26/11, M11):
+  //    senza un conto, ogni incasso restava «senza conto» e Banche & Conti a zero; senza sede e
+  //    giurisdizione, la fattura del cliente di prova nasceva con i campi vuoti. Sono dati di
+  //    prova dichiarati come tali nel nome, e il passo è ripetibile: non duplica e non sovrascrive
+  //    ciò che una corsa precedente (o chi sta provando l'app a mano) ha già cambiato.
+  const contoDiProva = await prisma.contoBancario.findFirst({
+    where: { tenantId: E2E_TENANT_ID, nomeConto: CONTO_DI_PROVA },
+  });
+  if (contoDiProva) {
+    console.log(`✓ Conto «${CONTO_DI_PROVA}» già presente`);
+  } else {
+    const haPredefinito = await prisma.contoBancario.count({ where: { tenantId: E2E_TENANT_ID, isDefault: true } });
+    await prisma.contoBancario.create({
+      data: {
+        tenantId: E2E_TENANT_ID,
+        nomeConto: CONTO_DI_PROVA,
+        banca: 'Banca di prova',
+        // I saldi non si scrivono qui: partono da 0 per schema, e la colonna del saldo ha un
+        // solo posto che la scrive (`services/primaNotaMovimento.ts`, presidio in
+        // `primaNotaSaldoCoerenza.test.ts`).
+        isDefault: haPredefinito === 0,
+      },
+    });
+    console.log(`✓ Conto «${CONTO_DI_PROVA}» creato${haPredefinito === 0 ? ' (predefinito)' : ''}`);
+  }
+  // L'anagrafica dello studio di prova è completa, così la guida «Dati obbligatori dello studio»
+  // non si apre sopra ogni pagina (copriva i pulsanti a chi provava l'app, e ai test). Il regime
+  // è un dato di prova: si scrive solo se manca.
+  if (!tenant.regimeFiscale?.trim()) {
+    await prisma.tenant.update({ where: { id: E2E_TENANT_ID }, data: { regimeFiscale: 'RF01' } });
+    console.log('✓ Studio di prova: regime fiscale RF01 (dato di prova, mancava)');
+  }
+  const anagraficaBelfort = await prisma.cliente.findUnique({
+    where: { id: 'cli-03' },
+    select: { giurisdizione: true, sedeLegale: true },
+  });
+  await prisma.cliente.update({
+    where: { id: 'cli-03' },
+    data: {
+      giurisdizione: anagraficaBelfort?.giurisdizione || 'Lussemburgo',
+      sedeLegale: anagraficaBelfort?.sedeLegale || '12 Rue de la Gare, Luxembourg (L-1616) - Lussemburgo',
+    },
+  });
+  console.log('✓ Cliente Belfort: giurisdizione e sede legale presenti');
 
   // 4. Progetto per Belfort con moduli istanziati: è il prerequisito del
   //    compositore fatture (FatturazioneTab) e rende il portale realistico.
