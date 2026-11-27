@@ -18,7 +18,7 @@ import {
   urlFileArchivio,
 } from '../api/client';
 import type { Progetto, Passaggio, Cliente } from '../types';
-import { fetchComunicazioniMicrovoceApi, type MessaggioDiMicrovoce } from '../api/progetti';
+import { eliminaPassaggioMicrovoceApi, fetchComunicazioniMicrovoceApi, type MessaggioDiMicrovoce } from '../api/progetti';
 import { fetchProfiloUtenteApi } from '../api/auth';
 import type { CanaleInvio } from '../hooks/useInvioComunicazione';
 import { ALL_STUDIO_TEMPLATES, getSmartDocumentRecommendation } from './passaggio/catalogoModelliStudio';
@@ -154,6 +154,17 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
   const handleDeleteStep = async (id: string) => {
     if (!(await confirm({ messaggio: 'Sei sicuro di voler eliminare questo passaggio dalla checklist?', confermaLabel: 'Elimina', pericolo: true }))) return;
+    // Prima si toglie dal server, poi dalla pagina: il salvataggio dell'elenco non toglie niente,
+    // e un passaggio sparito solo a schermo tornava alla riapertura. Se il server non lo toglie
+    // lo si dice e il passaggio resta dov'è.
+    if (effMicrovoceId) {
+      try {
+        await eliminaPassaggioMicrovoceApi(String(effMicrovoceId), id);
+      } catch (err) {
+        toast.errore(err instanceof Error ? err.message : 'Il passaggio non è stato eliminato.');
+        return;
+      }
+    }
     const nextSteps = steps.filter(s => s.id !== id);
     setSteps(nextSteps);
     voce.proc = nextSteps;

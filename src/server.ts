@@ -80,6 +80,7 @@ import { registraRotteModelliDocumento } from './routes/modelliDocumento.js';
 import { registraRotteFornitori } from './routes/fornitori.js';
 import { registraRotteLiquidazioneIva } from './routes/liquidazioneIva.js';
 import { registraRotteNoteBeta } from './routes/noteBeta.js';
+import { registraRottePassaggiMicrovoce } from './routes/passaggiMicrovoce.js';
 import { registraRotteSolleciti } from './routes/solleciti.js';
 import { registraRotteFascicoloFiscale } from './routes/fascicoloFiscale.js';
 import { registraRotteKyc } from './routes/kyc.js';
@@ -765,6 +766,7 @@ export function buildServer(app: AppPort): FastifyInstance {
   await registraRotteFornitori(server);
   await registraRotteLiquidazioneIva(server);
   await registraRotteNoteBeta(server);
+  await registraRottePassaggiMicrovoce(server);
   await registraRotteSolleciti(server);
   await registraRotteFascicoloFiscale(server);
   await registraRotteKyc(server);

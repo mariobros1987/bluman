@@ -23,6 +23,14 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   comunicato a voce, per email o di persona; restano scritte sul passaggio e si rileggono alla
   riapertura. **Un passaggio di tipo *Documento* nasce senza documento**: l'atto si collega dalla
   scheda con «⚡ Collega Consigliato» o «📂 Scegli Modello», e nessun nome di file viene inventato.
+- **Da dove vengono i passaggi**: dall'articolo della Libreria, se ne ha di suoi (vengono copiati
+  quando il progetto nasce). Oggi nessuna schermata permette di scriverli sull'articolo, quindi
+  un'attività senza passaggi suoi mostra **quattro passaggi generici**, uguali per tutte (Briefing,
+  Documentazione, Dati dal cliente, Validazione): sono una proposta della pagina e diventano righe
+  del fascicolo alla prima spunta o modifica.
+- **Spuntare ed eliminare**: una spunta salva il passaggio (lo stesso passaggio è sempre la stessa
+  riga, quante volte lo si salvi); **Elimina passaggio** lo toglie dal fascicolo e lo scrive nel Log
+  Audit. Con tutti i passaggi spuntati l'attività risulta completata, con almeno uno in corso.
 - **Chiusura / fine anno**: un progetto con fatture **non si elimina**, si **archivia** (resta
   consultabile con `?includiArchiviati=true`).
 
@@ -97,6 +105,8 @@ un altro modulo»** (bloccata finché l'altro non si chiude).
   se il modulo ha ore consuntivate o righe fattura.
 - Completare una micro-voce con **passaggi ancora aperti** → **409** (§17.1).
 - Marca-ritardo / blocco: **causaNota obbligatoria**.
+- **Elimina passaggio** non riuscito: il passaggio resta in elenco e compare il messaggio d'errore.
+- Attività aperte prima del 27/11/2026 possono avere **passaggi doppi** (ogni spunta li ricreava): i doppioni si tolgono con «Elimina passaggio».
 - Solo `advisor` / `super_admin` eliminano o archiviano; il ruolo `cliente` vede **solo i propri** progetti.
 
 ## 🔧 Nota tecnica

@@ -23,6 +23,7 @@
  */
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { idPassaggio } from './services/passaggiMicrovoce.js';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -33,6 +34,8 @@ const stato = {
   ],
   /** Ogni scrittura su `passaggio_progetto`, nell'ordine in cui è avvenuta. */
   scritture: [] as Array<{ tipo: 'create' | 'update'; data: any }>,
+  /** Gli id dei passaggi già a database. */
+  righe: new Set<string>(),
 };
 
 vi.mock('./util/prismaClient.js', async importOriginal => {
@@ -51,17 +54,24 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
     microvoceProgetto: { update: async (args: any) => args.data },
     user: { findUnique: async () => null },
     passaggioProgetto: {
+      // Le righe che «esistono»: una scrittura su un id presente è un aggiornamento, su uno assente
+      // una creazione — come fa il database. Così si vede anche che salvare due volte lo stesso
+      // passaggio non crea due righe.
       upsert: async (args: any) => {
-        // Il ramo in prova è sempre quello di aggiornamento: i test che usano `upsert` portano
-        // l'id di database, quindi la riga esiste.
-        stato.scritture.push({ tipo: 'update', data: args.update });
-        return args.update;
-      },
-      create: async (args: any) => {
+        const id = args.where.id as string;
+        if (stato.righe.has(id)) {
+          stato.scritture.push({ tipo: 'update', data: args.update });
+          return args.update;
+        }
         // Un titolo solo fallisce, e fallisce sempre: serve a provare che l'errore di un
         // passaggio non porta via gli altri, senza dover manomettere il mock dentro un test —
         // una manomissione lascerebbe il file dipendente dall'ordine di esecuzione.
-        if (args.data.titolo === 'Fallisce') throw new Error('violazione di vincolo');
+        if (args.create.titolo === 'Fallisce') throw new Error('violazione di vincolo');
+        stato.righe.add(id);
+        stato.scritture.push({ tipo: 'create', data: args.create });
+        return args.create;
+      },
+      create: async (args: any) => {
         stato.scritture.push({ tipo: 'create', data: args.data });
         return args.data;
       },
@@ -156,10 +166,11 @@ beforeEach(() => {
     { id: 'mv-1', nome: 'Raccolta dati societari', ordine: 0, stato: 'pending', causaNota: null, risorsaId: null },
   ];
   stato.scritture.length = 0;
+  stato.righe = new Set([ID_DB]);
 });
 
 describe('le risposte raccolte finiscono a database', () => {
-  it('un passaggio nuovo (id locale) nasce con i campi e le risposte, senza id imposto', async () => {
+  it('un passaggio nuovo (id locale) nasce con i campi e le risposte, con un id ricavato da attività e nome', async () => {
     const { res } = await salva({
       id: 'p-1759700000000',
       title: 'Dati societari',
@@ -171,12 +182,24 @@ describe('le risposte raccolte finiscono a database', () => {
 
     expect(res.statusCode).toBe(200);
     const w = scrittura();
-    // `p-…` è un id nato nel browser: il database deve assegnarne uno suo, o due browser
-    // aprirebbero la stessa riga.
+    // `p-…` è un nome nato nel browser e non diventa la chiave: la chiave è ricavata da attività
+    // + nome, sempre la stessa. Prima il database ne assegnava una nuova a ogni salvataggio, e
+    // ogni salvataggio creava un'altra riga (misurato il 27/11: una spunta, quattro righe in più).
     expect(w.tipo).toBe('create');
-    expect(w.data).not.toHaveProperty('id');
+    expect(w.data.id).toBe(idPassaggio('mv-1', 'p-1759700000000'));
+    expect(w.data.id).not.toBe('p-1759700000000');
     expect(w.data.campiFormJson).toEqual(['Ragione Sociale', 'P.IVA / VAT']);
     expect(w.data.risposteFormJson).toEqual({ 'Ragione Sociale': 'Bluecode Ltd' });
+  });
+
+  it('salvare due volte gli stessi passaggi non li raddoppia: la seconda volta si aggiornano', async () => {
+    const quattro = ['s1', 's2', 's3', 's4'].map((id, i) => ({ id, title: `Passaggio ${i + 1}`, type: 'info', who: 'operatore' }));
+    await salva2(quattro);
+    await salva2(quattro.map((p, i) => (i === 0 ? { ...p, stato: 'done' } : p)));
+
+    expect(stato.scritture.filter((w) => w.tipo === 'create')).toHaveLength(4);
+    expect(stato.scritture.filter((w) => w.tipo === 'update')).toHaveLength(4);
+    expect(stato.scritture[4]!.data.stato).toBe('done');
   });
 
   it('un passaggio che esiste già viene aggiornato con le risposte', async () => {

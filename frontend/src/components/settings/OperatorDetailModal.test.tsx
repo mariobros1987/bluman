@@ -26,6 +26,12 @@ function rigaModulo(etichetta: RegExp): HTMLElement {
   return screen.getByText(etichetta).parentElement!.parentElement!;
 }
 
+/** Un pulsante dal suo testo. `getByText` e non `getByRole`: il ruolo calcola il nome accessibile
+ *  di tutto il DOM della matrice e, con le prove in parallelo, superava da solo i 5 s del test. */
+function bottone(testo: RegExp, dentro: HTMLElement = document.body): HTMLElement {
+  return within(dentro).getByText(testo, { selector: 'button' });
+}
+
 beforeEach(() => {
   successo.mockClear();
   errore.mockClear();
@@ -35,11 +41,11 @@ beforeEach(() => {
 describe('OperatorDetailModal — salvataggio della matrice permessi', () => {
   it("con 'calendar' toccato, l'API riceve solo le chiavi della matrice server e il salvataggio riesce", async () => {
     render(<OperatorDetailModal operator={OPERATORE} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Matrice Permessi & Accessi/ }));
+    fireEvent.click(bottone(/Matrice Permessi & Accessi/));
 
-    fireEvent.click(within(rigaModulo(/Calendario Studio/)).getByRole('button', { name: /Bloccato/ }));
-    fireEvent.click(within(rigaModulo(/Impostazioni Studio/)).getByRole('button', { name: /Lettura/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Salva Matrice Permessi/ }));
+    fireEvent.click(bottone(/Bloccato/, rigaModulo(/Calendario Studio/)));
+    fireEvent.click(bottone(/Lettura/, rigaModulo(/Impostazioni Studio/)));
+    fireEvent.click(bottone(/Salva Matrice Permessi/));
 
     await waitFor(() => expect(salvaPermessiUtenteApi).toHaveBeenCalledTimes(1));
     const [userId, inviati] = vi.mocked(salvaPermessiUtenteApi).mock.calls[0]!;
@@ -55,10 +61,10 @@ describe('OperatorDetailModal — salvataggio della matrice permessi', () => {
 
   it("'calendar' e 'settings' restano salvati in locale, come prima", async () => {
     render(<OperatorDetailModal operator={OPERATORE} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Matrice Permessi & Accessi/ }));
+    fireEvent.click(bottone(/Matrice Permessi & Accessi/));
 
-    fireEvent.click(within(rigaModulo(/Calendario Studio/)).getByRole('button', { name: /Bloccato/ }));
-    fireEvent.click(screen.getByRole('button', { name: /Salva Matrice Permessi/ }));
+    fireEvent.click(bottone(/Bloccato/, rigaModulo(/Calendario Studio/)));
+    fireEvent.click(bottone(/Salva Matrice Permessi/));
     await waitFor(() => expect(salvaPermessiUtenteApi).toHaveBeenCalled());
 
     const chiaveLocale = Object.keys(localStorage).find((k) => k.includes('bluman_rbac_permissions_usr-collab'));

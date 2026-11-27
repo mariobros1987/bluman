@@ -27,7 +27,7 @@ import { livelloModuloUtente } from '../util/permessiModulo.js';
 import type { ModuloChiaveRbac } from '../util/rbacModuli.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
-import { livelloFirmaValido } from '../services/livelloFirmaService.js';
+import { salvaPassaggiMicrovoce } from '../services/passaggiMicrovoce.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
@@ -1206,117 +1206,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           microvociSalvate++;
         }
 
-        // Persistenza dei passaggi checklist e documenti allegati alla micro-voce
+        // I passaggi interni dell'attività: uno stesso passaggio porta sempre alla stessa riga
+        // (`services/passaggiMicrovoce.ts`), quindi un salvataggio ripetuto non li moltiplica.
         if (Array.isArray(mv.proc) && mv.proc.length > 0) {
-          for (let pIdx = 0; pIdx < mv.proc.length; pIdx++) {
-            const p = mv.proc[pIdx];
-            const pId = p.id && !String(p.id).startsWith('p-') && p.id.length > 10 ? p.id : undefined;
-            // Il tipo deve finire nell'enum `TipoPassaggio` (info|documento|form|verifica).
-            // Il frontend parla un vocabolario interno ridotto («doc», «check») e si
-            // traduce qui, al confine, senza toccare il rendering. Il vecchio fallback era
-            // «check», che nell'enum non esiste: Prisma rifiutava la riga
-            // (PrismaClientValidationError) e la risposta diceva comunque ok: true.
-            const tipoGrezzo = String(p.type || p.tipo || '');
-            const tipo: 'info' | 'documento' | 'form' | 'verifica' =
-              tipoGrezzo === 'info' ? 'info'
-              : tipoGrezzo === 'form' ? 'form'
-              : tipoGrezzo === 'doc' || tipoGrezzo === 'documento' ? 'documento'
-              : 'verifica';
-            const chi = ['operatore', 'cliente'].includes(p.who || p.chi) ? (p.who || p.chi) : 'operatore';
-            const statoP = p.stato === 'done' ? 'done' : 'pending';
-            const titolo = p.title || p.titolo || `Passaggio ${pIdx + 1}`;
-            const docAllegato = p.documentoAllegatoUrl || p.file || null;
-            const richiedeFirma = Boolean(p.richiedeFirmaCliente);
-            // Piano firma §3.1 — il livello (ses|fea|feq) che il singolo passaggio esige
-            // per la conferma firmata del modulo. Valori non validi si scartano: un
-            // client che manda dati sporchi non deve sovrascrivere il livello esistente.
-            const livelloRichiesta = typeof p.livelloFirmaRichiesto === 'string' && livelloFirmaValido(p.livelloFirmaRichiesto)
-              ? p.livelloFirmaRichiesto
-              : undefined;
-
-            // I campi del form e le risposte raccolte: due colonne `Json?` che esistono dal
-            // primo giorno e che nessuno scriveva da qui. La prima la popola l'istanziazione
-            // dal modello (`prismaIstanziazionePort`), la seconda non aveva ancora nessuno
-            // scrittore — la scheda che doveva compilarla era stata cancellata per sbaglio
-            // (vedi `passaggio/ModaleFormPassaggio.tsx`).
-            //
-            // Si accettano **solo** le due forme che il rendering sa leggere — array di
-            // stringhe per i campi, oggetto di stringhe per le risposte — perché una colonna
-            // Json accetta qualunque cosa: un client che manda un numero, una stringa o un
-            // array dove serve un oggetto la scriverebbe senza che nessuno se ne accorga, e
-            // poi `TabPassaggi` chiamerebbe `.map` su un valore che non è un array. Meglio
-            // scartare la forma storta che salvare un dato che non si potrà più disegnare.
-            const campiForm = Array.isArray(p.fields) && p.fields.every((f: unknown) => typeof f === 'string')
-              ? (p.fields as string[])
-              : undefined;
-            const risposteForm = p.risposte && typeof p.risposte === 'object' && !Array.isArray(p.risposte)
-              ? (p.risposte as Record<string, string>)
-              : undefined;
-
-            // Ogni passaggio si salva per conto suo: il vecchio catch avvolgeva l'intero
-            // ciclo, quindi il primo errore trascinava nel silenzio tutti i passaggi
-            // successivi. Chi fallisce si dichiara in «nonSalvate», che la risposta
-            // riporta e la UI mostra già (regola 5).
-            try {
-              if (pId) {
-                await prisma.passaggioProgetto.upsert({
-                  where: { id: pId },
-                  update: {
-                    titolo,
-                    tipo,
-                    chi,
-                    stato: statoP,
-                    ordine: pIdx,
-                    descrizione: p.desc || p.descrizione || null,
-                    documentoAllegatoUrl: docAllegato,
-                    richiedeFirmaCliente: richiedeFirma,
-                    ...(livelloRichiesta && { livelloFirmaRichiesto: livelloRichiesta }),
-                    // `undefined` in un `update` significa «non toccare la colonna»: un
-                    // passaggio che non porta campi né risposte non azzera quelli che ha.
-                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
-                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
-                  },
-                  create: {
-                    id: pId,
-                    tenantId,
-                    microvoceProgettoId: rigaMv.id,
-                    titolo,
-                    tipo,
-                    chi,
-                    stato: statoP,
-                    ordine: pIdx,
-                    descrizione: p.desc || p.descrizione || null,
-                    documentoAllegatoUrl: docAllegato,
-                    richiedeFirmaCliente: richiedeFirma,
-                    livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
-                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
-                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
-                  },
-                });
-              } else {
-                await prisma.passaggioProgetto.create({
-                  data: {
-                    tenantId,
-                    microvoceProgettoId: rigaMv.id,
-                    titolo,
-                    tipo,
-                    chi,
-                    stato: statoP,
-                    ordine: pIdx,
-                    descrizione: p.desc || p.descrizione || null,
-                    documentoAllegatoUrl: docAllegato,
-                    richiedeFirmaCliente: richiedeFirma,
-                    livelloFirmaRichiesto: livelloRichiesta ?? 'ses',
-                    ...(campiForm && { campiFormJson: campiForm as Prisma.InputJsonValue }),
-                    ...(risposteForm && { risposteFormJson: risposteForm as Prisma.InputJsonValue }),
-                  },
-                });
-              }
-            } catch (errPassaggio) {
-              console.warn(`Errore salvataggio passaggio «${titolo}» per micro-voce ${rigaMv.id}:`, errPassaggio);
-              nonSalvate.push(`micro-voce «${rigaMv.nome}»: passaggio «${titolo}» non salvato`);
-            }
-          }
+          nonSalvate.push(...(await salvaPassaggiMicrovoce(prisma, { tenantId, microvoce: rigaMv }, mv.proc)));
         }
       }
     }
