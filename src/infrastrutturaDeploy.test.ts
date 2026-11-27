@@ -311,6 +311,18 @@ describe('🖥️ aggiorna-blusmart.sh — l aggiornamento di blusmart.eu lancia
     for (const r of righe) expect(r, r).toContain('</dev/null');
   });
 
+  it('con --applica si stacca dalla connessione e restituisce l esito vero', () => {
+    // Il 27/11 ssh è caduto a metà della build delle immagini e lo script si è fermato, col
+    // frontend nuovo già servito davanti al backend vecchio.
+    expect(script).toMatch(/BLUMAN_STACCATO=1 setsid nohup bash "\$0" --applica > "\$LOG" 2>&1 <\/dev\/null &/);
+    expect(posizione('wait "$FIGLIO"')).toBeLessThan(posizione('titolo "1. Copia di sicurezza"'));
+  });
+
+  it('la versione in servizio è quella registrata dallo script, non dedotta da git', () => {
+    // Un git pull cambia i file su disco, non il sito: il 27/11 ORIG_HEAD indicava la versione sbagliata.
+    expect(script).not.toContain('ORIG_HEAD');
+  });
+
   it('si ferma se sul server ci sono file del repo modificati a mano', () => {
     expect(script).toContain('git status --porcelain --untracked-files=no');
   });

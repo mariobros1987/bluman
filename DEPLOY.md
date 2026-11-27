@@ -39,7 +39,8 @@ ssh blusmart "cd /opt/bluman && git pull --ff-only && bash scripts/aggiorna-blus
 ssh blusmart "cd /opt/bluman && bash scripts/aggiorna-blusmart.sh --applica"              # aggiorna
 ```
 - Senza argomenti lo script dice cosa cambierebbe: versione su disco e in servizio, migrazioni da applicare, ultima copia, spazio. Si ferma se sul server ci sono file del repo modificati a mano.
-- `--applica`: copia di sicurezza subito (`backup-vps.sh`, se fallisce non tocca niente), frontend con `VITE_API_BASE=/api`, `migrate` + `rls`, container, nginx allineato e ricaricato, sonde (health, pagine HTML, cache, rotte, manuale). Sono i passi di `distribuisci.sh --solo-vps` del titolare, eseguiti sul server.
+- `--applica` si stacca dalla connessione (`setsid`, log in `/var/log/bluman/aggiorna-<data>.log`) e il terminale segue il log: se ssh cade l'aggiornamento continua, e il comando per rileggere il log è stampato all'inizio.
+- I passi di `--applica`: copia di sicurezza subito (`backup-vps.sh`, se fallisce non tocca niente), frontend con `VITE_API_BASE=/api`, `migrate` + `rls`, container, nginx allineato e ricaricato, sonde (health, pagine HTML, cache, rotte, manuale). Sono i passi di `distribuisci.sh --solo-vps` del titolare, eseguiti sul server.
 - Copiare una copia del database sul PC: `scp "blusmart:/var/backups/bluman/<file>.dump.enc" .` (cifrata con `BACKUP_ENCRYPTION_KEY` del `.env` del server).
 - Durante l'aggiornamento `monitor-vps.sh` (ogni 10 minuti) può avvisare il titolare su Telegram: va avvisato prima.
 - `scripts/backup-vps.sh` (notturno alle 3:17, cifrato, 14 set in `/var/backups/bluman`) e `scripts/monitor-vps.sh` girano da cron sul server. Dettagli e stati limite: `docs/manuale/19-infra-deploy.md`. Una sessione non entra mai nel server e non usa `railway`, `vercel`, `distribuisci.sh`.

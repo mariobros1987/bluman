@@ -4,7 +4,7 @@
 # wolftradesystem-tech:main (il fork, dove gira il pilota) a mariobros1987/bluman main
 # (il repo del titolare, `upstream`, con push disattivato). All'unione Railway (backend,
 # `prisma migrate deploy` all'avvio del container) e Vercel (bluman.vercel.app, copia di
-# riserva) pubblicano da soli; blusmart.eu lo aggiorna solo il titolare con
+# riserva) pubblicano da soli; blusmart.eu si aggiorna dopo con `scripts/aggiorna-blusmart.sh` (Fabio) o
 # `scripts/distribuisci.sh --solo-vps`. DEPLOY.md.
 #
 #   senza argomenti  apre o aggiorna la PR su upstream: elenco dei commit, dove arriva,
@@ -66,7 +66,7 @@ corpo="$(mktemp)"
   echo
   echo "- Railway: backend (\`prisma migrate deploy\` all'avvio, poi il server)."
   echo "- Vercel: frontend su bluman.vercel.app (copia di riserva)."
-  echo "- blusmart.eu (server Register.it, produzione dello studio): **no**, lo aggiorna solo il titolare con \`scripts/distribuisci.sh --solo-vps\`."
+  echo "- blusmart.eu (server Register.it, produzione dello studio): **no**, si aggiorna dopo l'unione con \`scripts/aggiorna-blusmart.sh\` (Fabio, via ssh) o \`scripts/distribuisci.sh --solo-vps\` (titolare)."
   echo
   echo "## Come si unisce"
   echo
@@ -94,6 +94,6 @@ fi
 # pubblicazione dopo si vede cosa c'è di nuovo. --match-head-commit: si unisce quello
 # che è stato letto e scritto nella PR, non un main avanzato nel frattempo.
 gh pr merge "$pr" -R "$UP" --merge --match-head-commit "$testa"
-log "unita: Railway e Vercel pubblicano da soli; blusmart.eu resta al titolare"
+log "unita: Railway e Vercel pubblicano da soli; blusmart.eu: ssh blusmart \"cd /opt/bluman && git pull --ff-only && bash scripts/aggiorna-blusmart.sh\""
 gh repo sync "$FORK" --source "$UP" --branch main
 log "main del fork riallineato a upstream (merge commit compreso)"
