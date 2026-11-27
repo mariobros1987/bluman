@@ -83,6 +83,7 @@ describe('4.3 — i dati entrano nel download come testo', () => {
       recapitoDichiarato: '', setRecapitoDichiarato: vi.fn(), canaleCorrente: undefined, botTelegram: null,
       otpModalOpen: false, inviaCodiceFirma: vi.fn(), TITOLO_MANDATO: 'Mandato', loading: false, otpLoading: false,
       fileFirmato: null, leggiFileFirmato: vi.fn(), confermaFirmaConFile: vi.fn(), caricamentoFirmato: false,
+      anagraficaStudio: 'ok', riprovaAnagraficaStudio: vi.fn(),
     };
     // Il foglio A4 della vista misura il contenitore: jsdom non ha ResizeObserver.
     vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });

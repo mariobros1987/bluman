@@ -1,3 +1,4 @@
+import { etichettaFaseModulo } from './faseModulo';
 import { CatBadge } from '../ui/CatBadge';
 import { fmtPrezzo } from './format';
 import type { ModuloProposta } from './types';
@@ -18,7 +19,7 @@ export function TabAvanzamento({
 }: TabAvanzamentoProps) {
   return (
     <div style={docBoxStyle}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📊 Stato Avanzamento Lavori in Tempo Reale</div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📊 Avanzamento dei lavori</div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>
         Monitora le prestazioni specialistiche e i passaggi eseguiti dall'advisor per ciascun modulo. Clicca su un modulo per visualizzare i dettagli o firmare la conclusione dell'operazione.
       </div>
@@ -26,7 +27,7 @@ export function TabAvanzamento({
       {/* Progress Bar — percentuale calcolata dal backend (§16), non una soglia minima */}
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, marginBottom: 8 }}>
-          <span>Progresso Generale Fascicoli & Incarico</span>
+          <span>Avanzamento complessivo</span>
           <span style={{ color: 'var(--indigo-l)', fontWeight: 800 }}>
             {moduliProposti.length === 0
               ? 'Non ancora avviato'
@@ -48,7 +49,7 @@ export function TabAvanzamento({
 
       {/* Elenco Moduli con Avanzamento Live e Click per Dettagli */}
       <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 12 }}>
-        Fascicoli Operativi in Corso & Conclusi ({moduliProposti.length})
+        Le fasi del tuo incarico ({moduliProposti.length})
       </div>
 
       {moduliProposti.length === 0 && (
@@ -81,7 +82,7 @@ export function TabAvanzamento({
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 12,
-                boxShadow: '0 4px 14px rgba(0,0,0,.25)',
+                boxShadow: 'var(--shadow-sm)',
                 transition: 'all .2s ease',
               }}
             >
@@ -93,7 +94,9 @@ export function TabAvanzamento({
                       height: 32,
                       borderRadius: '50%',
                       background: isSigned ? 'var(--green)' : isDone ? 'var(--indigo-d)' : 'var(--card)',
-                      color: isSigned ? 'var(--pill-green-bg)' : '#fff',
+                      // Sul fondo chiaro del modulo non concluso il numero era bianco su bianco.
+                      color: isSigned ? 'var(--pill-green-bg)' : isDone ? 'var(--on-accent)' : 'var(--text)',
+                      border: isSigned || isDone ? 'none' : '1px solid var(--border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -123,12 +126,12 @@ export function TabAvanzamento({
                       ✓ CONCLUSO & VALIDATO
                     </span>
                   ) : isDone ? (
-                    <span style={{ background: 'var(--amber)', color: '#000', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
+                    <span style={{ background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', border: '1px solid var(--pill-amber-bd)', fontSize: 10.5, fontWeight: 800, padding: '4px 10px', borderRadius: 12 }}>
                       ✍️ ATTIVITÀ CONCLUSE (DA FIRMARE)
                     </span>
                   ) : (
                     <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 12 }}>
-                      ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
+                      ⏱ {etichettaFaseModulo(m.fase, m.percentuale)}
                     </span>
                   )}
                   <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmtPrezzo(m.prezzo)}</div>
@@ -136,7 +139,7 @@ export function TabAvanzamento({
               </div>
 
               {/* Mini Avanzamento Passaggi & Documenti */}
-              <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11 }}>
+              <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, fontSize: 11 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ color: 'var(--muted)' }}>
                     Progressione operativa: <strong style={{ color: 'var(--green)' }}>{passaggiCompletati}/{passaggi.length} micro-fasi</strong>

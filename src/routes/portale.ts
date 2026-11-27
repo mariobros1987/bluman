@@ -112,6 +112,12 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
           telefono: true,
           email: true,
           sedeLegale: true,
+          sedeOperativa: true,
+          piva: true,
+          codiceFiscale: true,
+          iban: true,
+          giurisdizione: true,
+          logoUrl: true,
         },
       });
       if (!tenant) return reply.code(404).send({ errore: 'Studio non trovato.' });
@@ -125,6 +131,24 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
           telefono: tenant.telefono || null,
           emailStudio: tenant.email || null,
           sedeLegale: tenant.sedeLegale || null,
+        },
+        // L'anagrafica dello studio che compare nella lettera d'incarico: è quella del database,
+        // la stessa che entra nell'impronta della firma (`improntaLetteraIncarico`, firma.ts).
+        // Prima il portale non la riceveva (al cliente `/tenant/info` è chiuso) e la lettera usava
+        // un'anagrafica scritta nel frontend: il cliente leggeva una controparte e ne firmava
+        // un'altra. Sono dati che la lettera stampa comunque; niente segreti.
+        anagrafica: {
+          ragioneSociale: tenant.ragioneSociale || '',
+          piva: tenant.piva || '',
+          codiceFiscale: tenant.codiceFiscale || '',
+          sedeLegale: tenant.sedeLegale || '',
+          sedeOperativa: tenant.sedeOperativa || '',
+          giurisdizione: tenant.giurisdizione || '',
+          iban: tenant.iban || '',
+          email: tenant.email || '',
+          telefono: tenant.telefono || '',
+          leadAdvisor: tenant.leadAdvisorNome || '',
+          logoUrl: tenant.logoUrl || '',
         },
       });
     } catch (err) {
@@ -166,6 +190,8 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
         orderBy: { data: 'desc' },
       });
 
+      const inizioDiOggi = new Date();
+      inizioDiOggi.setHours(0, 0, 0, 0);
       const elenco = fatture.map((f) => {
         const totaleCentesimi = f.righe.reduce((somma, r) => somma + (r.importo || 0), 0);
         const prossimaScadenza = f.scadenzeIncasso[0] ?? null;
@@ -180,7 +206,13 @@ export async function registraRottePortale(server: FastifyInstance): Promise<voi
           progettoId: f.progettoId,
           progetto: f.progetto?.nome ?? null,
           prossimaScadenza: prossimaScadenza
-            ? { dataScadenza: prossimaScadenza.dataScadenza, importoCentesimi: prossimaScadenza.importoCentesimi }
+            ? {
+                dataScadenza: prossimaScadenza.dataScadenza,
+                importoCentesimi: prossimaScadenza.importoCentesimi,
+                // Lo stato «scaduta» lo dice il server (regola 5): rata non pagata con la data
+                // di scadenza prima di oggi. Il portale prima la mostrava come una rata qualsiasi.
+                scaduta: prossimaScadenza.dataScadenza < inizioDiOggi,
+              }
             : null,
         };
       });

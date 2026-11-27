@@ -7,7 +7,6 @@ import {
   fetchComunicazioniApi,
   magicLoginApi,
   documentiPortaleApi,
-  contattiPortaleApi,
   proposteDatiPortaleApi,
   richiesteAddendumPortaleApi,
   fatturePortaleApi,
@@ -24,6 +23,8 @@ import type { ModuloProposta } from './types';
 import { mapProjectToPortalModules } from './mapPortalModules';
 import { dataOraLeggibile } from './format';
 import { statoFirmaLettera } from './firmaLettera';
+import { useContattiStudioPortale } from './useContattiStudioPortale';
+import type { StatoAnagraficaStudio } from './AvvisoAnagraficaStudio';
 
 // Chiamata magic-login in corso per un certo token: chi ne fa un'altra con lo
 // stesso token mentre la prima è in volo riceve la STESSA promise, non una
@@ -92,6 +93,8 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
   setBozzaDati: React.Dispatch<React.SetStateAction<{ ragioneSociale: string; piva: string; legaleRappresentante: string; codiceFiscale: string; iban: string; titolareEffettivo: string; sedeLegale: string }>>;
   proposteDati: PropostaDatiFiscale[];
   contattiStudio: ContattiStudio | null;
+  anagraficaStudio: StatoAnagraficaStudio;
+  riprovaAnagraficaStudio: () => void;
   fatturePortale: FatturaPortale[];
   fattureCaricamento: boolean;
   fattureErrore: string | null;
@@ -186,12 +189,8 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
   /** Proposte di modifica dei dati fiscali inviate dal cliente, col loro stato. */
   const [proposteDati, setProposteDati] = useState<PropostaDatiFiscale[]>([]);
 
-  /**
-   * §2.6: i recapiti dello studio (lead advisor reale) arrivano dal backend. Prima la scheda
-   * mostrava a tutti un nome proprio, un indirizzo email e un telefono scritti a mano nel
-   * codice — e il pallino verde "Advisor Online", che non riflette la presenza di nessuno.
-   */
-  const [contattiStudio, setContattiStudio] = useState<ContattiStudio | null>(null);
+  /** §2.6: recapiti e anagrafica dello studio dal backend (`useContattiStudioPortale`). */
+  const { contattiStudio, anagraficaStudio, caricaContattiStudio, riprovaAnagraficaStudio } = useContattiStudioPortale();
 
   /** §2.11: fatture e stato di pagamento dei progetti del cliente. */
   const [fatturePortale, setFatturePortale] = useState<FatturaPortale[]>([]);
@@ -370,16 +369,6 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
       setProposteDati(Array.isArray(res) ? res : []);
     } catch {
       setProposteDati([]);
-    }
-  };
-
-  /** §2.6 — Recapiti reali dello studio (lead advisor) dalla riga del tenant. */
-  const caricaContattiStudio = async (clienteIdSessione?: string | null) => {
-    try {
-      const res = await contattiPortaleApi(clienteIdSessione ?? undefined);
-      setContattiStudio(res);
-    } catch {
-      setContattiStudio(null);
     }
   };
 
@@ -608,6 +597,8 @@ export function usePortalData({ token, setIsAuthenticated, setAccessoNegato }: U
     setBozzaDati,
     proposteDati,
     contattiStudio,
+    anagraficaStudio,
+    riprovaAnagraficaStudio,
     fatturePortale,
     fattureCaricamento,
     fattureErrore,

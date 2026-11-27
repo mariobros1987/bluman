@@ -10,54 +10,36 @@ export interface PortalTabsBarProps {
   setActiveTab: (tab: PortalTab) => void;
 }
 
+// Nomi brevi, senza numeri: sul telefono la barra scorre e si vede una scheda alla volta, e
+// «Avanzamento Live Lavori» o «Contatto Advisor» dicevano meno di una parola sola.
+const SCHEDE: Array<[PortalTab, string]> = [
+  ['proposta', '✍️ Proposta e firma'],
+  ['avanzamento', '📊 Avanzamento'],
+  ['form', '📋 Dati societari'],
+  ['documenti', '📎 Documenti'],
+  ['fatture', '💳 Fatture'],
+  ['contatti', '💬 Messaggi'],
+  ['profilo', '👤 Profilo'],
+];
+
 export function PortalTabsBar({
   activeTab,
   setActiveTab,
 }: PortalTabsBarProps) {
   return (
-    <div style={tabsBarStyle}>
-      <button
-        onClick={() => setActiveTab('proposta')}
-        style={tabBtnStyle(activeTab === 'proposta')}
-      >
-        ✍️ 1. Proposta d'Ordine & Firma
-      </button>
-      <button
-        onClick={() => setActiveTab('avanzamento')}
-        style={tabBtnStyle(activeTab === 'avanzamento')}
-      >
-        📊 2. Avanzamento Live Lavori
-      </button>
-      <button
-        onClick={() => setActiveTab('form')}
-        style={tabBtnStyle(activeTab === 'form')}
-      >
-        📋 3. Form Dati Societari
-      </button>
-      <button
-        onClick={() => setActiveTab('documenti')}
-        style={tabBtnStyle(activeTab === 'documenti')}
-      >
-        📎 4. Documenti & Contratti
-      </button>
-      <button
-        onClick={() => setActiveTab('fatture')}
-        style={tabBtnStyle(activeTab === 'fatture')}
-      >
-        💳 5. Fatture & Pagamenti
-      </button>
-      <button
-        onClick={() => setActiveTab('contatti')}
-        style={tabBtnStyle(activeTab === 'contatti')}
-      >
-        💬 6. Contatto Advisor
-      </button>
-      <button
-        onClick={() => setActiveTab('profilo')}
-        style={tabBtnStyle(activeTab === 'profilo')}
-      >
-        👤 7. Profilo & Password
-      </button>
+    <div style={tabsBarStyle} role="tablist" aria-label="Sezioni del portale">
+      {SCHEDE.map(([id, etichetta]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={activeTab === id}
+          onClick={() => setActiveTab(id)}
+          style={tabBtnStyle(activeTab === id)}
+        >
+          {etichetta}
+        </button>
+      ))}
     </div>
   );
 }

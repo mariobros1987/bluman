@@ -1,3 +1,4 @@
+import type { FaseModulo } from './faseModulo';
 import type { AmbitoFirma, DocumentoPortale } from '../../api/client';
 import type { CategoriaModulo } from '../../types';
 
@@ -49,6 +50,8 @@ export interface ModuloProposta {
   righeCount: number;
   descrizione?: string;
   stato?: 'completato' | 'in_corso' | 'da_firmare' | 'pending';
+  /** La fase come la legge il cliente, dallo stato del server (`faseModulo.ts`). */
+  fase?: FaseModulo;
   operatore?: string;
   percentuale?: number;
   passaggi?: ModuloPassaggio[];

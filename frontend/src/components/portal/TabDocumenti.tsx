@@ -54,7 +54,7 @@ export function TabDocumenti({
     <div style={docBoxStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Vault Documenti Legali e Modelli In Incarico</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📎 Documenti del tuo incarico</div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
             Visualizza, scarica, firma con <strong>firma elettronica semplice</strong> (lettura, codice sul canale che scegli, firma grafometrica) oppure <strong>ricarica il PDF firmato a mano</strong>. Le firme sono registrate a database e visibili allo studio.
           </div>

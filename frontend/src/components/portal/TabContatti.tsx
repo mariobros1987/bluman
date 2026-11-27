@@ -131,7 +131,7 @@ export function TabContatti({
 
   return (
     <div style={docBoxStyle}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Assistenza Dedicata & Comunicazioni Dirette Studio</div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💬 Messaggi con lo studio</div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 18 }}>Invia messaggi in tempo reale al tuo Advisor di riferimento. La conversazione è sincronizzata con l'Advisor Hub dello Studio.</div>
 
       {/* §2.6 — Scheda Advisor costruita sui recapiti reali dello studio (riga del
@@ -378,7 +378,7 @@ export function TabContatti({
         style={{ display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--card2)', padding: 14, borderRadius: 12, border: '1px solid var(--border)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>Invia messaggio diretto all'Advisor:</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>Scrivi allo studio:</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Canale preferito:</span>
             <select

@@ -1,3 +1,4 @@
+import { motivoCanaleCliente } from './motivoCanaleCliente';
 import type { CanaleOtp } from '../../api/client';
 import type { CanaleFirma } from '../../api/firma';
 import type { BersaglioFirma } from './types';
@@ -248,7 +249,7 @@ export function FirmaOtpModal({
                   key={c.id}
                   type="button"
                   disabled={bloccato}
-                  title={!disponibile && info?.motivo ? info.motivo : undefined}
+                  title={!disponibile && info?.motivo ? motivoCanaleCliente(info.motivo) : undefined}
                   onClick={async () => {
                     setOtpCanale(c.id);
                     setOtpError(null);
@@ -283,7 +284,7 @@ export function FirmaOtpModal({
             if (sel && sel.disponibile === false) {
               return (
                 <div style={{ fontSize: 10.5, color: 'var(--amber)', marginTop: 2 }}>
-                  ⚠️ {nomeCanale[otpCanale]} non disponibile{sel.motivo ? `: ${sel.motivo}` : '. Scegli un altro canale.'}
+                  ⚠️ {nomeCanale[otpCanale]} non disponibile{sel.motivo ? `: ${motivoCanaleCliente(sel.motivo)}` : '. Scegli un altro canale.'}
                 </div>
               );
             }

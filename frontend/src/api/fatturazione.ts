@@ -14,7 +14,7 @@ export interface FatturaPortale {
   totaleCentesimi: number;
   progettoId: string;
   progetto: string | null;
-  prossimaScadenza: { dataScadenza: string; importoCentesimi: number } | null;
+  prossimaScadenza: { dataScadenza: string; importoCentesimi: number; /** Calcolato dal server: rata non pagata, scadenza prima di oggi. */ scaduta?: boolean } | null;
 }
 
 export async function fatturePortaleApi(clienteId?: string): Promise<FatturaPortale[]> {

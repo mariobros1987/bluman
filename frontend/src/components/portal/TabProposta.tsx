@@ -1,3 +1,7 @@
+import { motivoCanaleCliente } from './motivoCanaleCliente';
+import { etichettaFaseModulo } from './faseModulo';
+import { GuidaFirma } from './GuidaFirma';
+import { AvvisoAnagraficaStudio, type StatoAnagraficaStudio } from './AvvisoAnagraficaStudio';
 import { CatBadge } from '../ui/CatBadge';
 import { downloadRealPdf } from '../../utils/pdfGenerator';
 import { FoglioA4 } from '../documenti/FoglioA4';
@@ -49,6 +53,9 @@ export interface TabPropostaProps {
   leggiFileFirmato: (file: File) => Promise<void>;
   confermaFirmaConFile: (opzioni?: { bersaglio?: BersaglioFirma }) => Promise<boolean>;
   caricamentoFirmato: boolean;
+  /** Se l'anagrafica dello studio è arrivata dal server: senza, la lettera non si mostra né si firma. */
+  anagraficaStudio: StatoAnagraficaStudio;
+  riprovaAnagraficaStudio: () => void;
 }
 
 export function TabProposta({
@@ -91,6 +98,8 @@ export function TabProposta({
   leggiFileFirmato,
   confermaFirmaConFile,
   caricamentoFirmato,
+  anagraficaStudio,
+  riprovaAnagraficaStudio,
 }: TabPropostaProps) {
   // §39 — l'HTML del mandato può portare l'intestazione e il piede propri dello studio, marcati
   // dentro il documento al momento del salvataggio: qui si rimettono al loro posto sul foglio.
@@ -307,26 +316,7 @@ export function TabProposta({
         </div>
       ) : (
         <div>
-          {/* 🛡️ GUIDA STEP-BY-STEP PER IL CLIENTE NELLE FIRME */}
-          <div style={{ background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.7), rgba(49, 46, 129, 0.45))', border: '1px solid var(--indigo-d)', borderRadius: 14, padding: 18, marginBottom: 22 }}>
-            <div style={{ fontSize: 11, color: 'var(--pill-indigo-fg)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
-              📋 Guida Rapida alla Sottoscrizione Digitale (3 Semplici Passaggi)
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', marginBottom: 4 }}>1️⃣ Revisione Condizioni</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Esamina i moduli inclusi, le tariffe trasparenti e le clausole dell'incarico.</div>
-              </div>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--pill-indigo-fg)', marginBottom: 4 }}>2️⃣ Verifica OTP Sicuro</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Ricevi un codice temporaneo a 6 cifre via WhatsApp o Email certificata.</div>
-              </div>
-              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '12px 14px' }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)', marginBottom: 4 }}>3️⃣ Firma con OTP verificata</div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>Apponi la firma elettronica semplice (OTP verificata · art. 20 CAD) e scarica l'attestazione PDF.</div>
-              </div>
-            </div>
-          </div>
+          <GuidaFirma />
 
           <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16, marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
             <div>
@@ -335,14 +325,17 @@ export function TabProposta({
                     backend alla creazione. Prima era cablato EL-2026-089 per tutti. */}
                 ENGAGEMENT LETTER & PROPOSTA D'ORDINE N. {progettoAttivo?.numeroContratto || '— numero in assegnazione —'}
               </div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Dettaglio Incarico Professionale & Moduli Spettanti</h2>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>La proposta d'incarico</h2>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                Studio Erogante: <strong>{getStudioInfoForTenant().ragioneSociale || ANAGRAFICA_DA_COMPLETARE}</strong> · Advisor Lead: <strong>{getStudioInfoForTenant().leadAdvisor}</strong>
+                Studio: <strong>{getStudioInfoForTenant().ragioneSociale || ANAGRAFICA_DA_COMPLETARE}</strong>
+                {getStudioInfoForTenant().leadAdvisor && <> · Responsabile: <strong>{getStudioInfoForTenant().leadAdvisor}</strong></>}
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Giurisdizione Incarico:</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>{getStudioInfoForTenant().giurisdizione}</div>
+              {getStudioInfoForTenant().giurisdizione && <>
+                <div style={{ fontSize: 10, color: 'var(--muted)' }}>Paese dello studio</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--indigo-l)', marginTop: 2 }}>{getStudioInfoForTenant().giurisdizione}</div>
+              </>}
             </div>
           </div>
 
@@ -398,7 +391,7 @@ export function TabProposta({
                         </span>
                       ) : (
                         <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', fontSize: 10.5, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
-                          ⏱ IN LAVORAZIONE ({m.percentuale ?? 0}%)
+                          ⏱ {etichettaFaseModulo(m.fase, m.percentuale)}
                         </span>
                       )}
                       <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmtPrezzo(m.prezzo)}</div>
@@ -421,18 +414,19 @@ export function TabProposta({
 
           <div style={{ background: 'linear-gradient(135deg,var(--surface-1),var(--surface-1))', border: '1px solid var(--card2)', borderRadius: 14, padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--indigo-l)', fontWeight: 600 }}>Valore Totale Complessivo Proposta d'Ordine</div>
+              <div style={{ fontSize: 12, color: 'var(--indigo-l)', fontWeight: 600 }}>Totale della proposta</div>
               <div style={{ fontSize: 11, color: 'var(--indigo-l)', opacity: 0.8, marginTop: 2 }}>Nessun costo nascosto. Include assistenza fino al completamento.</div>
             </div>
             <div style={{ fontSize: 26, fontWeight: 800 }}>{fmtTotaleModuli(totaleProposta)}</div>
           </div>
 
+          {anagraficaStudio !== 'ok' ? <AvvisoAnagraficaStudio stato={anagraficaStudio} onRiprova={riprovaAnagraficaStudio} /> : (<>
           {/* 📜 VISUALIZZATORE DOCUMENTALE ENGAGEMENT LETTER A4 */}
           <div style={{ marginTop: 24, marginBottom: 24 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>📜 Testo Integrale del Mandato Professionale (Engagement Letter da Esaminare)</span>
+                  <span>📜 Testo completo della lettera d'incarico</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
                   Leggi attentamente le clausole, i moduli incorporati, i corrispettivi e le condizioni legali prima di apporre la firma.
@@ -483,7 +477,7 @@ export function TabProposta({
           </div>
 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Accettazione & Apposizione Firma Elettronica Semplice</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Firma della proposta</div>
             <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginBottom: 14 }}>
               Conferma la proposta contrattuale mediante <strong>Firma Elettronica Semplice (OTP verificata)</strong> ai sensi dell'art. 20 del CAD.
             </p>
@@ -567,7 +561,7 @@ export function TabProposta({
                             key={c.canale}
                             type="button"
                             disabled={!c.disponibile}
-                            title={c.disponibile ? undefined : c.motivo}
+                            title={c.disponibile ? undefined : motivoCanaleCliente(c.motivo)}
                             onClick={() => { setOtpCanale(c.canale); setOtpError(null); setUsaRecapitoDiverso(false); }}
                             style={{
                               background: scelto ? s.sfondo : 'var(--card)',
@@ -589,7 +583,7 @@ export function TabProposta({
                               </div>
                               {/* Il recapito è mascherato: serve a farti riconoscere il tuo, non a mostrarlo per intero. */}
                               <div style={{ fontSize: 10, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {c.disponibile ? c.recapitoMascherato : c.motivo}
+                                {c.disponibile ? c.recapitoMascherato : motivoCanaleCliente(c.motivo)}
                               </div>
                             </div>
                           </button>
@@ -769,6 +763,7 @@ export function TabProposta({
               </>
             )}
           </div>
+          </>)}
         </div>
       )}
     </div>

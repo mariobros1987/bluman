@@ -188,7 +188,7 @@ export function DettaglioModuloModal({
                             </div>
                             {doc.versioniPrecedenti && doc.versioniPrecedenti.length > 0 && (
                               <div style={{ fontSize: 9.5, color: 'var(--pill-blue-fg)', marginTop: 2 }}>
-                                🕘 v{doc.versione}: sostituisce {doc.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti & Contratti»
+                                🕘 v{doc.versione}: sostituisce {doc.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti»
                               </div>
                             )}
                           </div>
@@ -251,7 +251,7 @@ export function DettaglioModuloModal({
             {(selectedModule.deliverables ?? []).length === 0 && (
               <div style={{ background: 'var(--card2)', border: '1px dashed var(--border)', borderRadius: 10, padding: '12px 14px', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.6 }}>
                 Nessun documento è ancora stato pubblicato per questo modulo. I fascicoli
-                prodotti compaiono qui e nella scheda "Documenti & Contratti" non appena lo Studio
+                prodotti compaiono qui e nella scheda «Documenti» non appena lo Studio
                 li pubblica.
               </div>
             )}
@@ -287,7 +287,7 @@ export function DettaglioModuloModal({
                       </div>
                       {docReal?.versioniPrecedenti && docReal.versioniPrecedenti.length > 0 && (
                         <div style={{ fontSize: 9.5, color: 'var(--pill-blue-fg)', marginTop: 2 }}>
-                          🕘 v{docReal.versione}: sostituisce {docReal.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti & Contratti»
+                          🕘 v{docReal.versione}: sostituisce {docReal.versioniPrecedenti.map(v => `v${v.versione}${v.firmatoAt ? ' (firmata)' : ''}`).join(', ')} — cronologia completa nella scheda «Documenti»
                         </div>
                       )}
                     </div>

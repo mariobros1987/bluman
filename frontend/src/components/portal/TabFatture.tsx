@@ -21,7 +21,7 @@ export function TabFatture({
     <div style={docBoxStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💳 Fatture & Stato dei Pagamenti</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>💳 Le tue fatture</div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
             Le fatture emesse sui tuoi incarichi, con l'importo, lo stato di incasso e la prossima scadenza. Le bozze non ancora emesse restano allo studio.
           </div>
@@ -88,7 +88,9 @@ export function TabFatture({
                   {f.pagata
                     ? ' · ✓ Pagata'
                     : f.prossimaScadenza
-                      ? ` · Scadenza ${new Date(f.prossimaScadenza.dataScadenza).toLocaleDateString('it-IT')} (${fmt(f.prossimaScadenza.importoCentesimi / 100)})`
+                      ? <> · <span style={f.prossimaScadenza.scaduta ? { color: 'var(--pill-red-fg)', fontWeight: 700 } : undefined}>
+                          {f.prossimaScadenza.scaduta ? 'Scaduta il' : 'Scadenza'} {new Date(f.prossimaScadenza.dataScadenza).toLocaleDateString('it-IT')}
+                        </span> ({fmt(f.prossimaScadenza.importoCentesimi / 100)})</>
                       : ' · In attesa di pagamento'}
                 </div>
               </div>
@@ -96,15 +98,15 @@ export function TabFatture({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span
                 style={{
-                  background: f.pagata ? 'var(--green)' : 'var(--amber)',
-                  color: '#000',
+                  background: f.pagata ? 'var(--pill-green-bg)' : f.prossimaScadenza?.scaduta ? 'var(--pill-red-bg)' : 'var(--pill-amber-bg)',
+                  color: f.pagata ? 'var(--pill-green-fg)' : f.prossimaScadenza?.scaduta ? 'var(--pill-red-fg)' : 'var(--pill-amber-fg)',
                   fontSize: 10.5,
                   fontWeight: 800,
                   padding: '3px 9px',
                   borderRadius: 12,
                 }}
               >
-                {f.pagata ? '✓ INCASSATA' : '⏳ DA INCASSARE'}
+                {f.pagata ? '✓ PAGATA' : f.prossimaScadenza?.scaduta ? '⚠ SCADUTA' : '⏳ DA PAGARE'}
               </span>
               <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--indigo-l)' }}>{fmt(f.totaleCentesimi / 100)}</div>
             </div>

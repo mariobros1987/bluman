@@ -1,7 +1,7 @@
+import { letteraIncaricoHtml } from '../components/portal/letteraIncaricoHtml';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
-import { resolveDocumentTemplateHtml, PREBUILT_TEMPLATES } from '../utils/documentTemplates';
 import { getStudioInfoForTenant } from '../utils/tenant';
 import { useToast } from '../components/ui/ToastProvider';
 import {
@@ -15,7 +15,6 @@ import {
 import type { DocumentoPortale } from '../api/client';
 import type { ModuloProposta, PortalTab } from '../components/portal/types';
 import { mapProjectToPortalModules, totaleModuli } from '../components/portal/mapPortalModules';
-import { tabellaModuliLetteraHtml } from '../components/portal/tabellaModuliLettera';
 import { mascheraIban, mascheraUbo } from '../components/portal/format';
 import {
   portalWrapperStyle,
@@ -75,7 +74,7 @@ export function ClientPortal() {
     progettoId, setProgettoId, moduliProposti, setModuliProposti, messaggi, setMessaggi,
     moduleSignatures, signed, eidasSeal, caricaFirmeLettera, addendums, addendumErrore,
     pageLoading, portalDocs, portalDocsErrore, portalDocsCaricamento, formData, bozzaDati,
-    setBozzaDati, proposteDati, contattiStudio, fatturePortale, fattureCaricamento,
+    setBozzaDati, proposteDati, contattiStudio, anagraficaStudio, riprovaAnagraficaStudio, fatturePortale, fattureCaricamento,
     fattureErrore, isStudioPreview, elencoClienti, caricaDocumenti, caricaFirmeModuli,
     caricaAddendum, caricaProposteDati, caricaFatturePortale,
     ricaricaProgetti, loadPortalData,
@@ -362,32 +361,10 @@ export function ClientPortal() {
     }
   };
 
-  const getResolvedEngagementHtml = () => {
-    const tmpl = PREBUILT_TEMPLATES.find(t => t.id === 'tmpl-engagement');
-    const baseHtml = tmpl ? tmpl.contenutoHtml : '';
-
-    const modulesTableHtml = tabellaModuliLetteraHtml(moduliProposti, totaleProposta);
-
-    const studio = getStudioInfoForTenant();
-    return resolveDocumentTemplateHtml(baseHtml.replace('<!-- {{TABELLA_MODULI}} -->', modulesTableHtml), {
-      cliente: clientObj || {
-        nome: clientName,
-        referenteNome: clientName,
-        ragioneSociale: formData.ragioneSociale || clientName,
-        piva: formData.piva || '',
-        codiceFiscale: formData.codiceFiscale || '',
-      },
-      progetto: {
-        // Il nome dell'incarico a database. Era cablato «Progetto Consulenza & Structuring
-        // Patrimoniale»: compariva dentro il testo che il cliente sottoscrive, riferito a un
-        // incarico che non è il suo. Senza progetto resta la dizione generica.
-        titolo: progettoAttivo?.nome || 'Incarico professionale',
-        // Totale parziale (moduli senza prezzo) → segnaposto: non si fa firmare un importo incompleto.
-        totalePreventivo: totaleProposta.mancanti === 0 ? totaleProposta.totale : null,
-      },
-      studio,
-    });
-  };
+  // La lettera d'incarico composta nel browser (`letteraIncaricoHtml.ts`); lo studio è quello del
+  // database, copiato in locale da `useContattiStudioPortale` prima che la lettera si mostri.
+  const getResolvedEngagementHtml = () =>
+    letteraIncaricoHtml({ moduliProposti, totaleProposta, clientObj, clientName, formData, progettoAttivo });
 
   // Firma elettronica del portale (SES/FEA/FEQ): canali, OTP, firma con file, bersaglio,
   // estratti in `usePortalFirma`. La chiamata sta qui, e non accanto agli altri hook,
@@ -595,6 +572,7 @@ export function ClientPortal() {
             leggiFileFirmato={leggiFileFirmato}
             confermaFirmaConFile={confermaFirmaConFile}
             caricamentoFirmato={caricamentoFirmato}
+            anagraficaStudio={anagraficaStudio} riprovaAnagraficaStudio={riprovaAnagraficaStudio}
           />
         )}
 

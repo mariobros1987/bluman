@@ -30,7 +30,7 @@ test('magic link → firma SES della lettera d\'incarico con OTP email', async (
   // Il cliente apre il link: il token viene consumato e la sessione portale parte
   // sulla tab di default (la proposta).
   await page.goto(magicUrl);
-  await expect(page.getByRole('button', { name: "✍️ 1. Proposta d'Ordine & Firma" })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '✍️ Proposta e firma' })).toBeVisible();
 
   // Scelta della modalità di firma: online con codice OTP.
   await page.getByText('Firma online con codice OTP').first().click();
