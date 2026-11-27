@@ -19,6 +19,7 @@ import { TabSicurezza } from '../components/settings/TabSicurezza';
 import { TabCompliance } from '../components/settings/TabCompliance';
 import { TabServiziEsterni } from '../components/settings/TabServiziEsterni';
 import { fetchModuliTenant } from '../api/kyc';
+import { EVENTO_MODULI_CAMBIATI } from '../hooks/useModuloKycAttivo';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import { ArchiviaOperatoreModal } from '../components/settings/ArchiviaOperatoreModal';
@@ -52,6 +53,8 @@ export function SettingsPage() {
     { key: 'scadenzario', label: 'Scadenzario' }, { key: 'primanota', label: 'Prima Nota' },
     { key: 'banks', label: 'Banche' }, { key: 'retainers', label: 'Retainer' },
     { key: 'documents', label: 'Documenti' }, { key: 'reports', label: 'Report' },
+    // Non è solo una pagina del menu: è il pulsante 📝 presente in ogni pagina. In standby spariscono entrambi.
+    { key: 'notebeta', label: '📝 Note della beta (pulsante in ogni pagina)' },
   ];
   const [moduliStandby, setModuliStandby] = useState<string[]>([]);
   // null = stato dei moduli non ancora noto (o lettura fallita). In quel caso il modulo si considera
@@ -79,6 +82,7 @@ export function SettingsPage() {
       let info: any = {};
       try { info = JSON.parse(localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tid)) || '{}'); } catch { /* storage vuoto */ }
       saveTenantInfoToStorage(tid, { ...info, moduliDisattivati: moduliStandby });
+      window.dispatchEvent(new Event(EVENTO_MODULI_CAMBIATI));
       setModuliMsg('Salvato: i moduli in standby sono nascosti dalla navigazione per lo studio.');
     } catch (e: any) {
       setModuliMsg(e?.message || 'Errore nel salvataggio dei moduli');
@@ -890,6 +894,7 @@ export function SettingsPage() {
           setCopiedResetPass={setCopiedResetPass}
           onArchivia={(persona, verso) => setArchiviaModal({ persona, verso })}
           puoGestire={currentRuolo === 'super_admin' || currentRuolo === 'advisor'}
+          ruoloCorrente={currentRuolo}
         />
       )}
 

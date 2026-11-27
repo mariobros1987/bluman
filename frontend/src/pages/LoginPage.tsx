@@ -180,10 +180,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)', cursor: 'pointer' }}>
-                <input type="checkbox" defaultChecked /> Ricordami su questo dispositivo
-              </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', fontSize: 11 }}>
               <a href="#forgot" onClick={e => { e.preventDefault(); toast.info('Contatta il Super Admin per il reset password.'); }} style={{ color: 'var(--indigo-l)', textDecoration: 'none' }}>
                 Password dimenticata?
               </a>

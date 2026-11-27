@@ -1,0 +1,105 @@
+# Livelli di controllo delle PR (scripts/livello.sh). Una riga: livello e percorso;
+# * vale anche per le sottocartelle. Per ogni file vale l'ULTIMA riga che lo
+# descrive (come .gitignore: prima la regola larga, poi le eccezioni); un file che
+# nessuna riga descrive è «normale».
+#   leggero   → build e typecheck, niente prove, niente revisore
+#   normale   → in più le prove collegate ai file toccati e il revisore
+#   sensibile → in più la suite intera
+# Workflow, script, regole e file tolti sono almeno «normale», le dipendenze
+# «sensibile», qualunque cosa dica questo file (barriere fisse dello script).
+# Si legge dal ramo di produzione: una PR che lo cambia vale dalla PR dopo.
+# Le righe «sempre <file di test>» nominano prove che girano anche sul livello
+# normale: quelle che leggono i sorgenti dal disco invece di importarli (test di
+# superficie), che `vitest --changed` non sceglierebbe.
+# Le righe «sensibile» sono le «Aree a effort alto» di CLAUDE.md: soldi, dati, accessi.
+
+leggero   *.md
+leggero   docs/*
+# Istruzioni del Project: le legge Claude, sempre rivisto.
+normale   docs/project-instructions.md
+# Il manuale lo legge l'app a runtime (❓ Aiuto) e lo prova src/manuale.test.ts: rivisto.
+normale   docs/manuale/*
+leggero   dns/*
+leggero   frontend/public/*
+leggero   template/*
+leggero   e2e/*
+
+# Schema e isolamento fra studi (RLS): ogni migrazione va in produzione con la pubblicazione.
+sensibile prisma/*
+sensibile supabase/*
+sensibile src/util/prismaClient.ts
+# Accessi: autenticazione, permessi, token, password, webhook.
+sensibile src/util/authorization.ts
+sensibile src/util/rbacModuli.ts
+sensibile src/util/permessiModulo.ts
+sensibile src/util/guardiaModuli.ts
+sensibile src/util/jwt.ts
+sensibile src/util/password.ts
+sensibile src/util/totp.ts
+sensibile src/util/webhookSecurity.ts
+sensibile src/server.ts
+sensibile src/plugins/*
+sensibile src/routes/auth.ts
+sensibile src/routes/tenant.ts
+sensibile src/routes/portale.ts
+sensibile src/routes/webhooks.ts
+sensibile src/routes/serviziEsterni.ts
+sensibile api/*
+# Motore di stato, soldi (fatture, SdI, LIPE, prima nota, solleciti), firma, KYC/AML.
+sensibile src/domain/*
+sensibile src/services/calcoloService.ts
+sensibile src/services/fatturaEngine.ts
+sensibile src/services/sdiService.ts
+sensibile src/services/sdiXmlGenerator.ts
+sensibile src/services/mappaturaFatturaSdi.ts
+sensibile src/services/fatturaPassivaParser.ts
+sensibile src/services/lipeEngine.ts
+sensibile src/services/primaNotaMovimento.ts
+sensibile src/services/sollecitiEngine.ts
+sensibile src/services/livelloFirmaService.ts
+sensibile src/services/effettiFirma.ts
+sensibile src/services/copiaFirmata.ts
+sensibile src/services/verbaleFirma.ts
+sensibile src/services/marcaTemporaleService.ts
+sensibile src/services/otpService.ts
+sensibile src/services/kycCaseService.ts
+sensibile src/services/kycGate.ts
+sensibile src/services/complianceService.ts
+sensibile src/services/segnalazioneFiauService.ts
+sensibile src/services/verificaEsternaKyc.ts
+sensibile src/services/eliminazioneTenant.ts
+sensibile src/services/retentionService.ts
+sensibile src/routes/firma.ts
+sensibile src/routes/documentiFirmaStudio.ts
+sensibile src/routes/kyc.ts
+sensibile src/routes/compliance.ts
+sensibile src/routes/contabilita*
+sensibile src/routes/fascicoloFiscale.ts
+sensibile src/routes/liquidazioneIva.ts
+sensibile src/routes/fornitori.ts
+# Produzione del titolare (blusmart.eu, Railway, Vercel): immagine, compose, nginx.
+sensibile Dockerfile
+sensibile docker-compose.prod.yml
+sensibile nginx/*
+sensibile .railway/*
+sensibile vercel.json
+# Fondamenta delle prove: quando cambiano, la suite intera gira divisa in parti.
+sensibile vitest.config.ts
+sensibile vitest.setup.ts
+sensibile src/test-fixtures/*
+sensibile frontend/vite.config.ts
+sensibile frontend/src/test/*
+
+# Prove che leggono i sorgenti e i file del repo dal disco: girano anche sul normale.
+sempre src/credenziali.test.ts
+sempre src/ripieghiCredenziali.test.ts
+sempre src/infrastrutturaDeploy.test.ts
+sempre src/manuale.test.ts
+sempre src/cartellaTemplate.test.ts
+sempre src/collocazioneDocumento.test.ts
+sempre src/intestazionePiede.test.ts
+sempre src/firmaLetteraIncarico.test.ts
+sempre src/firmaLetteraStudio.test.ts
+sempre src/paginazioneA4.test.ts
+sempre src/postaDiagnosi.test.ts
+sempre src/postaRecordDns.test.ts

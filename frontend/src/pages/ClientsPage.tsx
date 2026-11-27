@@ -308,12 +308,12 @@ export function ClientsPage() {
         <div className={styles.kpiCard}>
           <div className={styles.kpiIcon} style={{ background: 'var(--pill-indigo-bg)' }}>🏢</div>
           <div className={styles.kpiValue}>{totalCompanies}</div>
-          <div className={styles.kpiLabel}>Società & Entities</div>
+          <div className={styles.kpiLabel}>Società ed enti</div>
         </div>
         <div className={styles.kpiCard}>
           <div className={styles.kpiIcon} style={{ background: 'var(--pill-green-bg)' }}>👤</div>
           <div className={styles.kpiValue}>{totalIndividuals}</div>
-          <div className={styles.kpiLabel}>Persone Fisiche / UBO</div>
+          <div className={styles.kpiLabel}>Persone fisiche</div>
         </div>
         {/* Cliccabile: è il modo più diretto per arrivare al filtro nuovo, e dice subito quanto
             lavoro resta sulle credenziali. È un <button> e non un <div> perché chi usa la

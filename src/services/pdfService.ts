@@ -1,5 +1,6 @@
 // Servizio Server-Side di Generazione PDF nativi conformi A4 per Fatture e Documenti
 import PDFDocument from 'pdfkit';
+import { rigaPagamento, rigaSdiSedeCliente } from './pdfFatturaTesti.js';
 
 export interface FatturaPdfRigaData {
   descrizione: string;
@@ -101,7 +102,8 @@ export async function generateInvoicePdfBuffer(data: FatturaPdfData): Promise<Bu
   doc.font(FONT).fontSize(8.5).fillColor('#334155');
   doc.text(`Numero: ${data.numero}`, col1X + 8, yBoxes + 24);
   doc.text(`Data: ${data.data}`, col1X + 8, yBoxes + 38);
-  doc.text(`Pagamento: ${data.condizionePagamento || 'Bonifico 30 gg'}`, col1X + 8, yBoxes + 52);
+  const testoPagamento = rigaPagamento(data.condizionePagamento);
+  if (testoPagamento) doc.text(testoPagamento, col1X + 8, yBoxes + 52);
 
   // Colonna Destra: Cessionario / Committente
   doc.rect(col2X, yBoxes, colWidth, 76).fillAndStroke('#f8fafc', '#e2e8f0');
@@ -113,7 +115,8 @@ export async function generateInvoicePdfBuffer(data: FatturaPdfData): Promise<Bu
     data.clienteCodiceFiscale ? `C.F.: ${data.clienteCodiceFiscale}` : null,
   ].filter(Boolean).join(' | ');
   doc.text(codiciCliente || 'Codice Fiscale / P.IVA non specificati', col2X + 8, yBoxes + 38, { width: colWidth - 16, ellipsis: true });
-  doc.text(`SDI: ${data.clienteSdiCode || '0000000'} | Sede: ${data.clienteSede || 'Italia'}`, col2X + 8, yBoxes + 52, { width: colWidth - 16, ellipsis: true });
+  const testoSdiSede = rigaSdiSedeCliente(data);
+  if (testoSdiSede) doc.text(testoSdiSede, col2X + 8, yBoxes + 52, { width: colWidth - 16, ellipsis: true });
 
   let curY = yBoxes + 90;
 

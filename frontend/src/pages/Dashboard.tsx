@@ -9,11 +9,16 @@ import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti, isRispostaPaginata } from '../api/client';
 import { usePeriodo } from '../context/PeriodoContext';
 import { getCurrentTenantId } from '../utils/tenant';
+import { DaFareOggi } from '../components/dashboard/DaFareOggi';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  // L'utente della sessione, per sapere quali elenchi può vedere il riquadro «Da fare oggi».
+  const utenteCorrente = (() => {
+    try { return JSON.parse(localStorage.getItem('bluman_user') || 'null'); } catch { return null; }
+  })();
   // La Dashboard rispetta lo stesso «Periodo» globale della pagina Progetti, altrimenti i due
   // conteggi divergono (Dashboard mostrava tutti i progetti, Progetti solo quelli del periodo).
   const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
@@ -23,6 +28,10 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'attivi' | 'archiviati'>('attivi');
   const [searchTerm, setSearchTerm] = useState('');
+  // Quanti progetti ha il periodo sul server: se sono più di quelli letti, i contatori sono parziali.
+  const [totaleServer, setTotaleServer] = useState(0);
+  /** L'istante dell'ultima lettura riuscita: è ciò che la riga in alto dichiara. */
+  const [lettoAlle, setLettoAlle] = useState<Date | null>(null);
 
   // F5 — se l'API non risponde la Dashboard lo dice («Riprova») e resta vuota: niente copie
   // locali né progetti di seed mostrati come se venissero dal database.
@@ -61,7 +70,7 @@ export function Dashboard() {
             start: rp.dataInizio
               ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
               : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
-            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
+            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : '',
             // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
             // non contribuisce al portafoglio — mai inventare una cifra verosimile.
             val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
@@ -113,6 +122,8 @@ export function Dashboard() {
       // altrimenti un progetto rimasto solo in localStorage comparirebbe qui e non in
       // Progetti. Stessa regola della pagina Progetti.
       combined = dbProjs;
+      setTotaleServer(remote.meta.totale);
+      setLettoAlle(new Date());
     } catch (err) {
       console.warn('Dashboard: lettura progetti non riuscita', err);
       combined = [];
@@ -131,10 +142,13 @@ export function Dashboard() {
   const currentUser = currentUserStr ? JSON.parse(currentUserStr) : { ruolo: 'advisor' };
   const isSuperAdminOrAdvisor = ['super_admin', 'advisor'].includes(currentUser.ruolo);
 
-  const active   = projectList.filter(p => p.st === 'in_progress').length;
-  const alerts   = projectList.filter(p => p.delay).length;
-  const totalVal = projectList.reduce((a, p) => a + p.val, 0);
-  const avgPct   = Math.round(projectList.reduce((a, p) => a + p.pct, 0) / (projectList.length || 1));
+  // I contatori riguardano i progetti NON archiviati, come la scheda «Progetti in Corso» qui sotto:
+  // prima «Progetti attivi» contava anche l'archivio.
+  const nonArchiviati = projectList.filter(p => p.st !== 'archived');
+  const active   = nonArchiviati.filter(p => p.st === 'in_progress').length;
+  const alerts   = nonArchiviati.filter(p => p.delay).length;
+  const totalVal = nonArchiviati.reduce((a, p) => a + p.val, 0);
+  const avgPct   = Math.round(nonArchiviati.reduce((a, p) => a + p.pct, 0) / (nonArchiviati.length || 1));
 
   const delayedProjects = projectList.filter(p => {
     const hasDelay = p.delay || p.mods?.some(m => m.st === 'blocked' || m.st === 'delayed' || m.rischio);
@@ -226,12 +240,6 @@ export function Dashboard() {
             >
               🔄 Riprova
             </button>
-            <button
-              onClick={() => window.open('mailto:admin@bluecode.advisory?subject=Errore%20Database%20BluMan', '_blank')}
-              className="btn btn-secondary"
-            >
-              📧 Contatta Amministratore
-            </button>
           </div>
         </div>
       </div>
@@ -240,21 +248,37 @@ export function Dashboard() {
 
   return (
     <>
-      {/* DB Connection Indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 11, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
-          🟢 Enterprise Cloud Database Collegato
-        </div>
+      {/* Quando sono stati letti i dati a schermo, con il modo di rileggerli. Prima qui c'era una
+          scritta fissa («Enterprise Cloud Database Collegato») che non dipendeva da niente. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 11, color: 'var(--muted)' }}>
+        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
+        <span>
+          {/* Senza un'ora di lettura non si scrive niente: «letti dal server» sarebbe un'affermazione
+              su una lettura che non si sa se è riuscita (nota del revisore sulla #7). */}
+          {lettoAlle ? `Dati aggiornati alle ${lettoAlle.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}
+        </span>
+        <button type="button" className="btn btn-sm btn-secondary" onClick={loadProjects} disabled={loading}>
+          ↻ Aggiorna
+        </button>
       </div>
+
+      {/* Che cosa aspetta l'operatore oggi, prima dei numeri (proposta M1 dell'analisi del 26/11). */}
+      <DaFareOggi user={utenteCorrente} moduliInRitardo={alertRows.length} />
 
       {/* KPI */}
       <div className={styles.kpiGrid}>
-        <KpiCard icon="📁" iconBg="var(--pill-indigo-bg)" value={projectList.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
+        <KpiCard icon="📁" iconBg="var(--pill-indigo-bg)" value={nonArchiviati.length} label="Progetti attivi" sub={`${active} in lavorazione`} />
         <KpiCard icon="⚠️" iconBg="var(--pill-amber-bg)" value={alerts} label="Ritardi attivi" sub="Richiedono attenzione" valueColor={alerts > 0 ? 'var(--amber)' : undefined} />
         <KpiCard icon="💶" iconBg="var(--pill-green-bg)" value={fmt(totalVal)} label="Valore portafoglio" sub="Progetti in corso" />
         <KpiCard icon="📈" iconBg="var(--pill-indigo-bg)" value={`${avgPct}%`} label="Avanzamento medio" sub="Tutti i progetti" />
       </div>
+
+      {totaleServer > projectList.length && (
+        <div role="status" style={{ background: 'var(--pill-amber-bg)', border: '1px solid var(--pill-amber-bd)', color: 'var(--pill-amber-fg)', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, marginBottom: 14 }}>
+          I contatori qui sopra riguardano i {projectList.length} progetti più recenti su {totaleServer} del periodo.
+          Per il quadro completo apri la pagina Progetti o restringi il Periodo.
+        </div>
+      )}
 
       {/* Alert banner */}
       {alertRows.length > 0 && (
@@ -336,7 +360,7 @@ export function Dashboard() {
                       >
                         {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
                       </span>
-                      <span>📅 {p.start} → {p.due}</span>
+                      <span title={p.due ? 'Data di avvio → scadenza' : 'Data di avvio (nessuna scadenza indicata)'}>📅 {p.start}{p.due ? ` → ${p.due}` : ''}</span>
                       {/* Regola 7: il valore si mostra solo se il progetto lo porta davvero;
                           mai esporre una cifra per un progetto senza valore registrato. */}
                       {p.val > 0 && <span>💶 {fmt(p.val)}</span>}

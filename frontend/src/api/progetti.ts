@@ -272,6 +272,21 @@ export interface MessaggioDiMicrovoce {
   errore: string | null;
 }
 
+/**
+ * Toglie un passaggio dalla checklist di un'attività. Il salvataggio dell'elenco aggiorna e crea,
+ * non toglie: senza questa chiamata il passaggio eliminato tornava alla riapertura.
+ * `eliminato: false` vuol dire che a database non c'era ancora (mai salvato): non è un errore.
+ */
+export async function eliminaPassaggioMicrovoceApi(microvoceId: string, passaggioId: string): Promise<{ eliminato: boolean }> {
+  const res = await apiFetch(
+    `${API_BASE}/microvoci/${encodeURIComponent(microvoceId)}/passaggi/${encodeURIComponent(passaggioId)}`,
+    { method: 'DELETE', headers: getAuthHeaders() },
+  );
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Il passaggio non è stato eliminato'));
+  const dati = await res.json();
+  return { eliminato: Boolean(dati?.eliminato) };
+}
+
 /** I messaggi abbinati a una micro-voce, dal più vecchio al più nuovo. */
 export async function fetchComunicazioniMicrovoceApi(
   microvoceId: string,

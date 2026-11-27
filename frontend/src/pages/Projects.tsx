@@ -289,7 +289,7 @@ export function Projects() {
           </div>
 
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>⏱ Consuntivo Ore (pagina corrente)</div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>⏱ Ore lavorate (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--indigo-l)', marginTop: 4 }}>
               {totalOreConsuntivate.toFixed(1)}h <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalOrePreventivate}h stimate</span>
             </div>
@@ -298,7 +298,7 @@ export function Projects() {
           <div style={{ background: 'var(--card2)', padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)' }}>
             <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>📋 Checklist Microvoci (pagina corrente)</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)', marginTop: 4 }}>
-              {totalMicrovociDone} <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalMicrovociCount} step eseguiti</span>
+              {totalMicrovociDone} <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>/ {totalMicrovociCount} attività completate</span>
             </div>
           </div>
 
@@ -574,7 +574,7 @@ export function Projects() {
                 {/* Avanzamento % e Checklist Moduli */}
                 <div style={{ background: 'var(--card2)', padding: 12, borderRadius: 10, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11.5 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Avanzamento Fascicolo</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text)' }}>Avanzamento</span>
                     <span style={{ fontWeight: 800, color: progressColor(p) }}>{p.pct}%</span>
                   </div>
                   <ProgressBar value={p.pct} color={progressColor(p)} />
@@ -608,7 +608,7 @@ export function Projects() {
                 {/* Dati Operativi: Ore, Microvoci, Economico & Scadenza */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 11.5 }}>
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>⏱ Consuntivo Ore</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>⏱ Ore lavorate</div>
                     <div style={{ fontWeight: 700, marginTop: 2, color: orePct > 90 ? 'var(--red)' : 'var(--text)' }}>
                       {oreCons.toFixed(1)}h <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 500 }}>/ {orePrev}h ({orePct}%)</span>
                     </div>
@@ -617,7 +617,7 @@ export function Projects() {
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 10, color: 'var(--muted)' }}>📋 Microvoci</div>
                     <div style={{ fontWeight: 700, marginTop: 2, color: 'var(--green)' }}>
-                      {microDone} / {microTotal} step
+                      {microDone} / {microTotal} attività
                     </div>
                   </div>
 
@@ -634,7 +634,7 @@ export function Projects() {
                   </div>
 
                   <div style={{ background: 'var(--card2)', padding: 8, borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>📅 Target Scadenza</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>📅 Scadenza</div>
                     <div style={{ fontWeight: 700, marginTop: 2, color: daysRemaining !== null && daysRemaining < 7 ? 'var(--red)' : 'var(--text)' }}>
                       {p.due || 'In corso'}
                       {daysRemaining !== null && (
@@ -652,7 +652,7 @@ export function Projects() {
                     {/* Regola 7: nessun volto inventato — se il progetto non ha un team
                         assegnato il gruppo avatar resta vuoto. */}
                     <AvatarGroup ids={p.mods?.[0]?.team || []} />
-                    <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Team Lead</span>
+                    <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>Team</span>
                   </div>
 
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -669,7 +669,7 @@ export function Projects() {
                       onClick={() => navigate(`/projects/${p.id}`)}
                       className="btn btn-primary btn-sm"
                     >
-                      Apri Fascicolo ➔
+                      Apri il progetto ➔
                     </button>
                   </div>
                 </div>

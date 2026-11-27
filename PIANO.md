@@ -5,6 +5,12 @@ sicurezza), poi mettere ordine in documentazione e codice.
 Fuori scope: nuove funzioni del backlog del titolare (LAVORO_RIMANENTE.md: fornitore KYC, goAML…).
 Riferimento: diagnosi del 02/11/2026 (codici A, F, D, M, N).
 
+## Standard — adozione (17/11/2026)
+- [~] S.1 Adozione sul fork: regole, workflow, script comuni, documenti, bot e secret (PR di adozione)
+- [ ] S.2 Primo giro sul pilota: una PR normale passa CI sul runner «ci», revisore e merge da soli; schedule di sentinella e riepilogo abilitati sul fork
+- [ ] S.3 Prima pubblicazione con `scripts/pubblica.sh`: PR verso upstream, misurare che Railway e Vercel pubblichino (il manuale dice che il deploy Vercel da webhook resta BLOCKED)
+- [ ] S.4 Chiusura adozione: «da verificare» di docs/adozione-standard.md chiusi; documenti del titolare in radice → docs/storico (con lui: rimandi di README, manuale e credenziali.test.ts; sostituisce 5.1 e 5.2)
+
 ## Fase 0 — Preparazione
 - [x] 0.1 CI verificata: verde; la X rossa su GitHub è il deploy Vercel da push (bloccato per scelta)
 - [x] 0.2 Copia locale C:\Progetti\bluman allineata, typecheck/test/build verdi (02/11)

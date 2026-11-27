@@ -121,7 +121,7 @@ describe('F2 — niente righe o conferme fabbricate', () => {
 
 describe('2.7 — l’importo ricavato dal modulo si dichiara', () => {
   const conValore = () => progetto({
-    mods: [{ id: 1, n: 'Modulo A', st: 'in_progress', val: 1000, v: [
+    mods: [{ id: 1, n: 'Modulo A', st: 'in_progress', p: 1000, v: [
       { id: 11, n: 'Parere', s: 'done', hA: 5 },
       { id: 12, n: 'Memoria', s: 'done', hA: 2 },
     ] }],

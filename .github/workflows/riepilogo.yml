@@ -1,0 +1,68 @@
+# Messaggio serale su Telegram: cosa è successo oggi su bluman e se
+# qualcosa aspetta Fabio. Così il silenzio non va interpretato: ogni sera arriva
+# una riga, e «tutto ok» vuol dire che è stato guardato (Fabio, 04/11, sul pilota).
+# Sul runner del server, sempre acceso: arriva anche col PC spento.
+# schedule: gira con il file del ramo predefinito.
+# BluMan: gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository in ogni
+# job): con la pubblicazione questo file arriva anche nel repo del titolare, dove non
+# ci sono runner né secret nostri (docs/adozione-standard.md).
+name: riepilogo
+
+on:
+  schedule:
+    - cron: "41 20 * * *"   # 21:41 d'inverno, 22:41 d'estate (ora di Roma)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  riepilogo:
+    if: github.repository == 'wolftradesystem-tech/bluman'
+    runs-on: [self-hosted, "ci"]
+    timeout-minutes: 6
+    steps:
+      # Sul runner «ci» del PC (utente senza sudo): gh e jq li installa
+      # server/prepara-ci-wsl.sh dello Standard; qui si controlla soltanto.
+      - name: gh e jq
+        run: |
+          command -v gh >/dev/null && command -v jq >/dev/null || { echo "gh o jq mancano sul runner ci (li installa server/prepara-ci-wsl.sh dello Standard)"; exit 1; }
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+        run: |
+          set -euo pipefail
+          da="$(TZ=Europe/Rome date -d 'today 00:00' +%s)"
+          giorno="$(TZ=Europe/Rome date +%d/%m)"
+          oggi() { jq --argjson da "$da" "$1"; }
+          pr="$(gh api "repos/$GH_REPO/pulls?state=closed&base=main&sort=updated&direction=desc&per_page=100")"
+          mergiate="$(oggi '[.[] | select(.merged_at != null and (.merged_at | fromdateiso8601) >= $da)]' <<<"$pr")"
+          n_pr="$(jq length <<<"$mergiate")"
+          # Tutte le pagine: i run escono dal più nuovo, e senza paginazione oltre i 100
+          # si perdevano i più vecchi (il backup della notte, i deploy del mattino).
+          runs="$(gh api --paginate "repos/$GH_REPO/actions/runs?per_page=100&created=>=$(date -u -d "@$da" +%Y-%m-%dT%H:%M:%SZ)" --jq '.workflow_runs[]' | jq -s '{workflow_runs: .}')"
+          dep="$(oggi '[.workflow_runs[] | select(.name == "deploy" and (.created_at | fromdateiso8601) >= $da and .status == "completed")]' <<<"$runs")"
+          dep_ok="$(jq '[.[] | select(.conclusion == "success")] | length' <<<"$dep")"
+          dep_ko="$(jq '[.[] | select(.conclusion == "failure")] | length' <<<"$dep")"
+          # Rossi di oggi, esclusi i run annullati (un commit nuovo annulla il precedente).
+          rossi="$(jq -r --argjson da "$da" '[.workflow_runs[] | select((.created_at | fromdateiso8601) >= $da and .conclusion == "failure")] | group_by(.name) | map("\(.[0].name) ×\(length)") | join(", ")' <<<"$runs")"
+          aperte="$(gh api "repos/$GH_REPO/pulls?state=open&base=main&per_page=100")"
+          aspetta="$(jq -r '[.[] | select(([.labels[].name] | index("serve-fabio")) and ([.labels[].name] | index("ok-fabio") | not)) | "#\(.number)"] | join(" ")' <<<"$aperte")"
+          n_aperte="$(jq length <<<"$aperte")"
+
+          msg="🌙 bluman, $giorno: $n_pr PR mergiate, deploy $dep_ok ok"
+          (( dep_ko > 0 )) && msg="$msg, falliti $dep_ko"
+          msg="$msg, $n_aperte PR aperte."
+          a=$'\n'
+          [[ -n "$rossi" ]] && msg="$msg${a}🔴 rossi di oggi: $rossi"
+          [[ -n "$aspetta" ]] && msg="$msg${a}🟠 aspettano te: $aspetta"
+          if [[ -z "$rossi" && -z "$aspetta" ]]; then msg="$msg${a}Tutto ok."; fi
+          (( n_pr > 0 )) && msg="$msg${a}$(jq -r '.[] | "· #\(.number) \(.title | .[0:70])"' <<<"$mergiate")"
+          echo "$msg"
+          [[ -n "${CI_TELEGRAM_TOKEN:-}" && -n "${CI_TELEGRAM_CHAT:-}" ]] || { echo "secret Telegram assenti"; exit 0; }
+          curl -fsS --max-time 10 "https://api.telegram.org/bot$CI_TELEGRAM_TOKEN/sendMessage" \
+            -d chat_id="$CI_TELEGRAM_CHAT" -d disable_web_page_preview=true --data-urlencode text="$msg" >/dev/null

@@ -39,7 +39,7 @@ import { sanitizzaHtmlDocumento } from '../util/htmlSanitizer.js';
  * `src/manuale.test.ts` verifica che ogni slug elencato **esista**: così un file rinominato fa
  * fallire il test invece di esporre in silenzio quello che doveva restare riservato.
  */
-export const SCHEDE_RISERVATE: readonly string[] = ['19-infra-deploy'];
+export const SCHEDE_RISERVATE: readonly string[] = ['19-infra-deploy', '31-multi-tenant-admin'];
 
 /**
  * Lo slug di una scheda: due cifre, un trattino, e il nome. Il controllo sta **prima** di toccare il

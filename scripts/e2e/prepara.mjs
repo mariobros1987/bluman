@@ -12,7 +12,11 @@
 // localhost e seedE2E.ts si rifiuta di girare su qualcos'altro.
 import { spawnSync } from 'node:child_process';
 
-const URL_DB_E2E = 'postgresql://bluman:bluman_dev_password@localhost:5433/bluman_e2e?schema=public';
+// La porta è 5433, salvo E2E_DB_PORT: sul PC possono girare i database di altri progetti (il
+// 18/11 la 5433 era del container di un altro gestionale), e fermarli per provare BluMan non
+// è una soluzione. L'host resta cablato su localhost: la variabile sposta solo la porta.
+const PORTA_DB_E2E = /^\d{2,5}$/.test(process.env.E2E_DB_PORT || '') ? process.env.E2E_DB_PORT : '5433';
+const URL_DB_E2E = `postgresql://bluman:bluman_dev_password@localhost:${PORTA_DB_E2E}/bluman_e2e?schema=public`;
 const PASSWORD_E2E = process.env.E2E_PASSWORD || 'E2e-BluMan-2026';
 
 const AMBIENTE_DB = {
@@ -101,7 +105,7 @@ async function main() {
     '-e', 'POSTGRES_USER=bluman',
     '-e', 'POSTGRES_PASSWORD=bluman_dev_password',
     '-e', 'POSTGRES_DB=bluman_e2e',
-    '-p', '5433:5432',
+    '-p', `${PORTA_DB_E2E}:5432`,
     'postgres:16-alpine',
   ]);
   assicuraContainer('bluman-e2e-mailpit', ['-p', '1025:1025', '-p', '8025:8025', 'axllent/mailpit']);

@@ -4,6 +4,7 @@ import { calcolaLiquidazioneIvaPeriodo, getCodiceTributoIva } from './lipeEngine
 import { generaFatturaElettronicaXml } from './sdiXmlGenerator.js';
 import { costruisciDatiFatturaSdi } from './mappaturaFatturaSdi.js';
 import { campiAnagraficaMancanti } from '../domain/anagraficaStudio.js';
+import { nomeContoMovimento, riferimentoDocumentoMovimento } from './fascicoloPrimaNota.js';
 
 /**
  * Escape per i campi CSV.
@@ -415,12 +416,12 @@ export async function generaFascicoloFiscaleZip(
 
   for (const m of movimenti) {
     const dataStr = m.data ? m.data.toISOString().split('T')[0] : '';
-    const conto = m.contoBancario?.nomeConto || 'Cassa Studio';
+    const conto = nomeContoMovimento(m);
     const entrata = m.tipo === 'entrata' ? ((m.importoCentesimi || 0) / 100).toFixed(2) : '0.00';
     const uscita = m.tipo === 'uscita' ? ((m.importoCentesimi || 0) / 100).toFixed(2) : '0.00';
     if (m.tipo === 'entrata') totaleEntrateCent += m.importoCentesimi || 0;
     if (m.tipo === 'uscita') totaleUsciteCent += m.importoCentesimi || 0;
-    const rif = m.fattura ? `FT ${m.fattura.serie}/${m.fattura.numeroProgressivoSerie}` : m.fatturaRicevuta ? `Fatt. Acquisto ${m.fatturaRicevuta.numero}` : '';
+    const rif = riferimentoDocumentoMovimento(m);
     csvPrimaNota.push([
       dataStr,
       m.tipo,

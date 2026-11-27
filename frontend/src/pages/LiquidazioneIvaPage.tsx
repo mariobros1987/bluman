@@ -9,6 +9,7 @@ import {
   salvaLipeApi,
   marcaVersataLipeApi,
 } from '../api/liquidazioneIva';
+import { fetchContiBancariApi } from '../api/client';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
 
 export const LiquidazioneIvaPage: React.FC = () => {
@@ -28,21 +29,39 @@ export const LiquidazioneIvaPage: React.FC = () => {
   const [errore, setErrore] = useState<string | null>(null);
   const [messaggioSuccesso, setMessaggioSuccesso] = useState<string | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
+  // Storico non letto ≠ nessuna liquidazione salvata.
+  const [erroreStorico, setErroreStorico] = useState<string | null>(null);
 
   // Modal versamento
   const [isModalVersamentoOpen, setIsModalVersamentoOpen] = useState(false);
   const [dataVersamento, setDataVersamento] = useState(new Date().toISOString().split('T')[0]);
   const [riferimentoF24, setRiferimentoF24] = useState('');
+  // Il conto da cui esce il denaro dell'F24: senza, l'uscita non scende da nessun saldo.
+  const [conti, setConti] = useState<any[]>([]);
+  const [erroreConti, setErroreConti] = useState<string | null>(null);
+  const [contoVersamentoId, setContoVersamentoId] = useState('');
+  useEffect(() => {
+    fetchContiBancariApi({ rigettaSuErrore: true })
+      .then((elenco) => {
+        const lista = Array.isArray(elenco) ? elenco : [];
+        setConti(lista);
+        setErroreConti(null);
+        setContoVersamentoId((prima) => prima || lista.find((c: any) => c.isDefault)?.id || '');
+      })
+      .catch((err) => { setConti([]); setErroreConti(err instanceof Error ? err.message : 'Errore di rete'); });
+  }, []);
 
   const periodoCodice =
     tipoPeriodo === 'trimestrale' ? `${anno}-Q${trimestre}` : `${anno}-${String(mese).padStart(2, '0')}`;
 
   const caricaStorico = async () => {
+    setErroreStorico(null);
     try {
       const res = await fetchLiquidazioniIvaApi();
       setStorico(res);
     } catch (err) {
       console.error('Errore recupero storico LIPE:', err);
+      setErroreStorico(err instanceof Error ? err.message : 'Errore di rete');
     }
   };
 
@@ -92,10 +111,17 @@ export const LiquidazioneIvaPage: React.FC = () => {
     setLoadingAzione(true);
     setErrore(null);
     try {
+      // Un gesto solo: prima si salva la liquidazione che l'operatore sta guardando, poi la si
+      // segna versata. Prima servivano due pulsanti in fila, e saltando «Salva LIPE» il server
+      // rispondeva «non trovata»; oppure si versava l'importo salvato giorni prima, diverso da
+      // quello a schermo. Se il secondo passo fallisce, il primo resta ed è innocuo.
+      const creditoCent = Math.round((parseFloat(creditoPrecedenteEur || '0') || 0) * 100);
+      await salvaLipeApi(periodoCodice, creditoCent);
       await marcaVersataLipeApi(periodoCodice, {
         dataVersamento,
+        contoBancarioId: contoVersamentoId || null,
         registraPrimaNota: true,
-        riferimentoTransazione: riferimentoF24.trim() || `F24-${periodoCodice}`,
+        riferimentoTransazione: riferimentoF24.trim() || null,
       });
       setIsModalVersamentoOpen(false);
       setMessaggioSuccesso(`Versamento F24 registrato con successo in Prima Nota per il periodo ${periodoCodice}.`);
@@ -493,7 +519,13 @@ export const LiquidazioneIvaPage: React.FC = () => {
           <span>📚</span> Storico Liquidazioni IVA Salvate
         </h3>
 
-        {storico.length === 0 ? (
+        {erroreStorico ? (
+          <div role="alert" style={{ textAlign: 'center', padding: '20px', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile leggere lo storico delle liquidazioni.</div>
+            <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreStorico}</div>
+            <button type="button" className="btn" onClick={() => void caricaStorico()}>Riprova</button>
+          </div>
+        ) : storico.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
             Nessuna liquidazione IVA ancora consolidata per questo tenant. Seleziona un periodo sopra e premi "Salva LIPE".
           </div>
@@ -592,6 +624,34 @@ export const LiquidazioneIvaPage: React.FC = () => {
                 </div>
 
                 <div>
+                  <label htmlFor="f24-conto" style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
+                    Conto da cui esce il versamento
+                  </label>
+                  <select
+                    id="f24-conto"
+                    className="input-field"
+                    value={contoVersamentoId}
+                    onChange={(e) => setContoVersamentoId(e.target.value)}
+                    disabled={conti.length === 0}
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">{conti.length === 0 ? 'Nessun conto disponibile' : 'Nessun conto (non scende da nessun saldo)'}</option>
+                    {conti.map((c: any) => (
+                      <option key={c.id} value={c.id}>{c.nomeConto}{c.banca ? ` — ${c.banca}` : ''}{c.isDefault ? ' (predefinito)' : ''}</option>
+                    ))}
+                  </select>
+                  {erroreConti ? (
+                    <div role="alert" style={{ fontSize: '0.78rem', color: 'var(--pill-red-fg)', marginTop: 4 }}>
+                      Elenco dei conti non letto ({erroreConti}): il versamento si può registrare, ma senza scegliere il conto.
+                    </div>
+                  ) : conti.length === 0 ? (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--pill-amber-fg)', marginTop: 4 }}>
+                      Lo studio non ha conti in Banche &amp; Conti: l'uscita viene scritta in Prima Nota ma non scende da nessun saldo.
+                    </div>
+                  ) : null}
+                </div>
+
+                <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>
                     Riferimento Transazione Bancaria / Quietanza F24
                   </label>
@@ -605,6 +665,13 @@ export const LiquidazioneIvaPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {/* L'errore si legge dentro il modale: sulla pagina resterebbe coperto. */}
+              {errore && (
+                <div role="alert" style={{ marginTop: 14, padding: '10px 12px', borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', fontSize: '0.85rem' }}>
+                  {errore}
+                </div>
+              )}
 
               <div
                 style={{

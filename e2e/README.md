@@ -1,15 +1,18 @@
-# E2E Playwright — i quattro flussi critici
+# E2E Playwright — i cinque flussi critici
 
 Suite end-to-end dei flussi che, se si rompono, fermano lo studio e i clienti:
 login con cambio password obbligatorio, firma SES della lettera d'incarico dal
 portale cliente, emissione fattura dal compositore di microvoci, abbinamento di
-un messaggio del cliente alla micro-voce di cui parla.
+un messaggio del cliente alla micro-voce di cui parla, e il percorso dei soldi
+dall'inizio alla fine (progetto → fattura → incasso → Prima Nota → saldo del conto).
 
 ## Architettura: database usa-e-getta, mai produzione
 
 L'unico database che esiste fuori da questi test è quello **reale** su Supabase.
 Gli E2E non lo toccano mai: girano su un container Postgres 16 usa-e-getta
 (`bluman-e2e-pg`, porta **5433**), creato e popolato da `scripts/e2e/prepara.mjs`.
+Se la 5433 è occupata da un altro progetto, la porta si sposta con `E2E_DB_PORT` (stesso valore
+per `prepara.mjs` e `avvia-backend.mjs`): in PowerShell `$env:E2E_DB_PORT="5434"`.
 Il database va svuotato con `docker rm -f bluman-e2e-pg` quando non serve più.
 
 Le protezioni, in ordine:
@@ -54,7 +57,13 @@ dell'HTML: l'invio è solo HTML (il campo Text di Mailpit è vuoto) e la riga
 ```bash
 npm run test:e2e     # prepara l'ambiente (container, migrazioni, seed) e lancia i test
 npm run e2e:prepara  # solo la preparazione, senza eseguire i test
+npm run e2e:reset    # riparte da zero: cancella il database di prova e lo ricrea
 ```
+
+`e2e:reset` serve a chi prova l'app a mano: dopo un po' i dati di prova si riempiono di
+progetti, fatture e incassi, e con questo comando si torna al punto di partenza. Chiede
+conferma (si salta con `-- --si`) e tocca **un solo container, per nome esatto**:
+`bluman-e2e-pg`.
 
 Prerequisiti: Docker Desktop in esecuzione e i browser Playwright
 (`npx playwright install chromium`, una volta sola per macchina).
@@ -82,8 +91,14 @@ magic link e OTP soggetti a anti-abuso.
 | Advisor attivo (flussi fattura e abbinamento) | `lorenzo.marino@bluecode.advisory` |
 | Cliente portale | `cli-03` — Belfort Industries S.A. |
 | Progetto di test | «Incarico E2E — Belfort Industries» (mod-m01 + mod-m02) |
+| Conto bancario | «Conto operativo (dati di prova)», predefinito se lo studio non ne ha un altro |
+| Anagrafica dello studio | completa (regime fiscale di prova `RF01` se mancava): la guida «Dati obbligatori dello studio» non si apre |
+| Anagrafica di Belfort | giurisdizione e sede legale presenti |
 
-I quattro flussi:
+Conto, regime e anagrafica sono **dati di prova**, scritti solo se mancano: l'overlay non
+sovrascrive ciò che una corsa precedente, o chi sta provando l'app, ha cambiato.
+
+I cinque flussi:
 
 - `flusso-login.spec.ts` — login dell'invitato, modale «Primo Accesso», cambio
   password, riaccesso con la nuova credenziale.
@@ -103,6 +118,14 @@ I quattro flussi:
   lo crea l'API e non il compositore, perché la cosa da provare è il **legame**,
   e il canale è il portale perché non ha un passo di consegna dopo la scrittura —
   nessuna riga di questo test contatta Meta o un SMTP.
+- `flusso-percorso-completo.spec.ts` — il percorso dei soldi in fila: un progetto nuovo
+  avviato come fa il wizard (il **valore** è la somma dei moduli, a database), il
+  compositore della fattura con gli **importi già proposti**, la rata nello Scadenzario,
+  l'**incasso con data e conto**, la Prima Nota con quel conto e il **lucchetto** (e il 409
+  del server a chi prova a eliminarlo), il **saldo del conto** salito esattamente
+  dell'importo incassato. Ogni corsa crea un progetto suo, quindi si rilancia senza reset.
+  È il test dei passaggi fra una pagina e l'altra: i difetti dell'analisi del 26/11
+  stavano tutti lì.
 
 ## Pulizia
 

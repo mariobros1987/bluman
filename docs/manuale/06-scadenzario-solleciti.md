@@ -1,7 +1,7 @@
 # 06 · Scadenzario incassi & Solleciti
 
 ## 👤 Cosa fa e come si usa
-Lo **Scadenzario** (`/invoices/scadenzario`) tiene le **rate di incasso** generate dalle fatture:
+Lo **Scadenzario** (`/scadenzario`) tiene le **rate di incasso** generate dalle fatture:
 scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
 - **Registrare un incasso**: da una rata → importo, metodo, conto → registra il pagamento (e crea in
   automatico il movimento di Prima Nota, §07). Il conto scelto è quello che riceve il denaro: se non
@@ -13,6 +13,7 @@ scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
 - **Filtri**: stato, cliente, ricerca e **periodo** (data di scadenza).
 
 ## 📐 Calcoli & logica
+- **Registra Incasso** chiede la **data** in cui il denaro è arrivato (proposta: oggi, mai futura) e il **conto** su cui è entrato (proposto: quello della fattura, altrimenti il predefinito). La data finisce in Prima Nota; il saldo del conto scelto sale dell'importo. Se lo studio non ha conti, il modale avvisa che l'incasso non entra in nessun saldo.
 - **Mora D.Lgs. 231/2002**: giorni di ritardo, maggiorazione **tasso legale BCE +8%** e **indennizzo
   forfettario 40 €** (art. 6). Il motore `sollecitiEngine` calcola importi e testo.
 - **Escalation stretta**: la regola pura `puoInviareSollecito` impedisce che la **diffida** sia il

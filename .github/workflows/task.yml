@@ -1,0 +1,153 @@
+# Una task da una issue, anche dal telefono: Fabio apre una issue (o commenta)
+# con «@claude» e la richiesta; un Claude la fa su un ramo nuovo e apre la PR,
+# che poi segue il giro normale (CI, revisore, merge, deploy).
+# Solo il proprietario del repo può avviarla (author_association OWNER).
+# Su un commento, solo se COMINCIA con «@claude»: i commenti di Claude escono col
+# token del proprietario, e una sua domanda con «@claude» la faceva ripartire (misurato sul progetto pilota).
+# issues e issue_comment girano con il file del ramo predefinito.
+# Mai sulle issue di Wayfinder (etichette «wayfinder:…»): le scrive una sessione col
+# token del proprietario, e una che contenesse «@claude» avvierebbe una task non chiesta.
+# BluMan: gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository in ogni
+# job): con la pubblicazione questo file arriva anche nel repo del titolare, dove non
+# ci sono runner né secret nostri (docs/adozione-standard.md).
+name: task
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: task-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  # I job che eseguono o leggono codice delle PR girano sui runner «ci» del PC
+  # (server/install-ci-runner.sh); merge, etichette, verifica del deploy e
+  # riepilogo sui runner dei server, che non eseguono mai codice delle PR. Mai sulle
+  # macchine di GitHub: i minuti gratuiti finiscono e non si pagano (09/11). Il
+  # job resta perché gli altri lo aspettano; col PC spento i job restano in coda.
+  dove:
+    if: >-
+      github.repository == 'wolftradesystem-tech/bluman' && !github.event.issue.pull_request && !contains(join(github.event.issue.labels.*.name, ','), 'wayfinder:') && (
+        (github.event_name == 'issues' && github.event.issue.author_association == 'OWNER'
+          && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+        || (github.event_name == 'issue_comment' && github.event.comment.author_association == 'OWNER'
+          && startsWith(github.event.comment.body, '@claude'))
+      )
+    runs-on: [self-hosted, ci]
+    timeout-minutes: 2
+    outputs:
+      runner: ${{ steps.d.outputs.runner }}
+    steps:
+      - id: d
+        run: |
+          echo 'runner=["self-hosted","ci"]' >> "$GITHUB_OUTPUT"
+          echo 'gira su: il runner «ci» del PC'
+
+  task:
+    needs: dove
+    if: >-
+      github.repository == 'wolftradesystem-tech/bluman' && !github.event.issue.pull_request && !contains(join(github.event.issue.labels.*.name, ','), 'wayfinder:') && (
+        (github.event_name == 'issues' && github.event.issue.author_association == 'OWNER'
+          && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+        || (github.event_name == 'issue_comment' && github.event.comment.author_association == 'OWNER'
+          && startsWith(github.event.comment.body, '@claude'))
+      )
+    runs-on: ${{ fromJSON(needs.dove.outputs.runner) }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      # Sul PC la cartella di lavoro è in comune fra i job del repo, e la CI esegue
+      # codice delle PR: si svuota tutta, .git compreso (hook, config, credenziali
+      # rimaste da un job interrotto), prima del checkout.
+      - name: cartella di lavoro pulita
+        run: |
+          [[ "$GITHUB_WORKSPACE" == */_work/* ]] || { echo "cartella inattesa: $GITHUB_WORKSPACE"; exit 1; }
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+      - uses: actions/checkout@v6
+        with:
+          # Push con il token del bot CI (secret RUNNER_PROBE_TOKEN): un push con
+          # GITHUB_TOKEN lascia CI e revisione «action_required» (misurato sul progetto pilota).
+          token: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          fetch-depth: 0
+      # Le stesse installazioni di ci.yml (job check): npm, Prisma client, frontend.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npx --no-install prisma generate
+      - run: npm ci
+        working-directory: frontend
+      # Dove Claude lascia titolo e corpo della PR: fuori dal git, la apre il workflow.
+      - run: mkdir -p .task-pr && echo ".task-pr/" >> .git/info/exclude
+      # Lo script del push copiato fuori dalla cartella di lavoro PRIMA di Claude:
+      # quello nel repo lo potrebbe modificare.
+      - run: cp scripts/push-ramo.sh "$RUNNER_TEMP/push-ramo.sh"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Commenti, PR e push come il proprietario: così CI e revisione partono da sole.
+          github_token: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          # Niente scritture in .git: da .git/config (core.fsmonitor, alias, hook) un
+          # `git status` permesso eseguirebbe qualunque comando col token del bot
+          # (revisione indipendente del 04/11).
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 200
+            --disallowedTools "Edit(.git/**),Write(.git/**),Edit(**/.git/**),Write(**/.git/**)"
+            --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git switch -c:*),Bash(git checkout -b:*),Bash(git add:*),Bash(git commit:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(npx tsc:*),Bash(npm run build:*),Bash(npx vitest run:*),Bash(npx --no-install prisma generate:*),Bash(npx prisma generate:*),Bash(cd frontend && npx tsc:*),Bash(cd frontend && npm run lint:*),Bash(cd frontend && npx vitest run:*),Bash(cd frontend && npm run build:*)"
+          prompt: |
+            Task dalla issue #${{ github.event.issue.number }} di ${{ github.repository }}.
+            Leggila con `gh issue view ${{ github.event.issue.number }} --comments`: vale la richiesta
+            dell'ultimo messaggio di Fabio che contiene «@claude», con il contesto dei precedenti.
+            Sei su main (il ramo di produzione), con le dipendenze installate.
+
+            1. Leggi CLAUDE.md, .claude/rules/ (metodo comune e differenze del progetto), PIANO.md. Valgono tutte.
+            2. Se la task tocca più di qualche file, scrivi il piano (obiettivo, vincoli, file, fuori perimetro) nel corpo della PR.
+            3. Se una decisione di prodotto non è scritta da nessuna parte (regola di business, spesa,
+               azione irreversibile su dati veri), NON indovinare: scrivi le domande sulla issue con
+               `gh issue comment`, una per riga e ognuna con un default proposto, e fermati. Fabio
+               risponderà con un commento che COMINCIA con «@claude» e la task ripartirà.
+               Non cominciare MAI un tuo commento con «@claude» (lo farebbe ripartire).
+            4. Altrimenti: ramo nuovo (`git switch -c fix/…` o `feat/…`), codice e test, verifica
+               (typecheck o build, test dei soli file toccati, con i comandi di CLAUDE.md;
+               mai la suite intera: la fa la CI).
+            5. Commit nel formato delle regole. NON fare push e NON aprire la PR: li fa il workflow dopo di te.
+               Scrivi invece due file: `.task-pr/titolo.txt` (una riga, uguale al commit principale) e
+               `.task-pr/corpo.md` (il corpo da `.github/pull_request_template.md`, tutte le sezioni, il piano in
+               «Piano o richiesta», `Closes #${{ github.event.issue.number }}` in fondo). Resta sul tuo ramo alla fine.
+            6. Non commentare la issue con il link: lo fa il workflow, insieme alle tre righe di «Fatto» che metti
+               nel file `.task-pr/fatto.txt`.
+            Mai push, mai merge, mai etichette di esito.
+
+      # Push e PR li fa il workflow, non Claude: solo da un ramo di lavoro, mai
+      # sulla produzione (scripts/push-ramo.sh, copia presa prima di Claude). Senza un ramo nuovo con commit
+      # (Claude ha fatto domande ed è fermo) non fa niente.
+      - name: Push e PR
+        env:
+          # push-ramo.sh non legge file del repo: ramo di produzione e rami vietati arrivano da qui.
+          PROD: ${{ github.event.repository.default_branch }}
+          RAMI_VIETATI: ""   # es. un vecchio ramo di produzione rinominato
+          GH_TOKEN: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          ramo="$(git rev-parse --abbrev-ref HEAD)"
+          if [[ "$ramo" == main || "$ramo" == HEAD ]]; then echo "nessun ramo di lavoro: niente da aprire"; exit 0; fi
+          [[ -s .task-pr/titolo.txt && -s .task-pr/corpo.md ]] || { gh issue comment "$ISSUE" --body "Il lavoro è sul ramo \`$ramo\` ma mancano titolo o corpo della PR: la PR non è stata aperta."; exit 1; }
+          bash "$RUNNER_TEMP/push-ramo.sh" "$ramo"
+          if [[ "$(gh api "repos/$GH_REPO/pulls?head=${GH_REPO%%/*}:$ramo&state=open" --jq 'length')" == 0 ]]; then
+            url="$(gh api "repos/$GH_REPO/pulls" -f title="$(head -n1 .task-pr/titolo.txt)" -f head="$ramo" -f base=main -F body=@.task-pr/corpo.md --jq .html_url)"
+          else
+            url="$(gh api "repos/$GH_REPO/pulls?head=${GH_REPO%%/*}:$ramo&state=open" --jq '.[0].html_url')"
+          fi
+          { echo "PR: $url"; echo; cat .task-pr/fatto.txt 2>/dev/null || true; } > .task-pr/commento.md
+          gh issue comment "$ISSUE" --body-file .task-pr/commento.md

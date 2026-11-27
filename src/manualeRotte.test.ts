@@ -102,13 +102,13 @@ describe('📖 GET /manuale — l’indice', () => {
     expect(res.headers['content-type']).not.toMatch(/text\/html/);
   });
 
-  it('al super admin elenca 19 schede, al collaboratore 18', async () => {
+  it('al super admin elenca 31 schede, al collaboratore 29', async () => {
     const superAdmin = await server().inject({ method: 'GET', url: '/manuale', headers: auth('super_admin') });
     const collaboratore = await server().inject({ method: 'GET', url: '/manuale', headers: auth('collaboratore_interno') });
 
     expect(superAdmin.json().letto).toBe(true);
-    expect(superAdmin.json().schede).toHaveLength(19);
-    expect(collaboratore.json().schede).toHaveLength(18);
+    expect(superAdmin.json().schede).toHaveLength(31);
+    expect(collaboratore.json().schede).toHaveLength(29);
   });
 
   it('la §19 non compare nell’indice di chi non è super admin', async () => {

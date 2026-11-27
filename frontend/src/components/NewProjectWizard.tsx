@@ -279,7 +279,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
     <>
       {notif && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '12px 16px', borderRadius: 10, fontSize: 12, fontWeight: 500, zIndex: 200, display: 'flex', alignItems: 'center', gap: 8 }}>
-          ✓ Progetto istanziato e collegato su Supabase DB!
+          ✓ Progetto creato e salvato.
         </div>
       )}
 
@@ -289,16 +289,16 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
           {/* Head */}
           <div style={{ padding: 20, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div id="wizard-progetto-titolo" style={{ fontSize: 15, fontWeight: 600 }}>Nuovo progetto — Wizard di Configurazione</div>
+              <div id="wizard-progetto-titolo" style={{ fontSize: 15, fontWeight: 600 }}>Nuovo progetto</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12 }}>
                 {[0, 1, 2, 3].map((n, i) => (
                   <React.Fragment key={n}>
-                    <div style={sd(n)}>{n < step ? '✓' : n}</div>
+                    <div style={sd(n)}>{n < step ? '✓' : n + 1}</div>
                     {i < 3 && <div style={{ width: 28, height: 2, borderRadius: 1, background: n < step ? 'var(--green)' : 'var(--border)' }} />}
                   </React.Fragment>
                 ))}
                 <span style={{ fontSize: 10, color: 'var(--indigo-l)', marginLeft: 8, fontWeight: 600 }}>
-                  {['Giurisdizione', 'Cliente & Progetto', 'Libreria Moduli', 'Riepilogo'][step]}
+                  Passo {step + 1} di 4 · {['Giurisdizione', 'Cliente & Progetto', 'Libreria Moduli', 'Riepilogo'][step]}
                 </span>
               </div>
             </div>

@@ -28,7 +28,20 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     passaggioProgetto: { deleteMany: registra('passaggioProgetto.deleteMany') },
     microvoceProgetto: { deleteMany: registra('microvoceProgetto.deleteMany') },
     moduloProgettoDipendenza: { deleteMany: registra('moduloProgettoDipendenza.deleteMany') },
-    moduloProgetto: { delete: registra('moduloProgetto.delete') },
+    moduloProgetto: {
+      delete: registra('moduloProgetto.delete'),
+      // E10 — dopo il delete il valore del progetto si riallinea ai moduli rimasti (qui: nessuno).
+      aggregate: async () => {
+        stato.eventi.push('moduloProgetto.aggregate');
+        return { _sum: { prezzo: null }, _count: { _all: 0 } };
+      },
+    },
+    progetto: {
+      update: async (args: any) => {
+        stato.eventi.push(`progetto.update:valoreTotale=${args.data.valoreTotale}`);
+        return {};
+      },
+    },
   };
   const finto: any = {
     moduloProgetto: {
@@ -81,5 +94,20 @@ describe('DELETE /progetti/:id/moduli/:moduloId — contesto tenant nella transa
     expect(stato.eventi[0]).toBe(`set_config:${STUDIO_2}`);
     expect(stato.eventi).toContain('moduloProgetto.delete');
     expect(stato.audit.some((a) => a.azione === 'MODULO_ELIMINATO')).toBe(true);
+  });
+
+  // Analisi del 26/11, E10 — tolto l'ultimo modulo, il valore del progetto torna a 0 nella stessa
+  // transazione del delete (quindi dopo il set_config dello studio), non resta la somma di prima.
+  it('dopo il delete riallinea il valore del progetto, dentro la transazione', async () => {
+    await buildServer(new InMemoryApp()).inject({
+      method: 'DELETE',
+      url: '/progetti/prg-1/moduli/mod-1',
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+
+    const iDelete = stato.eventi.indexOf('moduloProgetto.delete');
+    const iValore = stato.eventi.indexOf('progetto.update:valoreTotale=0');
+    expect(iDelete).toBeGreaterThan(0);
+    expect(iValore).toBeGreaterThan(iDelete);
   });
 });

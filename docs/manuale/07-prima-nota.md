@@ -1,7 +1,7 @@
 # 07 · Prima Nota & Riconciliazione bancaria
 
 ## 👤 Cosa fa e come si usa
-La **Prima Nota** (`/prima-nota`) è il registro dei movimenti di **cassa e banca** dello studio:
+La **Prima Nota** (`/primanota`) è il registro dei movimenti di **cassa e banca** dello studio:
 entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - **Movimenti automatici**: quando registri un incasso nello Scadenzario (§06) o versi un F24 dalla
   LIPE (§08), il movimento entra qui **da solo**.
@@ -41,6 +41,8 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 - **Fornitori / Ciclo passivo**: le fatture ricevute alimentano le uscite.
 
 ## ⚠️ Stati limite & errori
+- **Conto non indicato**: un movimento senza conto si mostra con «⚠ Conto non indicato» e non entra nel saldo di nessun conto in Banche & Conti. Lo stesso testo compare nel CSV del fascicolo per il commercialista, dove il riferimento alla fattura è il suo numero ufficiale.
+- **Movimenti che non si eliminano**: l'incasso di una fattura e il pagamento di una fattura d'acquisto hanno un lucchetto al posto del cestino, perché eliminandoli la rata resterebbe «incassata» (o la fattura «pagata») senza il suo denaro. Anche il server lo rifiuta. Gli altri movimenti si eliminano, e l'eliminazione resta nel Log Audit.
 - Import CSV: una riga con un importo o una data che non si legge **non entra** in Prima Nota e viene
   elencata nel modale (numero di riga, motivo, testo della riga). Non si ripiega su un valore
   plausibile — né un importo né la data di oggi — perché un movimento inventato è indistinguibile da

@@ -13,6 +13,9 @@ tracciato **XML SdI** (FatturaPA).
   riepilogo (emesso/incassato/sospeso/NC).
 
 ## 📐 Calcoli & logica
+- **Importo proposto per ogni voce** nel compositore = prezzo del modulo diviso per il numero delle sue
+  voci, con l'etichetta «ripartito dal modulo»; l'operatore lo può cambiare. Un modulo senza prezzo
+  lascia le voci con «importo mancante», da scrivere a mano prima di emettere.
 - **Numerazione progressiva per serie e per anno**: il progressivo è `max(numeroProgressivoSerie) +
   1` fra le fatture **emesse nell'anno in corso**, quindi riparte da `001` a ogni gennaio (art. 21
   DPR 633/72): la prima fattura del 2027 è `FT-2027/001`, non `FT-2027/043`. Un indice UNIQUE

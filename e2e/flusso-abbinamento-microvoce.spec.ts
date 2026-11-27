@@ -107,7 +107,7 @@ test('abbina un messaggio a una micro-voce, e poi lo slega', async ({ page, requ
   await expect(page.getByText('✋ a mano')).toBeVisible();
 
   // Si chiude il modal prima di tornare alla chat: la scheda Comunicazioni sta dietro l'overlay.
-  await page.locator('#proc-ov').getByRole('button', { name: '✕' }).click();
+  await page.locator('#proc-ov').getByRole('button', { name: 'Chiudi la finestra' }).click();
   await expect(page.locator('#proc-ov')).toHaveCount(0);
 
   // Lo slegamento, dal «×» sul badge.
@@ -163,7 +163,7 @@ test('abbina un messaggio a una micro-voce, e poi lo slega', async ({ page, requ
   // L'altro lato: **una riga sola, in due posti**. Nella chat della pratica il messaggio c'è, ed è
   // la stessa riga — non una copia — con lo stesso motivo. Se le due viste divergessero, una delle
   // due starebbe raccontando una storia sua.
-  await page.locator('#proc-ov').getByRole('button', { name: '✕' }).click();
+  await page.locator('#proc-ov').getByRole('button', { name: 'Chiudi la finestra' }).click();
   await expect(page.locator('#proc-ov')).toHaveCount(0);
   await page.getByRole('button', { name: '💬 Comunicazioni & Ingestion' }).click();
   const bollaRisposta = page

@@ -39,6 +39,8 @@ Flusso: crei/aggiorni qui articoli e moduli → in un **preventivo** (§04) sceg
 - **Fatture** (§05): articoli, prezzi e prezzo-pacchetto sono la base degli importi.
 
 ## ⚠️ Stati limite & errori
+- **Filtri del Catalogo Articoli**: sono le categorie che gli articoli hanno davvero. Se filtro o ricerca non trovano niente, la pagina lo dice e offre **Mostra tutti gli articoli**.
+- **Documenti e form dell'articolo**: nella modifica di un articolo i documenti allacciati e il form scelti **non vengono ancora salvati** (si salvano nome, prezzo e ore); il modale lo avvisa.
 - Eliminare una **giurisdizione** ancora usata da moduli o progetti → **409** (messaggio esplicito).
 - Impostare una **dipendenza** che formerebbe un ciclo (A→B→A) → **400**.
 - Nessuna riga inventata: un modulo senza distinta è **vuoto**, non si riempie a render time (regola 7).

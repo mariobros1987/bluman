@@ -23,10 +23,22 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   comunicato a voce, per email o di persona; restano scritte sul passaggio e si rileggono alla
   riapertura. **Un passaggio di tipo *Documento* nasce senza documento**: l'atto si collega dalla
   scheda con «⚡ Collega Consigliato» o «📂 Scegli Modello», e nessun nome di file viene inventato.
+- **Da dove vengono i passaggi**: dall'articolo della Libreria, se ne ha di suoi (vengono copiati
+  quando il progetto nasce). Oggi nessuna schermata permette di scriverli sull'articolo, quindi
+  un'attività senza passaggi suoi mostra **quattro passaggi generici**, uguali per tutte (Briefing,
+  Documentazione, Dati dal cliente, Validazione): sono una proposta della pagina e diventano righe
+  del fascicolo alla prima spunta o modifica.
+- **Spuntare ed eliminare**: una spunta salva il passaggio (lo stesso passaggio è sempre la stessa
+  riga, quante volte lo si salvi); **Elimina passaggio** lo toglie dal fascicolo e lo scrive nel Log
+  Audit. Con tutti i passaggi spuntati l'attività risulta completata, con almeno uno in corso.
 - **Chiusura / fine anno**: un progetto con fatture **non si elimina**, si **archivia** (resta
   consultabile con `?includiArchiviati=true`).
 
 ## 📐 Calcoli & logica (li fa il backend, §16)
+- **Valore dell'incarico** = somma dei prezzi dei moduli del progetto. Lo scrive il server quando i
+  moduli cambiano (avvio del progetto, modulo eliminato, prezzo di un modulo salvato), quindi elenco,
+  Dashboard e dettaglio mostrano lo stesso importo. Con moduli presenti non si scrive a mano: passando
+  il mouse sull'importo lo si legge. Un progetto **senza moduli** tiene il valore scritto a mano.
 - **La cascata sale, mai scende (§16.6)**: lo stato di una micro-voce cambia solo per **azione
   esplicita** (consuntivazione, ritardo, completamento); da lì si ricalcola il modulo, poi il
   progetto. Non si scrive mai lo stato di una micro-voce «dall'alto».
@@ -64,11 +76,18 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
 
 ### Dipendenze tra moduli
 Le dipendenze sono **tra moduli** (non tra articoli/micro-voci): «il modulo A dipende dal modulo B».
-Si impostano nel **costruttore modulo in Libreria** (§03) → campo **«🔗 Dipende da (moduli)»** (multi-
-selezione degli altri moduli); il backend rifiuta i **cicli** (400). Un progetto istanziato eredita le
+Si impostano nel **costruttore modulo in Libreria** (§03) → campo **«🔗 Dipende da (moduli)»** (si possono
+scegliere più moduli); il backend rifiuta i **cicli** (400). Un progetto istanziato eredita le
 dipendenze dei suoi template. Finché il modulo «da cui dipende» non è `done`, le micro-voci del
 dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalcolo le **sblocca**
-(`attesa_dipendenza → pending`). Il grafo nella scheda progetto mostra il vero stato delle dipendenze.
+(`attesa_dipendenza → pending`).
+
+Nella scheda progetto le dipendenze si leggono così: i moduli sono elencati **in ordine di dipendenza**
+(prima quelli da cui gli altri attendono); sotto il nome di un modulo in attesa compare **«⏳ In attesa
+di: «nome del modulo»»**; la scheda **Ordine dei moduli** mette i moduli in colonne («1 · Si possono iniziare
+subito», «2 · Dopo i precedenti») e su ogni modulo dice **«Viene dopo: …»** con ✓ se quel modulo è
+chiuso e ⏳ se non lo è. Le etichette di stato: **«Da iniziare»** (si può lavorare) e **«In attesa di
+un altro modulo»** (bloccata finché l'altro non si chiude).
 
 ## 🔗 Collegamenti
 - **Preventivi / Libreria** (§03–04): i moduli nascono dall'istanziazione dei template (distinta base).
@@ -86,6 +105,8 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
   se il modulo ha ore consuntivate o righe fattura.
 - Completare una micro-voce con **passaggi ancora aperti** → **409** (§17.1).
 - Marca-ritardo / blocco: **causaNota obbligatoria**.
+- **Elimina passaggio** non riuscito: il passaggio resta in elenco e compare il messaggio d'errore.
+- Attività aperte prima del 27/11/2026 possono avere **passaggi doppi** (ogni spunta li ricreava): i doppioni si tolgono con «Elimina passaggio».
 - Solo `advisor` / `super_admin` eliminano o archiviano; il ruolo `cliente` vede **solo i propri** progetti.
 
 ## 🔧 Nota tecnica

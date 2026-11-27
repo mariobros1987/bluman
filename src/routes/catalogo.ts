@@ -17,6 +17,18 @@ import { trovaCicloDipendenze } from '../services/dipendenzeModuli.js';
 import { UploadSchema } from '../schemas/upload.schema.js';
 import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
 import { leggiDaCacheOCalcola, invalidaCachePrefisso } from '../services/backendCache.js';
+import { livelloModuloUtente } from '../util/permessiModulo.js';
+
+/**
+ * Le giurisdizioni si LEGGONO fuori matrice (servono al wizard di chiunque crei un progetto), ma
+ * si scrivono solo con `library = write`: sono catalogo dello studio come articoli e moduli.
+ */
+async function puoScrivereGiurisdizioni(req: { tenantId?: string; userId?: string; ruolo?: string }): Promise<boolean> {
+  if (req.ruolo === 'super_admin') return true;
+  if (!req.tenantId || !req.userId) return false;
+  return (await livelloModuloUtente(req.tenantId, req.userId, req.ruolo, 'library')) === 'write';
+}
+const ERRORE_GIURISDIZIONI = { errore: "Permesso insufficiente sul modulo 'library': le giurisdizioni si modificano con il livello write." };
 
 // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -32,6 +44,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.post<{ Body: { nome: string; codice: string; tipo: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni', async (req, reply) => {
+    if (!(await puoScrivereGiurisdizioni(req as any))) return reply.code(403).send(ERRORE_GIURISDIZIONI);
     const tenantId = req.tenantId;
     const body = req.body || {};
     const item = await prisma.giurisdizione.create({
@@ -56,6 +69,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.put<{ Params: { id: string }; Body: { nome?: string; codice?: string; tipo?: 'ue' | 'extra_ue' | 'stato_usa' | 'altro'; note?: string } }>('/giurisdizioni/:id', async (req, reply) => {
+    if (!(await puoScrivereGiurisdizioni(req as any))) return reply.code(403).send(ERRORE_GIURISDIZIONI);
     const tenantId = req.tenantId;
     const { id } = req.params;
     const body = req.body || {};
@@ -89,6 +103,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
   });
 
   server.delete<{ Params: { id: string } }>('/giurisdizioni/:id', async (req, reply) => {
+    if (!(await puoScrivereGiurisdizioni(req as any))) return reply.code(403).send(ERRORE_GIURISDIZIONI);
     const tenantId = req.tenantId;
     const { id } = req.params;
     try {

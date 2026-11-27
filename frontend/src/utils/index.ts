@@ -44,11 +44,11 @@ export function statoConfig(s: StatoModulo | StatoMicrovoce | StatoProgetto | st
     completed:          { label: 'Completato',       bg: '#0d2d22', color: '#34d399' },
     in_progress:        { label: 'In corso',         bg: '#1a1f3d', color: '#818cf8' },
     active:             { label: 'In corso',         bg: '#1a1f3d', color: '#818cf8' },
-    pending:            { label: 'In attesa',        bg: '#1e2030', color: '#7b7f9e' },
+    pending:            { label: 'Da iniziare',      bg: '#1e2030', color: '#7b7f9e' },
     delayed:            { label: 'Ritardo',          bg: '#2d1a05', color: '#f59e0b' },
     blocked:            { label: 'Bloccato',         bg: '#2d0d0d', color: '#f87171' },
     pre_project:        { label: 'Pre-progetto',     bg: '#20134a', color: '#a78bfa' },
-    attesa_dipendenza:  { label: 'Attesa dipendenza',bg: '#241a3d', color: '#a78bfa' },
+    attesa_dipendenza:  { label: 'In attesa di un altro modulo', bg: '#241a3d', color: '#a78bfa' },
   };
   return map[s] || map.pending;
 }

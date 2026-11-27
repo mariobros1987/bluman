@@ -1,3 +1,4 @@
+import { categorieDegliArticoli } from '../../utils/categorieArticoli';
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CatBadge } from '../ui/CatBadge';
@@ -107,11 +108,13 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editHours, setEditHours] = useState<number>(0);
   const [editName, setEditName] = useState<string>('');
-  const [editFormMasterId, setEditFormMasterId] = useState<string>('f1');
-  const [editDocModels, setEditDocModels] = useState<string[]>(['m1']);
+  const [editFormMasterId, setEditFormMasterId] = useState<string>('');
+  const [editDocModels, setEditDocModels] = useState<string[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
 
-  const categories = ['TUTTI', 'Analisi', 'Societario', 'Compliance', 'Banking', 'Trust', 'IP & Tax'];
+  // I filtri sono le categorie che gli articoli hanno davvero: prima era un elenco fisso, con
+  // pulsanti («IP & Tax») che non trovavano niente e categorie vere che non avevano un pulsante.
+  const categories = categorieDegliArticoli(articoliList);
 
   const filtered = articoliList.filter(a => {
     const matchCat = selectedCat === 'TUTTI' || a.cat === selectedCat;
@@ -130,8 +133,10 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
     setEditPrice(art.p);
     setEditHours(art.h);
     setEditName(art.n);
-    setEditFormMasterId(art.formMasterId || 'f1');
-    setEditDocModels(art.documentiRichiesti || ['m1']);
+    // Niente preselezione: un articolo senza form e senza documenti si apre senza form e senza
+    // documenti. Prima comparivano già scelti il primo form e il primo modello.
+    setEditFormMasterId(art.formMasterId || '');
+    setEditDocModels(art.documentiRichiesti || []);
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -230,6 +235,22 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
           </button>
         </div>
       </div>
+
+      {/* Nessun risultato: si dice perché, invece di lasciare la pagina bianca sotto i filtri. */}
+      {filtered.length === 0 && (
+        <div style={{ background: 'var(--card)', border: '1px dashed var(--border)', borderRadius: 14, padding: 28, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+          {articoliList.length === 0
+            ? 'La libreria non ha ancora articoli. Creane uno con «+ Nuovo Articolo Prestazione».'
+            : `Nessun articolo corrisponde a ${[selectedCat !== 'TUTTI' ? `categoria «${selectedCat}»` : '', searchQuery.trim() ? `ricerca «${searchQuery.trim()}»` : ''].filter(Boolean).join(' e ')}.`}
+          {articoliList.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => { setSelectedCat('TUTTI'); setSearchQuery(''); }}>
+                Mostra tutti gli articoli
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Grid Cards Articoli */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
@@ -351,6 +372,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>📄 Documenti & Modelli Allacciati ({editDocModels.length})</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)' }}>Seleziona dalla memoria, crea un nuovo modello Word o importalo dal PC</div>
+                  <div role="note" style={{ fontSize: 10, color: 'var(--pill-amber-fg)', marginTop: 3 }}>
+                    ⚠ I documenti allacciati e il form scelti qui non vengono ancora salvati: valgono finché la pagina resta aperta. Si salvano nome, prezzo e ore.
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', gap: 6 }}>

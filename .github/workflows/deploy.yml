@@ -1,0 +1,52 @@
+# deploy.yml di BluMan: nel fork NON C'È DEPLOY. Questo workflow esiste perché
+# scripts/automerge.sh (comune, identico in ogni progetto) lo lancia dopo ogni merge
+# e, se non lo trova, avvisa «mergiata ma il deploy non è partito» a ogni PR.
+# Qui fa una cosa sola: dice su Telegram che main del fork è avanzato, quanti commit
+# aspettano la pubblicazione e se portano migrazioni dello schema (backup del DB di
+# produzione PRIMA di unire la pubblicazione: Railway le applica all'avvio senza backup).
+# La produzione si aggiorna con scripts/pubblica.sh (PR verso mariobros1987/bluman):
+# DEPLOY.md. Niente push, niente server, niente segreti oltre a quelli di Telegram.
+# Gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository): con la
+# pubblicazione il file arriva anche nel repo del titolare (docs/adozione-standard.md).
+name: deploy
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-bluman
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  nessun-deploy:
+    if: github.repository == 'wolftradesystem-tech/bluman'
+    runs-on: [self-hosted, ci]
+    timeout-minutes: 6
+    steps:
+      - name: cartella di lavoro pulita
+        run: |
+          [[ "$GITHUB_WORKSPACE" == */_work/* ]] || { echo "cartella inattesa: $GITHUB_WORKSPACE"; exit 1; }
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+      - uses: actions/checkout@v4
+        with: { ref: main, fetch-depth: 0, persist-credentials: false }
+      - name: Cosa aspetta la pubblicazione
+        env:
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+        run: |
+          set -euo pipefail
+          # Il repo del titolare è pubblico: si legge senza credenziali, in sola lettura.
+          git remote add upstream https://github.com/mariobros1987/bluman.git
+          git fetch --quiet upstream main
+          n="$(git rev-list --count upstream/main..HEAD)"
+          migr="$(git diff --name-only "upstream/main...HEAD" -- prisma/migrations | sed -nE 's#^prisma/migrations/([^/]+)/.*#\1#p' | sort -u)"
+          a=$'\n'
+          msg="📦 bluman: main del fork a $(git rev-parse --short HEAD), $n commit da pubblicare. Nessun deploy dal fork: si pubblica con «pubblica» (scripts/pubblica.sh)."
+          if [[ -n "$migr" ]]; then
+            msg="$msg$a⚠️ La pubblicazione porta migrazioni dello schema: backup del DB di produzione PRIMA di unirla.$a$migr"
+          fi
+          echo "$msg"
+          bash scripts/ci-notify.sh "$msg"

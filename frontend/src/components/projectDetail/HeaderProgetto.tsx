@@ -2,6 +2,7 @@ import { Badge } from '../ui/Badge';
 import { ProgressBar } from '../ui/ProgressBar';
 import { LinkTelegramProgetto } from './LinkTelegramProgetto';
 import { fmt } from '../../utils';
+import { SPIEGAZIONE_VALORE_DA_MODULI } from '../../utils/valoreProgetto';
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 
@@ -15,6 +16,7 @@ export function HeaderProgetto({
   onRinomina,
   onApriCliente,
   onModificaValore,
+  valoreModificabile = true,
   onApriAccessi,
   onRicalcola,
   onArchivia,
@@ -28,6 +30,8 @@ export function HeaderProgetto({
   onRinomina: () => void;
   onApriCliente: () => void;
   onModificaValore: () => void;
+  /** Falso quando il valore è la somma dei moduli: niente matita, e il title lo spiega. */
+  valoreModificabile?: boolean;
   onApriAccessi: () => void;
   onRicalcola: () => void;
   onArchivia: () => void;
@@ -55,13 +59,13 @@ export function HeaderProgetto({
           >
             {project.ct === 'individual' ? '👤' : '🏢'} {project.cl}
           </span>
-          <span>📅 {project.start} → {project.due}</span>
+          <span title={project.due ? 'Data di avvio → scadenza del progetto' : 'Data di avvio (nessuna scadenza indicata)'}>📅 {project.start}{project.due ? ` → ${project.due}` : ''}</span>
           <span
-            style={{ cursor: 'pointer' }}
-            title="Valore Incarico (Modificabile dall'Admin)"
+            style={{ cursor: valoreModificabile ? 'pointer' : 'help' }}
+            title={valoreModificabile ? 'Valore dell’incarico: clicca per scriverlo' : SPIEGAZIONE_VALORE_DA_MODULI}
             onClick={onModificaValore}
           >
-            💶 {fmt(project.val)} ✏️
+            💶 {fmt(project.val)}{valoreModificabile ? ' ✏️' : ''}
           </span>
           <Badge stato={project.st} />
           <button

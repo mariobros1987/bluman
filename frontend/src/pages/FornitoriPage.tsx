@@ -17,6 +17,8 @@ export const FornitoriPage: React.FC = () => {
   const [fornitori, setFornitori] = useState<Fornitore[]>([]);
   const [fatture, setFatture] = useState<FatturaRicevuta[]>([]);
   const [loading, setLoading] = useState(true);
+  // Una lettura fallita è un errore da dichiarare, non «nessun fornitore».
+  const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStato, setFilterStato] = useState<'tutte' | 'aperte' | 'saldate'>('tutte');
 
@@ -31,6 +33,7 @@ export const FornitoriPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setErroreCaricamento(null);
     try {
       const [fornData, fattData] = await Promise.all([
         fetchFornitoriApi(),
@@ -40,6 +43,9 @@ export const FornitoriPage: React.FC = () => {
       setFatture(fattData || []);
     } catch (err) {
       console.error('Errore caricamento dati ciclo passivo:', err);
+      setFornitori([]);
+      setFatture([]);
+      setErroreCaricamento(err instanceof Error ? err.message : 'Errore di rete');
     } finally {
       setLoading(false);
     }
@@ -136,6 +142,14 @@ export const FornitoriPage: React.FC = () => {
         </div>
       </div>
 
+      {erroreCaricamento && (
+        <div role="alert" style={{ padding: '16px 20px', marginBottom: 20, textAlign: 'center', background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 12 }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Impossibile caricare fornitori e fatture d'acquisto.</div>
+          <div style={{ fontSize: 13, marginBottom: 12 }}>{erroreCaricamento}. I totali e gli elenchi qui sotto sono vuoti perché non sono stati letti, non perché non ci siano dati.</div>
+          <button type="button" className="btn" onClick={() => loadData()}>Riprova</button>
+        </div>
+      )}
+
       {/* KPI Strip */}
       <div
         style={{
@@ -177,7 +191,7 @@ export const FornitoriPage: React.FC = () => {
             €{(totaleApertoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            {fatture.filter((f) => !f.pagata).length} scadenze passive pendenti
+            {fatture.filter((f) => !f.pagata).length} fatture da pagare
           </div>
         </div>
 
@@ -418,7 +432,7 @@ export const FornitoriPage: React.FC = () => {
                           )}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{forn.sdiCode || '0000000'}</div>
+                          <div style={{ fontWeight: 600, fontFamily: 'monospace' }}>{forn.sdiCode || '—'}</div>
                           {forn.pec && (
                             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{forn.pec}</div>
                           )}

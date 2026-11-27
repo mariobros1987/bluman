@@ -4,6 +4,7 @@ import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
 import { Modal } from '../components/ui/Modal';
 import { oggi } from '../utils/calendarioDate';
+import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
 
 export function PaymentsPage() {
   const toast = useToast();
@@ -93,11 +94,9 @@ export function PaymentsPage() {
     }
   };
 
-  const handleSendReminder = (scad: any) => {
-    const clienteNome = scad.fattura?.progetto?.cliente?.nome || 'Cliente';
-    const importo = fmt((scad.importoCentesimi || 0) / 100);
-    toast.successo(`Sollecito inviato con successo a ${clienteNome} per la rata di ${importo}!`);
-  };
+  // Il sollecito passa dallo stesso modale dello Scadenzario, che lo spedisce davvero: prima qui
+  // un toast diceva «Sollecito inviato con successo» senza che partisse nessun messaggio.
+  const [scadenzaDaSollecitare, setScadenzaDaSollecitare] = useState<any>(null);
 
   const filteredScadenze = scadenze.filter(s => {
     if (filterStato !== 'tutte' && s.stato !== filterStato) return false;
@@ -224,7 +223,7 @@ export function PaymentsPage() {
                         {scad.stato !== 'incassato' && scad.stato !== 'stornata' ? (
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                             <button
-                              onClick={() => handleSendReminder(scad)}
+                              onClick={() => setScadenzaDaSollecitare(scad)}
                               style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}
                             >
                               ✉️ Sollecita
@@ -343,6 +342,18 @@ export function PaymentsPage() {
           )}
         </Modal>
       )}
+
+      <InviaSollecitoModal
+        isOpen={!!scadenzaDaSollecitare}
+        onClose={() => setScadenzaDaSollecitare(null)}
+        onSuccess={(msg) => {
+          toast.successo(msg);
+          loadData();
+        }}
+        scadenzaId={scadenzaDaSollecitare?.id || null}
+        numeroFattura={scadenzaDaSollecitare?.fattura?.numero || 'Fattura'}
+        clienteNome={scadenzaDaSollecitare?.fattura?.cliente?.nome || scadenzaDaSollecitare?.fattura?.progetto?.cliente?.nome || 'Cliente'}
+      />
     </div>
   );
 }

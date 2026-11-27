@@ -41,3 +41,12 @@ export function datiStudioDocumento(tenantInfo: any) {
     email: testo(tenantInfo?.email, 'email dello studio'),
   };
 }
+
+/**
+ * Il livello di firma (ses | fea | feq) così com'è scritto sul modello o sul documento salvato,
+ * oppure `null` se manca o non è uno dei tre. Chi chiama decide il ripiego: qui non si sceglie
+ * un livello al posto del dato.
+ */
+export function livelloFirmaValido(livello: unknown): 'ses' | 'fea' | 'feq' | null {
+  return livello === 'ses' || livello === 'fea' || livello === 'feq' ? livello : null;
+}

@@ -156,6 +156,7 @@ model Tenant {
   credenzialiServiziEsterni CredenzialeServizioEsterno[]
 
   @@map("tenant")
+  noteBeta             NotaBeta[]
 }
 
 enum RuoloUtente {
@@ -1222,6 +1223,34 @@ model FatturaRicevuta {
   @@index([tenantId, data(sort: Desc)])
   @@index([tenantId, pagata])
   @@map("fattura_ricevuta")
+}
+
+// Note della beta: ciò che chi prova il gestionale segnala pagina per pagina (un errore, un
+// miglioramento, una domanda). Si scrivono dal pulsante presente in ogni pagina e si raccolgono
+// in «Note della beta». Tenant-scoped, con la sua policy RLS nella migrazione.
+model NotaBeta {
+  id         String    @id @default(uuid())
+  tenantId   String    @map("tenant_id")
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  // Chi l'ha scritta: l'id resta anche se l'utente viene archiviato; nome e ruolo sono quelli
+  // del momento, così la nota si legge senza rincorrere l'anagrafica.
+  userId     String?   @map("user_id")
+  autoreNome String    @map("autore_nome")
+  ruolo      String
+  // La pagina in forma generale («/projects/:id») per raggruppare, e l'indirizzo esatto
+  // («/projects/6a3b…») per ritrovare il punto preciso.
+  pagina     String
+  percorso   String
+  tipo       String    @default("errore") // errore | miglioramento | domanda
+  testo      String
+  stato      String    @default("aperta") // aperta | risolta
+  risoltaAt  DateTime? @map("risolta_at")
+  risoltaDa  String?   @map("risolta_da")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, pagina, stato])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("nota_beta")
 }
 
 model LiquidazioneIva {

@@ -61,6 +61,7 @@
     "start:db": "tsx watch src/adapters/prisma/index.ts",
     "seed": "tsx src/adapters/prisma/seed.ts",
     "e2e:prepara": "node scripts/e2e/prepara.mjs",
+    "e2e:reset": "node scripts/e2e/reset.mjs",
     "test:e2e": "node scripts/e2e/prepara.mjs && playwright test",
     "prepare": "simple-git-hooks"
   },

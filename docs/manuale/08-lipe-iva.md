@@ -23,6 +23,7 @@ prospetto **F24**.
 - **Prima Nota** (§07): il versamento F24 registra l'uscita.
 
 ## ⚠️ Stati limite & errori
+- **Salda con F24** fa tutto in un gesto: salva la liquidazione mostrata a schermo e la segna versata. Chiede la data e il **conto** da cui esce il denaro; liquidazione versata e uscita in Prima Nota si scrivono insieme (o tutte e due, o nessuna).
 - Periodo senza operazioni: prospetto a zero, non inventato.
 - **Esigibilità differita**: le operazioni emesse con quell'opzione entrano comunque nel debito del
   periodo della **fattura**, e il prospetto lo **dichiara** con un avviso in alto che nomina i

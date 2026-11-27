@@ -1,6 +1,7 @@
 # 02 · Clienti & Anagrafica ERP
 
 ## 👤 Cosa fa e come si usa
+- **La scheda segue il tipo di cliente**: per una **persona fisica** non compaiono i dati societari (Paese di costituzione, Registro Imprese / REA, capitale sociale) e il nome si chiama «Nome e cognome»; per una **società o ente** ci sono tutti. PEC e codice destinatario SDI servono solo per i clienti italiani.
 L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Clienti** (`/clients`).
 
 - **Creare / modificare un cliente**: modale a **5 schede** —
@@ -38,6 +39,7 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
   `clients` (permesso per ruolo).
 
 ## ⚠️ Stati limite & errori
+- **Campi obbligatori**: nella scheda è obbligatorio solo il **nome**. Gli altri dati (P.IVA, PEC, codice SDI, IBAN…) si compilano quando servono: un campo vuoto resta vuoto, la scheda non propone valori al posto del dato (niente «Italia», niente capitale, niente codice SDI di comodo).
 - Un **collaboratore** che tenta di cambiare la password di un cliente/utente dall'anagrafica → **400**
   («procedura dedicata»): il cambio password non passa da qui.
 - Magic-link e reset password sono riservati (guard di ruolo sul modulo `clients`).

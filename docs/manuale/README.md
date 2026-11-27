@@ -20,8 +20,9 @@ vale quindi due volte.
 
 - tutto ciò che sta da `## 🔧 Nota tecnica` **in giù** — per questo quel titolo va **sempre per
   ultimo**: è il punto in cui il testo viene tagliato per gli altri ruoli;
-- **l'intera scheda `19-infra-deploy.md`** (indirizzo del VPS, backup, nginx): è il manuale
-  dell'operatore della piattaforma, non dello studio. L'elenco delle schede riservate è
+- **l'intera scheda `19-infra-deploy.md`** (indirizzo del VPS, backup, nginx) e la
+  **`31-multi-tenant-admin.md`** (pannello della piattaforma): sono il manuale dell'operatore
+  della piattaforma, non dello studio. L'elenco delle schede riservate è
   `SCHEDE_RISERVATE` in `src/domain/manuale.ts`, ed è esplicito, non dedotto dai titoli — la §19 apre
   con `## 👤`, quindi un filtro per titolo la lascerebbe passare.
 
@@ -103,6 +104,18 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 17 | RBAC / Permessi & Ruoli | `17-rbac.md` | matrice permessi, gerarchia, default per ruolo | ✅ |
 | 18 | Filtri per data & Periodo | `18-filtri-periodo.md` | filtro da/a, selettore Esercizio globale | ✅ |
 | 19 | Infrastruttura & Deploy | `19-infra-deploy.md` | VPS (produzione di destinazione) + Railway/Vercel, migrazioni, RLS, backup | ✅ |
+| 20 | Accesso alla piattaforma | `20-accesso.md` | login, primo accesso, 2FA | ✅ |
+| 21 | Dashboard | `21-dashboard.md` | contatori, avvisi, elenco progetti | ✅ |
+| 22 | Coda KYC / AML | `22-coda-kyc.md` | pratiche aperte, approvazione in blocco | ✅ |
+| 23 | Fornitori & Acquisti | `23-fornitori-acquisti.md` | ciclo passivo, import XML, saldo | ✅ |
+| 24 | Banche & Conti | `24-banche-conti.md` | conti dello studio, liquidità | ✅ |
+| 25 | Pagamenti | `25-pagamenti.md` | vista rate fuori menu | ✅ |
+| 26 | Report & Analytics | `26-report.md` | i cinque report, export | ✅ |
+| 27 | Timesheet Ore | `27-timesheet.md` | ore settimanali, approvazione | ✅ |
+| 28 | Log Audit Studio | `28-log-audit.md` | registro delle azioni | ✅ |
+| 29 | Cartella Modelli | `29-cartella-modelli.md` | modelli e stato di revisione | ✅ |
+| 30 | Aiuto | `30-aiuto.md` | il manuale dentro l'app | ✅ |
+| 31 | Multi-Tenant Admin | `31-multi-tenant-admin.md` | studi e licenze (riservata al super admin) | ✅ |
 
 ## Template di ogni scheda
 Ogni file `NN-*.md` segue questa struttura (così sono tutte uguali e complete):

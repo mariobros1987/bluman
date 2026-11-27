@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti } from '../api/client';
+import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti, fetchContiBancariApi } from '../api/client';
+import { oggi } from '../utils/calendarioDate';
 import { fmt } from '../utils';
 import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
 import { useToast } from '../components/ui/ToastProvider';
@@ -31,6 +32,23 @@ export function ScadenzarioPage() {
   const [riferimentoTransazione, setRiferimentoTransazione] = useState('');
   const [noteOperatore, setNoteOperatore] = useState('');
   const [savingIncasso, setSavingIncasso] = useState(false);
+  // Quando è entrato il denaro e su quale conto: il server li accettava già, ma il modale non li
+  // chiedeva. Ogni incasso prendeva la data di oggi e, senza conti, restava fuori da ogni saldo.
+  const [dataIncasso, setDataIncasso] = useState(oggi());
+  const [contoIncassoId, setContoIncassoId] = useState('');
+  const [conti, setConti] = useState<any[]>([]);
+  /** `null` = conti letti; una stringa = lettura fallita (non «nessun conto»). */
+  const [erroreConti, setErroreConti] = useState<string | null>(null);
+
+  const apriIncasso = (scadenza: any) => {
+    setSelectedScadenza(scadenza);
+    setImportoIncasso(((scadenza.importoCentesimi || 0) / 100).toFixed(2));
+    setDataIncasso(oggi());
+    // Stessa precedenza del server: il conto indicato sulla fattura, altrimenti il predefinito.
+    const proposto =
+      conti.find((c) => c.id === scadenza.fattura?.contoAccreditoId) || conti.find((c) => c.isDefault);
+    setContoIncassoId(proposto?.id || '');
+  };
 
   // F6 — una lettura fallita è un errore da dichiarare, non «nessuna scadenza».
   const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
@@ -57,6 +75,12 @@ export function ScadenzarioPage() {
     loadData();
   }, [dataDa, dataA]);
 
+  useEffect(() => {
+    fetchContiBancariApi({ rigettaSuErrore: true })
+      .then((elenco) => { setConti(Array.isArray(elenco) ? elenco : []); setErroreConti(null); })
+      .catch((err) => { setConti([]); setErroreConti(err instanceof Error ? err.message : 'Errore di rete'); });
+  }, []);
+
   const totalSospeso = scadenze
     .filter((s) => s.stato !== 'incassato' && s.stato !== 'stornata')
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
@@ -78,11 +102,13 @@ export function ScadenzarioPage() {
     try {
       await registraIncassoApi(selectedScadenza.id, {
         importoIncassatoCentesimi: importoCentesimi,
+        dataIncasso,
+        contoBancarioId: contoIncassoId || undefined,
         metodoPagamento,
         riferimentoTransazione: riferimentoTransazione || undefined,
         noteOperatore: noteOperatore || undefined,
       });
-      toast.successo('Incasso registrato con successo e scritto automaticamente in Prima Nota!');
+      toast.successo('Incasso registrato: lo trovi anche in Prima Nota.');
       setSelectedScadenza(null);
       setImportoIncasso('');
       setRiferimentoTransazione('');
@@ -251,10 +277,7 @@ export function ScadenzarioPage() {
                             <button
                               type="button"
                               className="btn btn-sm btn-success"
-                              onClick={() => {
-                                setSelectedScadenza(s);
-                                setImportoIncasso(((s.importoCentesimi || 0) / 100).toFixed(2));
-                              }}
+                              onClick={() => apriIncasso(s)}
                             >
                               📥 Registra Incasso
                             </button>
@@ -291,6 +314,51 @@ export function ScadenzarioPage() {
                   onChange={(e) => setImportoIncasso(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 16, fontWeight: 700 }}
                 />
+              </div>
+
+              <div>
+                <label htmlFor="incasso-data" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data dell'incasso *</label>
+                <input
+                  id="incasso-data"
+                  type="date"
+                  required
+                  max={oggi()}
+                  value={dataIncasso}
+                  onChange={(e) => setDataIncasso(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                />
+                <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 4 }}>
+                  Il giorno in cui il denaro è arrivato: è la data che finisce in Prima Nota.
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="incasso-conto" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Conto su cui è entrato il denaro</label>
+                <select
+                  id="incasso-conto"
+                  value={contoIncassoId}
+                  onChange={(e) => setContoIncassoId(e.target.value)}
+                  disabled={conti.length === 0}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                >
+                  <option value="">{conti.length === 0 ? 'Nessun conto disponibile' : 'Non indicato (conto della fattura o predefinito)'}</option>
+                  {conti.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nomeConto}{c.banca ? ` — ${c.banca}` : ''}{c.isDefault ? ' (predefinito)' : ''}</option>
+                  ))}
+                </select>
+                {erroreConti ? (
+                  <div role="alert" style={{ fontSize: 11, color: 'var(--pill-red-fg)', marginTop: 4 }}>
+                    Elenco dei conti non letto ({erroreConti}): l'incasso si può registrare, ma senza scegliere il conto.
+                  </div>
+                ) : conti.length === 0 ? (
+                  <div style={{ fontSize: 11, color: 'var(--pill-amber-fg)', marginTop: 4 }}>
+                    Lo studio non ha conti in Banche &amp; Conti: l'incasso viene scritto in Prima Nota ma non entra nel saldo di nessun conto.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 4 }}>
+                    Il saldo di questo conto sale dell'importo incassato.
+                  </div>
+                )}
               </div>
 
               <div>

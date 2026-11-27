@@ -317,9 +317,15 @@ export async function fetchAnagraficaStudioApi(): Promise<StatoAnagraficaStudio>
   }
 }
 
-export async function fetchAuditLogsApi(parametri?: ParametriListaPaginata) {
+export async function fetchAuditLogsApi(parametri?: ParametriListaPaginata & { ruolo?: string; categoria?: string }) {
   try {
-    const res = await apiFetch(`${API_BASE}/audit-logs${queryPaginazione(parametri)}`, { headers: getAuthHeaders() });
+    // Ruolo e categoria li filtra il server su tutto il registro, non la pagina sulle righe ricevute.
+    const filtri = new URLSearchParams();
+    if (parametri?.ruolo) filtri.set('ruolo', parametri.ruolo);
+    if (parametri?.categoria) filtri.set('categoria', parametri.categoria);
+    const base = queryPaginazione(parametri);
+    const coda = filtri.toString() ? `${base ? `${base}&` : '?'}${filtri.toString()}` : base;
+    const res = await apiFetch(`${API_BASE}/audit-logs${coda}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore recupero audit logs'));
     return await res.json();
   } catch (err) {

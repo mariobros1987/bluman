@@ -9,7 +9,8 @@
 
 import type { FastifyInstance } from 'fastify';
 import { randomBytes } from 'node:crypto';
-import { RuoloUtente } from '@prisma/client';
+import { RuoloUtente, type Prisma } from '@prisma/client';
+import { eCategoriaAudit, eRuoloAudit, regolaFiltroCategoriaAudit } from '../domain/categoriaAudit.js';
 import { prisma, prismaAmministrativo, contestoTenant, conContestoInTransazione } from '../util/prismaClient.js';
 import { CreaTenantSchema, AggiornaTenantSchema, AuditLogSchema, PermessiUtenteSchema } from '../schemas/tenant.schema.js';
 import { generaPasswordTemporanea, hashPassword } from '../util/password.js';
@@ -1702,8 +1703,25 @@ export async function registraRotteTenant(server: FastifyInstance): Promise<void
       const { page, limit, search, sortBy, sortOrder, skip } = paginazione.parametri;
       const campo = campoOrdinamento(sortBy, ['createdAt', 'azione', 'ruolo', 'userNome'] as const, 'createdAt');
       if (!campo) return reply.code(400).send({ errore: 'Campo di ordinamento audit non valido' });
-      const where = {
+      // Filtri per ruolo e categoria su TUTTO il registro, non sulla pagina visualizzata. Valori
+      // fuori elenco si rifiutano: un filtro ignorato in silenzio mostrerebbe tutto il registro a
+      // chi crede di guardarne una parte.
+      const q = (req.query || {}) as { ruolo?: unknown; categoria?: unknown };
+      const filtroRuolo = typeof q.ruolo === 'string' && q.ruolo ? q.ruolo : null;
+      const filtroCategoria = typeof q.categoria === 'string' && q.categoria ? q.categoria : null;
+      if (filtroRuolo && !eRuoloAudit(filtroRuolo)) return reply.code(400).send({ errore: 'Ruolo del filtro audit non valido' });
+      if (filtroCategoria && !eCategoriaAudit(filtroCategoria)) return reply.code(400).send({ errore: 'Categoria del filtro audit non valida' });
+      const condizioniCategoria: Prisma.AuditLogWhereInput[] = [];
+      if (filtroCategoria && eCategoriaAudit(filtroCategoria)) {
+        const { contiene, nonContiene } = regolaFiltroCategoriaAudit(filtroCategoria);
+        const haParola = (p: string): Prisma.AuditLogWhereInput => ({ azione: { contains: p, mode: 'insensitive' } });
+        if (contiene.length) condizioniCategoria.push({ OR: contiene.map(haParola) });
+        if (nonContiene.length) condizioniCategoria.push({ NOT: { OR: nonContiene.map(haParola) } });
+      }
+      const where: Prisma.AuditLogWhereInput = {
         tenantId,
+        ...(filtroRuolo ? { ruolo: filtroRuolo } : {}),
+        ...(condizioniCategoria.length ? { AND: condizioniCategoria } : {}),
         ...(search ? {
           OR: [
             { userNome: { contains: search, mode: 'insensitive' as const } },

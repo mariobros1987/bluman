@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { categoriaAzioneAudit } from '../../../src/domain/categoriaAudit';
 import { fetchAuditLogsApi } from '../api/client';
 import { Paginatore } from '../components/ui/Paginatore';
 import { isRispostaPaginata, type MetaPaginazione } from '../api/paginazione';
@@ -49,31 +50,21 @@ export function AuditLogPage() {
       setLoading(true);
       setErrore('');
       try {
-        const risposta = await fetchAuditLogsApi({ page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc' });
+        const risposta = await fetchAuditLogsApi({
+          page, limit, search: searchDebounced, sortBy: 'createdAt', sortOrder: 'desc',
+          ruolo: filterRuolo === 'TUTTI' ? undefined : filterRuolo,
+          categoria: filterCat === 'TUTTI' ? undefined : filterCat,
+        });
         if (!isRispostaPaginata<any>(risposta)) throw new Error('Risposta audit log non valida');
         setMeta(risposta.meta);
         if (risposta.meta.pagine > 0 && page > risposta.meta.pagine) setPage(risposta.meta.pagine);
         setLogs(risposta.data.map((l: any) => {
-          const az = (l.azione || '').toUpperCase();
-          let cat: AuditEntry['categoria'] = 'DOCUMENTI';
-          if (az.includes('FATTURA') || az.includes('INCASSO') || az.includes('SDI') || az.includes('PRIMA_NOTA') || az.includes('CONTRATTO')) {
-            cat = 'FATTURAZIONE';
-          } else if (az.includes('PROGETTO') || az.includes('ORE') || az.includes('MODULO') || az.includes('PREVENTIVO')) {
-            cat = 'PROGETTO';
-          } else if (az.includes('TENANT') || az.includes('UTENTE') || az.includes('STUDIO')) {
-            cat = 'TENANT';
-          } else if (az.includes('LOGIN') || az.includes('AUTH') || az.includes('PASSWORD')) {
-            cat = 'AUTH';
-          } else if (az.includes('PERMESSI')) {
-            cat = 'PERMESSI';
-          } else if (az.includes('KYC')) {
-            cat = 'KYC';
-          }
-
           return {
             ...l,
-            tenantName: l.tenantName || 'Studio Advisory',
-            categoria: l.categoria || cat,
+            // Il nome dello studio si mostra se la riga lo porta: prima, mancando, compariva
+            // «Studio Advisory», uno studio che non esiste.
+            tenantName: l.tenantName || '',
+            categoria: l.categoria || categoriaAzioneAudit(l.azione),
             dataOra: l.createdAt ? new Date(l.createdAt).toLocaleString('it-IT') : l.dataOra,
           };
         }));
@@ -85,15 +76,11 @@ export function AuditLogPage() {
       }
     };
     loadAuditLogs();
-  }, [page, limit, searchDebounced]);
+  }, [page, limit, searchDebounced, filterRuolo, filterCat]);
 
-  // L'endpoint è già isolato sul tenant della sessione; questi filtri agiscono sulla pagina corrente.
-  const filteredLogs = logs.filter(l => {
-    const matchSearch = true;
-    const matchRuolo = filterRuolo === 'TUTTI' || l.ruolo === filterRuolo;
-    const matchCat = filterCat === 'TUTTI' || l.categoria === filterCat;
-    return matchSearch && matchRuolo && matchCat;
-  });
+  // Ricerca, ruolo e categoria li applica il server su tutto il registro: le righe ricevute sono
+  // già quelle giuste. Prima ruolo e categoria filtravano solo la pagina visualizzata.
+  const filteredLogs = logs;
 
   const getRuoloBadge = (ruolo: string) => {
     switch (ruolo) {
@@ -146,19 +133,23 @@ export function AuditLogPage() {
           />
 
           <select value={filterRuolo} onChange={e => { setFilterRuolo(e.target.value); setPage(1); }} style={{ padding: 8, fontSize: 12 }}>
-            <option value="TUTTI">Tutti i Ruoli Attore (pagina corrente)</option>
+            <option value="TUTTI">Tutti i ruoli</option>
             <option value="super_admin">👑 Super Admin</option>
-            <option value="advisor">👨‍💼 Advisor Senior</option>
-            <option value="collaboratore_interno">👷 Operatore Studio</option>
+            <option value="advisor">👨‍💼 Advisor</option>
+            <option value="collaboratore_interno">👷 Operatore dello studio</option>
+            <option value="collaboratore_esterno">🤝 Collaboratore esterno</option>
             <option value="cliente">🔑 Cliente</option>
           </select>
 
           <select value={filterCat} onChange={e => { setFilterCat(e.target.value); setPage(1); }} style={{ padding: 8, fontSize: 12 }}>
-            <option value="TUTTI">Tutte le Categorie Azione (pagina corrente)</option>
-            <option value="DOCUMENTI">📄 Documenti & File</option>
-            <option value="FATTURAZIONE">💶 Fatturazione & SDI</option>
-            <option value="PROGETTO">🗂 Progetti & Ore</option>
-            <option value="TENANT">🏢 Multi-Tenant Admin</option>
+            <option value="TUTTI">Tutte le categorie</option>
+            <option value="DOCUMENTI">📄 Documenti e file</option>
+            <option value="FATTURAZIONE">💶 Fatture e contabilità</option>
+            <option value="PROGETTO">🗂 Progetti e ore</option>
+            <option value="KYC">🛡️ KYC / AML</option>
+            <option value="AUTH">🔑 Accessi e password</option>
+            <option value="PERMESSI">🔐 Permessi</option>
+            <option value="TENANT">🏢 Studio e utenti</option>
           </select>
         </div>
 

@@ -15,7 +15,7 @@
 // configurare non è codice morto — l'advisor passa comunque, i collaboratori
 // partono ristretti.
 // Le rotte fuori da questa mappa (auth, notifiche, documenti, portale, tenant,
-// admin, webhooks, cron, fornitori, timesheet, search…) non passano dal RBAC
+// admin, webhooks, cron, timesheet, search…) non passano dal RBAC
 // per modulo: restano protette dall'autenticazione e dai guard di ruolo
 // esistenti. Il criterio per allargare la mappa è sempre lo stesso: prima si
 // aggiunge la chiave alla matrice lato frontend, poi qui la rotta.
@@ -72,6 +72,12 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   ['/clienti', 'clients'],
   ['/invoices', 'invoices'],
   ['/fatture', 'invoices'],
+  // Ciclo passivo e liquidazione IVA: nell'app stanno dietro la chiave `invoices` (menu e
+  // ProtectedModule), ma via API erano aperti a qualunque collaboratore autenticato. Stessa chiave
+  // qui: nessuna voce nuova in matrice. L'esterno resta escluso a monte (PREFISSI_VIETATI_ESTERNO).
+  ['/fornitori', 'invoices'],
+  ['/fatture-ricevute', 'invoices'],
+  ['/liquidazione-iva', 'invoices'],
   ['/contratti-ricorrenti', 'retainers'],
   ['/prima-nota', 'primanota'],
   ['/conti-bancari', 'banks'],

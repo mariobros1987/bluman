@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import {
   inviaComunicazioneApi,
   sendEmailDirectApi,
+  fetchTenantInfoApi,
   sendSignalDirectApi,
   sendTelegramDirectApi,
   sendWhatsAppDirectApi,
   uploadFileApi,
 } from '../api/client';
 import type { RecapitiCliente } from '../utils/recapitiCliente';
+import { EMAIL_SENZA_RAGIONE_SOCIALE, oggettoEmailCliente } from '../utils/oggettoEmailCliente';
 
 /**
  * L'invio di un messaggio del fascicolo: **una** implementazione, due punti di montaggio.
@@ -271,9 +273,16 @@ export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicaz
           avvisa({ tipo: 'err', testo: `Nessuna email per ${nomeCliente || 'il cliente'}: scrivila nel campo destinatario o compila l'anagrafica.` });
           return;
         }
+        // L'oggetto porta il nome dello studio che scrive, letto dal server: prima era scritto a
+        // mano «Studio BlueCode Advisory» per tutti gli studi. Senza ragione sociale non si invia.
+        const oggetto = oggettoEmailCliente((await fetchTenantInfoApi())?.ragioneSociale, nomeCliente);
+        if (!oggetto) {
+          avvisa({ tipo: 'err', testo: EMAIL_SENZA_RAGIONE_SOCIALE });
+          return;
+        }
         const res = await sendEmailDirectApi(
           destEmail,
-          `💬 Comunicazione Studio BlueCode Advisory — Fascicolo ${nomeCliente || 'Pratica'}`,
+          oggetto,
           testoDaInviare,
           undefined,
           comunicazioneId,

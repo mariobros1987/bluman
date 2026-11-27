@@ -57,6 +57,7 @@ export async function eliminaTenantCompleto(tenantId: string): Promise<Record<st
       ['fatturaRiga', () => tx.fatturaRiga.deleteMany(w)],
       ['fattura', () => tx.fattura.deleteMany(w)],
       ['liquidazioneIva', () => tx.liquidazioneIva.deleteMany(w)],
+      ['notaBeta', () => tx.notaBeta.deleteMany(w)],
       ['fatturaRicevuta', () => tx.fatturaRicevuta.deleteMany(w)],
       ['fornitore', () => tx.fornitore.deleteMany(w)],
       ['contoBancario', () => tx.contoBancario.deleteMany(w)],

@@ -1,0 +1,333 @@
+# Correttore automatico: quando il revisore mette review-da-correggere,
+# scripts/review-label.sh lancia questo workflow sulla PR. Un Claude legge il
+# commento del revisore, corregge sullo STESSO ramo e fa push: il commit nuovo
+# fa ripartire CI e revisione. Al massimo 2 giri per PR (li conta
+# review-label.sh dai commenti «**Correzione automatica — giro N**», che scrive
+# questo workflow PRIMA di lanciare Claude: il conteggio non dipende da lui).
+#
+# Con motivo=conflitto (lo lancia automerge.sh quando la PR non si mergia perché
+# il ramo di produzione è andato avanti, di solito due righe in fondo al DIARIO)
+# il Claude porta main nel ramo e risolve il conflitto. Giri contati a parte
+# dai commenti «**Allineamento automatico — giro N**», anche questi al massimo 2.
+#
+# Con motivo=prove (lo lancia scripts/ci-rossa.sh quando le prove sono rosse, dal
+# 10/11) il Claude legge i log del run e corregge; se il fallimento non viene dal
+# codice (rete, runner, tempo scaduto) non tocca niente e il workflow rilancia le
+# sole parti fallite. Giri contati dai commenti «**Correzione delle prove — giro N**».
+# Un conflitto che riguarda solo il DIARIO si risolve prima, senza Claude: righe di
+# tutte e due le parti (merge=union), in un minuto.
+# Nessun giro finisce muto: se non arriva niente di nuovo sul ramo, serve-fabio e avviso.
+#
+# workflow_dispatch: gira con il file del ramo predefinito.
+# BluMan: gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository in ogni
+# job): con la pubblicazione questo file arriva anche nel repo del titolare, dove non
+# ci sono runner né secret nostri (docs/adozione-standard.md).
+name: fix
+# Il titolo del run porta la PR: la sentinella vede se un correttore è già in coda o in corso.
+run-name: "fix #${{ github.event.inputs.pr }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numero della PR da correggere"
+        required: true
+      motivo:
+        description: "correzione (dal revisore), conflitto (col ramo di produzione) o prove (rosse)"
+        required: false
+        default: correzione
+      run:
+        description: "Con motivo=prove: il run di ci da leggere"
+        required: false
+        default: ""
+
+concurrency:
+  group: fix-${{ github.event.inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  # I job che eseguono o leggono codice delle PR girano sui runner «ci» del PC
+  # (server/install-ci-runner.sh); merge, etichette, verifica del deploy e
+  # riepilogo sui runner dei server, che non eseguono mai codice delle PR. Mai sulle
+  # macchine di GitHub: i minuti gratuiti finiscono e non si pagano (09/11). Il
+  # job resta perché gli altri lo aspettano; col PC spento i job restano in coda.
+  dove:
+    if: github.repository == 'wolftradesystem-tech/bluman'
+    runs-on: [self-hosted, ci]
+    timeout-minutes: 2
+    outputs:
+      runner: ${{ steps.d.outputs.runner }}
+    steps:
+      - id: d
+        run: |
+          echo 'runner=["self-hosted","ci"]' >> "$GITHUB_OUTPUT"
+          echo 'gira su: il runner «ci» del PC'
+
+  fix:
+    if: github.repository == 'wolftradesystem-tech/bluman'
+    needs: dove
+    runs-on: ${{ fromJSON(needs.dove.outputs.runner) }}
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: write   # motivo=prove: rilancio delle parti fallite
+    steps:
+      # Sul PC la cartella di lavoro è in comune fra i job del repo, e la CI esegue
+      # codice delle PR: si svuota tutta, .git compreso (hook, config, credenziali
+      # rimaste da un job interrotto), prima del checkout.
+      - name: cartella di lavoro pulita
+        run: |
+          [[ "$GITHUB_WORKSPACE" == */_work/* ]] || { echo "cartella inattesa: $GITHUB_WORKSPACE"; exit 1; }
+          find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+      - id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.inputs.pr }}
+          MOTIVO: ${{ github.event.inputs.motivo || 'correzione' }}
+        run: |
+          set -euo pipefail
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "pr non numerica"; exit 1; }
+          [[ "$MOTIVO" == correzione || "$MOTIVO" == conflitto || "$MOTIVO" == prove ]] || { echo "motivo sconosciuto"; exit 1; }
+          j="$(gh api "repos/$GH_REPO/pulls/$PR")"
+          [[ "$(jq -r .state <<<"$j")" == open ]] || { echo "PR non aperta"; exit 1; }
+          # Solo rami di questo repo: un fork non si corregge da qui.
+          [[ "$(jq -r .head.repo.full_name <<<"$j")" == "$GH_REPO" ]] || { echo "PR da un fork"; exit 1; }
+          echo "ref=$(jq -r .head.ref <<<"$j")" >> "$GITHUB_OUTPUT"
+          if [[ "$MOTIVO" == conflitto ]]; then testa="**Allineamento automatico"; cosa="porta main in questo ramo e risolve il conflitto"
+          elif [[ "$MOTIVO" == prove ]]; then testa="**Correzione delle prove"; cosa="legge i log delle prove rosse e corregge su questo ramo, o rilancia le parti fallite se il codice non c'entra"
+          else testa="**Correzione automatica"; cosa="legge l'ultimo commento del revisore e corregge su questo ramo"; fi
+          giri="$(gh api --paginate "repos/$GH_REPO/issues/$PR/comments" --jq \
+            "[.[] | select(.user.type == \"Bot\" and (.body | startswith(\"$testa\")))] | length" \
+            | awk '{s+=$1} END {print s+0}')"
+          n=$((giri + 1))
+          echo "giro=$n" >> "$GITHUB_OUTPUT"
+          gh pr comment "$PR" --body "$testa — giro $n di 2**
+          Il correttore $cosa. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      - uses: actions/checkout@v6
+        with:
+          # Push con il token del bot CI (secret RUNNER_PROBE_TOKEN): un push con
+          # GITHUB_TOKEN lascia CI e revisione «action_required» (misurato sul progetto pilota).
+          token: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          ref: ${{ steps.pr.outputs.ref }}
+          fetch-depth: 0
+      # Lo script del push nella versione di PRODUZIONE, non in quella della PR (una
+      # PR non cambia le regole che la riguardano, analisi del 04/11), copiato fuori
+      # dalla cartella di lavoro prima di Claude, che lì non scrive.
+      - run: |
+          git show origin/main:scripts/push-ramo.sh > "$RUNNER_TEMP/push-ramo.sh"
+          git show origin/main:scripts/ci-notify.sh > "$RUNNER_TEMP/ci-notify.sh"
+          mkdir -p .fix-pr && echo ".fix-pr/" >> .git/info/exclude
+      # Prove rosse: i log delle parti fallite li scarica il workflow col suo token
+      # (actions: write), in un file che Claude legge; il PAT dato a Claude non è
+      # detto che possa leggere i log di Actions.
+      - name: log delle prove rosse
+        if: github.event.inputs.motivo == 'prove'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.event.inputs.run }}
+        run: |
+          [[ "$RUN" =~ ^[0-9]+$ ]] || { echo "run non numerico"; exit 1; }
+          gh run view "$RUN" --log-failed 2>&1 | tail -n 4000 > .fix-pr/log-prove.txt || true
+          [[ -s .fix-pr/log-prove.txt ]] || echo "log non disponibile: guarda il run $RUN" > .fix-pr/log-prove.txt
+          wc -l .fix-pr/log-prove.txt
+      # Conflitto: prima il merge meccanico, con le righe del DIARIO di tutte e due le
+      # parti. Se basta, Claude non serve; se resta un conflitto, si annulla e decide lui.
+      - id: mecc
+        if: github.event.inputs.motivo == 'conflitto'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "DIARIO.md merge=union" >> .git/info/attributes
+          git fetch --quiet origin main
+          if git -c core.hooksPath=/dev/null merge --no-edit origin/main; then
+            echo "fatto=si" >> "$GITHUB_OUTPUT"
+            echo "Fatto: allineamento meccanico con main (righe del diario di tutte e due le parti), senza correttore." > .fix-pr/commento.md
+          else
+            git merge --abort || true
+            echo "fatto=no" >> "$GITHUB_OUTPUT"
+          fi
+      # Le stesse installazioni di ci.yml (job check): npm, Prisma client, frontend.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npx --no-install prisma generate
+      - run: npm ci
+        working-directory: frontend
+      - uses: anthropics/claude-code-action@v1
+        if: steps.mecc.outputs.fatto != 'si'
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Commenti, PR e push come il proprietario: così CI e revisione partono da sole.
+          github_token: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          # Questo workflow lo lancia review-label.sh con GITHUB_TOKEN: l'attore è il
+          # bot github-actions, e l'azione rifiuta i bot che non sono nominati qui
+          # (prima prova vera, PR #12 del 03/11: «Workflow initiated by non-human actor»).
+          allowed_bots: "github-actions"
+          # Niente scritture in .git: da .git/config (core.fsmonitor, alias, hook) un
+          # `git status` permesso eseguirebbe qualunque comando col token del bot
+          # (revisione indipendente del 04/11).
+          claude_args: |
+            --model claude-opus-5-5
+            --max-turns 80
+            --disallowedTools "Edit(.git/**),Write(.git/**),Edit(**/.git/**),Write(**/.git/**)"
+            --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git fetch origin:*),Bash(git merge origin/main:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(npx tsc:*),Bash(npm run build:*),Bash(npx vitest run:*),Bash(npx --no-install prisma generate:*),Bash(npx prisma generate:*),Bash(cd frontend && npx tsc:*),Bash(cd frontend && npm run lint:*),Bash(cd frontend && npx vitest run:*),Bash(cd frontend && npm run build:*)"
+          prompt: |
+            Sei il correttore della PR #${{ github.event.inputs.pr }} di ${{ github.repository }}, giro ${{ steps.pr.outputs.giro }} di 2.
+            Motivo: ${{ github.event.inputs.motivo || 'correzione' }}.
+            Sei sul suo ramo, `${{ steps.pr.outputs.ref }}`, con le dipendenze installate.
+
+            1. Leggi CLAUDE.md e .claude/rules/: valgono tutte.
+            2. Leggi la PR (`gh pr view ${{ github.event.inputs.pr }} --comments`, `gh pr diff ${{ github.event.inputs.pr }}`): il piano è nel corpo.
+            3. Se il motivo è «correzione»: l'ULTIMO commento «**Revisione automatica — review-da-correggere**» dice cosa correggere.
+               Correggi SOLO quello, dentro il piano della PR. Niente di nuovo, niente pulizie.
+               Se il motivo è «conflitto»: `git fetch origin main` e `git merge origin/main`. Risolvi i conflitti:
+               - DIARIO.md, PIANO.md e gli altri documenti: tieni le righe di TUTTE E DUE le parti, quelle di main prima;
+               - codice: risolvi solo se le due intenzioni sono chiare e compatibili; altrimenti `git merge --abort`, non spingere
+                 niente e scrivi nel commento finale, sotto «Per Fabio», quali file e perché.
+               Non cambiare altro oltre alla risoluzione.
+               Se il motivo è «prove»: le prove della PR sono rosse. Leggi `.fix-pr/log-prove.txt` (i log delle parti fallite del run ${{ github.event.inputs.run }}).
+               - se il fallimento viene dal codice o dai test della PR: correggi solo quello. Un test che cambia verso porta
+                 nel commento cosa diceva prima e perché;
+               - se non viene dal codice (rete, download, runner morto, servizio che non parte, disco pieno, job ucciso
+                 dal tempo massimo PRIMA delle prove): non cambiare niente e crea il file `.fix-pr/rilancia` (il workflow
+                 rilancia le sole parti fallite). Un test rosso, anche se sembra instabile, e un tempo scaduto DENTRO una
+                 prova vengono dal codice: «il verde dopo un rosso non è attendibile», si corregge o si rende deterministico.
+               Se va corretta la descrizione della PR (il revisore lo chiede, o la tua correzione la rende vecchia):
+               scrivi il corpo INTERO aggiornato in `.fix-pr/descrizione.md`, con tutte le sezioni del modello; lo
+               pubblica il workflow. Non usare `gh pr edit`. Correggi e aggiungi, MAI togliere voci da «Piano o
+               richiesta», vincoli, «Ho deciso da solo», rischi o «Dopo il merge»: una cosa del piano non fatta si fa, non
+               si cancella dal piano. In quelle sezioni (e in «Gira sul PC», «Cosa fa il primo deploy») si aggiunge
+               soltanto: il workflow non pubblica un corpo che ne toglie o ne cambia una riga; una riga sbagliata
+               lì si corregge con una riga nuova sotto, che lo dice.
+               In tutti e due i casi: se un punto chiede una decisione di prodotto, una spesa o un'azione su dati veri, non farlo:
+               scrivilo sotto «Per Fabio».
+            4. Verifica con i comandi di CLAUDE.md: typecheck o build, i test dei soli file toccati
+               (quelli che vogliono un database qui non girano: li fa la CI). Mai la suite intera.
+            5. Commit nel formato delle regole (`tipo(area): cosa — perché`; per il conflitto basta il commit di merge).
+               NON fare push: lo fa il workflow dopo di te, solo su questo ramo. Mai mergiare la PR.
+            6. NON commentare la PR: scrivi il commento nel file `.fix-pr/commento.md` (lo pubblica il workflow dopo il push,
+               così non dice «fatto» se il push non è passato): «Fatto: …» (un punto per riga, file:riga), «Non fatto: …» con
+               il perché, «Per Fabio: …» («niente» se vuota). Non scrivere «Correzione automatica» né «Allineamento automatico»
+               in testa: quel commento c'è già.
+
+      # Il push lo fa il workflow, non Claude: solo sul ramo della PR, mai sulla
+      # produzione, mai storia riscritta (scripts/push-ramo.sh di produzione).
+      - name: Push sul ramo della PR
+        env:
+          RAMO: ${{ steps.pr.outputs.ref }}
+          GH_REPO: ${{ github.repository }}
+          # push-ramo.sh non legge file del repo: ramo di produzione e rami vietati arrivano da qui.
+          PROD: ${{ github.event.repository.default_branch }}
+          RAMI_VIETATI: ""   # es. un vecchio ramo di produzione rinominato
+          GH_TOKEN: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          HA_PAT: ${{ secrets.RUNNER_PROBE_TOKEN != '' }}
+          PR: ${{ github.event.inputs.pr }}
+          RUN: ${{ github.event.inputs.run }}
+          # Il rilancio con il token del workflow: il suo permesso actions: write è
+          # dichiarato qui sopra; quello del PAT non è verificato (revisione sul pilota, 10/11).
+          TOKEN_RILANCIO: ${{ github.token }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+          NOME: "bluman"
+        run: |
+          set -uo pipefail
+          git fetch --quiet origin "$RAMO" || true
+          prima="$(git rev-parse "origin/$RAMO" 2>/dev/null || echo nessuno)"
+          ferma() {
+            gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=serve-fabio" >/dev/null || true
+            bash "$RUNNER_TEMP/ci-notify.sh" "🔴 $NOME: $1
+          #$PR — ${{ github.server_url }}/${{ github.repository }}/pull/$PR"
+          }
+          # Prove rosse non per colpa del codice: si rilanciano le parti fallite.
+          if [[ -f .fix-pr/rilancia && "$(git rev-parse HEAD)" == "$prima" && "$RUN" =~ ^[0-9]+$ ]]; then
+            if GH_TOKEN="$TOKEN_RILANCIO" gh run rerun "$RUN" --failed; then
+              gh pr comment "$PR" --body "Il correttore dice che le prove non sono fallite per il codice: rilanciate le sole parti fallite. $(cat .fix-pr/commento.md 2>/dev/null)"
+            else
+              ferma "le prove non ripartono (rilancio rifiutato)"
+            fi
+            exit 0
+          fi
+          if bash "$RUNNER_TEMP/push-ramo.sh" "$RAMO"; then
+            [[ -s .fix-pr/commento.md ]] || echo "Il correttore non ha lasciato il riepilogo: guarda il run." > .fix-pr/commento.md
+            gh pr comment "$PR" --body-file .fix-pr/commento.md
+            # Descrizione aggiornata (11/11): la pubblica il workflow, non Claude. Un
+            # corpo nuovo fa ripartire la revisione (review.yml, evento edited).
+            # Solo col token del bot (RUNNER_PROBE_TOKEN): una modifica fatta con
+            # GITHUB_TOKEN non fa partire la revisione, e la PR resterebbe ferma. Il
+            # revisore vede nel commento cosa è cambiato nel corpo.
+            # Barriera nella struttura (12/11, nata in un progetto): nelle sezioni che dicono
+            # cosa va fatto e cosa si rischia il correttore può solo AGGIUNGERE. Ogni riga
+            # di prima resta, uguale, sotto lo stesso titolo; se no il corpo non si pubblica.
+            righe_protette() {  # «titolo<TAB>riga» delle sezioni protette, ordinate
+              tr -d '\r' < "$1" | awk '
+                /^## / { sub(/[ \t]+$/, ""); sez = ($0 ~ /^## (Piano o richiesta|Ho deciso da solo|Dopo il merge|Gira sul PC|Cosa fa il primo deploy|Rischi)/) ? $0 : ""
+                         if (sez != "") print sez "\t"; next }
+                # Non contano: i commenti del modello (<!-- -->), «niente» (si sostituisce
+                # con la cosa da fare) e la spunta di una casella (- [ ] → - [x]).
+                incom { if (index($0, "-->")) incom = 0; next }
+                /^[ \t]*<!--/ { if (!index($0, "-->")) incom = 1; next }
+                sez != "" && NF { sub(/[ \t]+$/, ""); gsub(/\[[xX]\]/, "[ ]")
+                                  if (tolower($0) ~ /^[-* \t«»"]*niente[.»"]*$/) next
+                                  print sez "\t" $0 }' | LC_ALL=C sort -u
+            }
+            descr=no
+            if [[ -s .fix-pr/descrizione.md ]]; then
+              if [[ "$HA_PAT" != true ]]; then
+                descr=ferma
+                ferma "il correttore ha riscritto la descrizione ma manca RUNNER_PROBE_TOKEN per pubblicarla"
+              elif ! gh api "repos/$GH_REPO/pulls/$PR" --jq .body > .fix-pr/descrizione-prima.md; then
+                # Senza il corpo di prima non si sa cosa toglie: non si pubblica.
+                descr=ferma
+                ferma "descrizione di prima non letta: quella nuova del correttore non è pubblicata"
+              elif ! righe_protette .fix-pr/descrizione-prima.md > .fix-pr/protette-prima.txt \
+                || ! righe_protette .fix-pr/descrizione.md > .fix-pr/protette-dopo.txt \
+                || ! tolte="$(LC_ALL=C comm -23 .fix-pr/protette-prima.txt .fix-pr/protette-dopo.txt)"; then
+                descr=ferma
+                ferma "confronto della descrizione non riuscito: quella nuova del correttore non è pubblicata"
+              elif [[ -n "$tolte" ]]; then
+                descr=ferma
+                { echo "**Descrizione del correttore NON pubblicata** — toglie o cambia queste righe di piano, vincoli, decisioni, rischi o «Dopo il merge» (vale quella di prima):"
+                  echo '```'; sed -n '1,50p' <<<"$tolte"; echo '```'; } > .fix-pr/descrizione-rifiutata.md
+                gh pr comment "$PR" --body-file .fix-pr/descrizione-rifiutata.md || true
+                ferma "il correttore ha tolto o cambiato righe del piano o dei rischi: descrizione non pubblicata"
+              else
+                # Il commento con cosa cambia arriva PRIMA della modifica: la revisione
+                # che parte dall'edited lo trova già.
+                { echo "**Descrizione aggiornata dal correttore** — cosa cambia:"; echo '```diff'
+                  { diff -u .fix-pr/descrizione-prima.md .fix-pr/descrizione.md || true; } | sed -n '3,202p'; echo '```'; } > .fix-pr/diff-descrizione.md
+                gh pr comment "$PR" --body-file .fix-pr/diff-descrizione.md || true
+                if gh api -X PATCH "repos/$GH_REPO/pulls/$PR" -F "body=@.fix-pr/descrizione.md" >/dev/null; then
+                  descr=si
+                else
+                  gh pr comment "$PR" --body "La descrizione qui sopra NON è stata pubblicata (modifica rifiutata): vale quella di prima." || true
+                fi
+              fi
+            fi
+            # Niente di nuovo sul ramo né nella descrizione = la PR resterebbe ferma: lo si dice.
+            if [[ "$(git rev-parse HEAD)" == "$prima" && "$descr" == no ]]; then   # «ferma» ha già avvisato
+              ferma "il correttore non ha cambiato niente, la PR è ferma"
+            fi
+          else
+            gh pr comment "$PR" --body "**Push rifiutato** da \`scripts/push-ramo.sh\` sul ramo \`$RAMO\`: la correzione non è arrivata. Guarda il run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            exit 1
+          fi
+      # Un correttore che si rompe (tempo scaduto, errore) non lascia la PR ferma in silenzio.
+      - name: avviso se il correttore si è fermato
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.RUNNER_PROBE_TOKEN || github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.inputs.pr }}
+          CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
+          CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
+          NOME: "bluman"
+        run: |
+          gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=serve-fabio" >/dev/null || true
+          [[ -f "$RUNNER_TEMP/ci-notify.sh" ]] && bash "$RUNNER_TEMP/ci-notify.sh" "🔴 $NOME: il correttore si è fermato con un errore, la PR è ferma
+          #$PR — ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" || true

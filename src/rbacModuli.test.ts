@@ -64,14 +64,24 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/microvoci/:id/comunicazioni')).toBe('communications');
   });
 
+  it('ciclo passivo e liquidazione IVA seguono la chiave invoices, come nel menu', () => {
+    // Fino al 18/11/2026 questo file affermava il contrario (`toBeUndefined`): l'app nascondeva
+    // le pagine a chi aveva invoices=denied, ma le API rispondevano a qualunque collaboratore.
+    expect(moduloDellaRotta('/fornitori')).toBe('invoices');
+    expect(moduloDellaRotta('/fornitori/:id')).toBe('invoices');
+    expect(moduloDellaRotta('/fatture-ricevute')).toBe('invoices');
+    expect(moduloDellaRotta('/fatture-ricevute/:id/paga')).toBe('invoices');
+    expect(moduloDellaRotta('/fatture-ricevute/import-xml')).toBe('invoices');
+    expect(moduloDellaRotta('/liquidazione-iva')).toBe('invoices');
+    expect(moduloDellaRotta('/liquidazione-iva/:periodo/marca-versata')).toBe('invoices');
+  });
+
   it('le rotte fuori dalla matrice non passano dal RBAC per modulo', () => {
     // Hanno i loro guard (autenticazione, ruolo cliente, segreti webhook):
     // mapparle a chiavi che la matrice non gestisce sarebbe codice morto.
     expect(moduloDellaRotta('/auth/me')).toBeUndefined();
     expect(moduloDellaRotta('/tenant/utenti')).toBeUndefined();
     expect(moduloDellaRotta('/admin/tenants')).toBeUndefined();
-    expect(moduloDellaRotta('/fornitori')).toBeUndefined();
-    expect(moduloDellaRotta('/fatture-ricevute')).toBeUndefined();
     expect(moduloDellaRotta('/timesheet')).toBeUndefined();
     expect(moduloDellaRotta('/search')).toBeUndefined();
     expect(moduloDellaRotta('/portal/fatture')).toBeUndefined();

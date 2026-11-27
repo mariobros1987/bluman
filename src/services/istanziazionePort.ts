@@ -90,6 +90,12 @@ export interface IstanziazioneTransazione {
    * perché un preventivo già accettato viene rifiutato dal controllo di stato a monte.
    */
   marcaAccettatoPreventivo?(preventivoId: string): Promise<void>;
+  /**
+   * Riscrive il valore del progetto come somma dei prezzi dei suoi moduli, dentro la stessa
+   * transazione: senza, il progetto appena avviato restava a valore 0 in elenco e in Dashboard.
+   * Opzionale come sopra: chi non tiene un valore di progetto non deve implementarla.
+   */
+  riallineaValoreProgetto?(progettoId: string): Promise<void>;
 }
 
 export interface IstanziazionePort {

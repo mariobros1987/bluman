@@ -1,7 +1,7 @@
 // Rotte Liquidazione IVA Periodica (LIPE), Calcolo Imposte & Prospetto F24.
 
 import type { FastifyInstance } from 'fastify';
-import { prisma } from '../util/prismaClient.js';
+import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import {
   determinaPeriodoFiscale,
@@ -115,6 +115,17 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
     try {
       const periodoFiscale = determinaPeriodoFiscale(periodo);
 
+      // Una liquidazione già versata non si ricalcola: l'upsert qui sotto ne riscriverebbe gli
+      // importi, e resterebbe un versamento registrato per una cifra diversa da quella salvata
+      // (segnalato dal revisore sulla #6: da due schede aperte poteva succedere).
+      const esistente = await prisma.liquidazioneIva.findFirst({
+        where: { tenantId, periodo: periodoFiscale.codicePeriodo },
+        select: { versata: true },
+      });
+      if (esistente?.versata) {
+        return reply.code(409).send({ errore: 'La liquidazione IVA di questo periodo è già versata: non si può ricalcolare.' });
+      }
+
       const fattureAttive = await prisma.fattura.findMany({
         where: {
           tenantId,
@@ -223,34 +234,48 @@ export async function registraRotteLiquidazioneIva(server: FastifyInstance): Pro
         return reply.code(409).send({ errore: 'La liquidazione IVA per questo periodo risulta già versata.' });
       }
 
-      const aggiornata = await prisma.liquidazioneIva.update({
-        where: { id: lipe.id },
-        data: {
-          versata: true,
-          dataVersamento,
-        },
-      });
+      // Segnare la liquidazione come versata e scrivere l'uscita in Prima Nota sono un atto solo.
+      // Prima erano due scritture separate: se la seconda falliva restava una liquidazione
+      // «versata» senza la sua uscita, e non più riprovabile (il controllo qui sopra la rifiuta).
+      // Il passaggio è condizionato a `versata = false`: di due conferme insieme ne passa una.
+      const esito = await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, async () => {
+          const segnate = await tx.liquidazioneIva.updateMany({
+            where: { id: lipe.id, versata: false },
+            data: { versata: true, dataVersamento },
+          });
+          if (segnate.count !== 1) return { giaVersata: true as const };
 
-      let movimentoPrimaNota = null;
-      if (registraPrimaNota && lipe.saldoCentesimi > 0) {
-        // Il versamento F24 è denaro che esce: anche qui movimento e saldo sono un atto solo
-        // (`services/primaNotaMovimento.ts`). Prima nasceva solo il movimento, quindi il conto
-        // restava pieno dell'IVA che era stata versata.
-        movimentoPrimaNota = await creaMovimentoConSaldo(prisma, {
-          data: {
-            tenantId,
-            contoBancarioId: contoBancarioId || null,
-            data: dataVersamento,
-            tipo: 'uscita',
-            categoria: 'imposta_tasse',
-            descrizione: `Versamento F24 IVA Periodo ${lipe.periodo}`,
-            importoCentesimi: lipe.saldoCentesimi,
-            metodoPagamento: 'bonifico',
-            riferimentoTransazione: riferimentoTransazione || `F24-${lipe.periodo}`,
-            note: note || 'Versamento imposta IVA periodica tramite F24',
-          },
-        });
+          let movimento = null;
+          if (registraPrimaNota && lipe.saldoCentesimi > 0) {
+            // Il versamento F24 è denaro che esce: movimento e saldo del conto insieme
+            // (`services/primaNotaMovimento.ts`).
+            movimento = await creaMovimentoConSaldo(tx, {
+              data: {
+                tenantId,
+                contoBancarioId: contoBancarioId || null,
+                data: dataVersamento,
+                tipo: 'uscita',
+                categoria: 'imposta_tasse',
+                descrizione: `Versamento F24 IVA Periodo ${lipe.periodo}`,
+                importoCentesimi: lipe.saldoCentesimi,
+                metodoPagamento: 'bonifico',
+                // Il riferimento è quello della quietanza, se l'operatore lo scrive: prima, vuoto,
+                // diventava «F24-<periodo>», un numero di transazione che nessuna banca ha emesso.
+                riferimentoTransazione: riferimentoTransazione?.trim() || null,
+                note: note || 'Versamento imposta IVA periodica tramite F24',
+              },
+            });
+          }
+          const aggiornata = await tx.liquidazioneIva.findUnique({ where: { id: lipe.id } });
+          return { giaVersata: false as const, aggiornata, movimento };
+        }),
+      );
+      if (esito.giaVersata) {
+        return reply.code(409).send({ errore: 'La liquidazione IVA per questo periodo risulta già versata.' });
       }
+      const aggiornata = esito.aggiornata;
+      const movimentoPrimaNota = esito.movimento;
 
       await recordAudit({
         tenantId,

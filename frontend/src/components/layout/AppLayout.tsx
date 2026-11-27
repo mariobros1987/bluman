@@ -1,4 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { titoloDellaPagina } from '../../utils/titoliPagine';
+import { PulsanteNoteBeta } from '../beta/PulsanteNoteBeta';
+import { noteBetaVisibili } from '../../utils/noteBetaVisibili';
+import { EVENTO_MODULI_CAMBIATI } from '../../hooks/useModuloKycAttivo';
+import { schedaAiutoDellaPagina } from '../../utils/aiutoDellaPagina';
+import { etichettaNotificheNonLette } from '../../utils/etichettaNotifiche';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { GlobalSearch } from './GlobalSearch';
@@ -13,25 +19,6 @@ import { ThemeToggle } from './ThemeToggle';
 import { SelettorePeriodo } from './SelettorePeriodo';
 import { getCurrentTenantId, getAllAvailableTenants, getTenantStorageKey, isAdminStudio, setActiveTenantId } from '../../utils/tenant';
 import styles from './AppLayout.module.css';
-
-const TITLES: Record<string, string> = {
-  '/':          'Dashboard',
-  '/projects':  'Progetti',
-  '/clients':   'Clienti',
-  '/compliance': 'Coda KYC / AML',
-  '/calendar':  'Calendario',
-  '/library':   'Libreria moduli',
-  '/settings':  'Impostazioni',
-  '/invoices':  'Fatture & Pagamenti',
-  '/documents': 'Document Studio (Word & Contratti)',
-  '/modelli':   'Cartella Modelli dello Studio',
-  '/archivio':  'Archivio Documentale',
-  '/audit':     'Log Audit Studio',
-  '/timesheet': 'Timesheet Settimanale Ore',
-  // Senza questa riga la barra in alto direbbe «BluMan», cioè il nome dell'app al posto del nome
-  // della pagina.
-  '/aiuto':     'Aiuto',
-};
 
 const INITIAL_NOTIFICATIONS: NotificationItem[] = [];
 
@@ -51,6 +38,11 @@ const TIPO_PER_EVENTO: Record<string, NotificationItem['type']> = {
   // un ritardo, cioè con l'icona che dice «aspetta», su una cosa che chiede di agire.
   messaggio_non_instradabile: 'blocked',
   chat_collegata_progetto: 'system',
+  // Eventi che il server emette e che qui non avevano una voce: ricadevano nell'euristica e
+  // venivano contati come ritardi.
+  risposta_proposta_dati: 'system',
+  risposta_addendum: 'system',
+  documento_sbloccato: 'system',
 };
 
 function mapNotificaBackend(n: any): NotificationItem {
@@ -94,6 +86,14 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(user);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  // Lo standby dei moduli cambia dalle Impostazioni: il pulsante 📝 delle note lo segue subito,
+  // senza aspettare il cambio di pagina.
+  const [, setModuliCambiati] = useState(0);
+  useEffect(() => {
+    const rileggi = () => setModuliCambiati((n) => n + 1);
+    window.addEventListener(EVENTO_MODULI_CAMBIATI, rileggi);
+    return () => window.removeEventListener(EVENTO_MODULI_CAMBIATI, rileggi);
+  }, []);
   // La guida all'anagrafica si chiude con «Più tardi», e la scelta vale per lo **studio** in cui
   // è stata fatta: la chiave è per tenant come tutto il resto dei dati locali. `datiLocali.ts`
   // ragiona «per lista di ciò che resta», quindi un azzeramento dei dati locali la cancella da
@@ -170,12 +170,9 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
     return chiudi;
   }, []);
 
-  // `TITLES` è a corrispondenza esatta, quindi le pagine con un parametro nel percorso hanno il
-  // loro ramo: `/aiuto/05-fatture-sdi` è una scheda, e nella barra in alto si chiama «Aiuto».
-  const title = TITLES[location.pathname]
-    || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : null)
-    || (location.pathname.startsWith('/aiuto/') ? 'Aiuto' : null)
-    || 'BluMan';
+  // Il nome della pagina corrente (`utils/titoliPagine.ts`): lo usano il titolo, il «?» e le note della beta.
+  const title = titoloDellaPagina(location.pathname);
+  const schedaAiuto = schedaAiutoDellaPagina(location.pathname);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAllRead = async () => {
@@ -249,6 +246,23 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
               ☰
             </button>
             <div className={styles.topbarTitle}>{title}</div>
+            {/* «?»: la scheda dell'Aiuto che spiega questa pagina, a un clic. */}
+            {schedaAiuto && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => navigate(`/aiuto/${schedaAiuto}`)}
+                title={`Come funziona «${title}»: apri la spiegazione nell'Aiuto`}
+                aria-label={`Aiuto su ${title}`}
+                style={{ borderRadius: '50%', width: 26, height: 26, padding: 0, fontWeight: 700, flexShrink: 0 }}
+              >
+                ?
+              </button>
+            )}
+            {/* Note della beta: lo stesso pulsante in ogni pagina, per chi lavora nello studio. */}
+            {noteBetaVisibili(currentUser) && (
+              <PulsanteNoteBeta percorso={location.pathname} titoloPagina={title} userId={currentUser?.id ?? null} />
+            )}
             <GlobalSearch />
           </div>
           <div className={styles.topbarRight}>
@@ -353,9 +367,16 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
                 <span>🚪</span> Esci
               </button>
             )}
+            {/* Il numero è quello delle notifiche non lette, di qualunque tipo: prima la pillola le
+                chiamava tutte «ritardi», anche un «progetto avviato» o una firma apposta. */}
             {unreadCount > 0 && (
-              <div className={styles.alertPill} onClick={() => setNotifOpen(true)} style={{ cursor: 'pointer' }}>
-                ⚠ {unreadCount} ritard{unreadCount === 1 ? 'o' : 'i'}
+              <div
+                className={styles.alertPill}
+                onClick={() => setNotifOpen(true)}
+                style={{ cursor: 'pointer' }}
+                title="Apri le notifiche non lette"
+              >
+                {etichettaNotificheNonLette(unreadCount, notifications.filter((n) => !n.read && n.type === 'delay').length)}
               </div>
             )}
             <button

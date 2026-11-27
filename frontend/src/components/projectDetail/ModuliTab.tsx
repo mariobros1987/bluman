@@ -1,4 +1,5 @@
 import { ModuloBlock } from './ModuloBlock';
+import { ordinaPerLivello } from '../../utils/dipendenzeModuli';
 import type { Progetto, ModuloProgetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 
@@ -56,7 +57,9 @@ export function ModuliTab({
           </button>
         </div>
       ) : (
-        project.mods.map((mod, mIdx) => (
+        // In ordine di dipendenza: prima i moduli da cui gli altri attendono. L'indice che si passa
+        // sotto resta quello dell'elenco di partenza, perché altri dati si leggono per posizione.
+        ordinaPerLivello(project.mods.map((mod, mIdx) => ({ mod, mIdx })), (x) => x.mod.livello ?? 0).map(({ mod, mIdx }) => (
           <ModuloBlock
             key={mod.id}
             mod={mod}
