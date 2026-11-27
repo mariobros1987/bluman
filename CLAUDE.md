@@ -76,8 +76,10 @@ motore in `src/domain/`) · React 19 + Vite (`frontend/`) · PostgreSQL + Prisma
 - Dal fork non si deploya niente. Pubblicare = `bash scripts/pubblica.sh` (PR da
   `wolftradesystem-tech:main` a `mariobros1987/bluman` `main`); `--merge` solo quando Fabio
   scrive «pubblica». All'unione Railway e Vercel (bluman.vercel.app, copia di riserva)
-  pubblicano da soli; blusmart.eu lo aggiorna solo il titolare con `scripts/distribuisci.sh --solo-vps`.
+  pubblicano da soli. blusmart.eu: dopo la pubblicazione lo aggiorna Fabio dal suo PC con
+  `scripts/aggiorna-blusmart.sh` (gira sul server, prima controlla, poi `--applica`), oppure il titolare.
 - Una pubblicazione che cambia `prisma/migrations` si unisce solo dopo un backup del DB di
   produzione (Railway applica le migrazioni senza backup): `pubblica.sh` lo scrive in testa
   alla PR e con `--merge` rifiuta senza `--backup-fatto`.
-- `railway`, `vercel`, `ssh`, `scripts/distribuisci.sh`, `backup-vps.sh`, `monitor-vps.sh`: del titolare, mai da una sessione.
+- `railway`, `vercel`, `scripts/distribuisci.sh`: del titolare. `ssh` sul server: Fabio, con la sua chiave
+  (dal 27/11); una sessione mai, scrive i comandi esatti. `backup-vps.sh`, `monitor-vps.sh` girano da soli sul server.

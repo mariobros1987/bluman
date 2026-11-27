@@ -8,7 +8,7 @@ chi fa cosa, da dove parte la produzione e cosa fare quando non va. **Dal fork n
 |---|---|---|
 | `wolftradesystem-tech/bluman` (fork, `origin`) | dove gira il pilota dello Standard; `main` = produzione del fork | il merge automatico delle PR |
 | `mariobros1987/bluman` (`upstream`, push disattivato) | il repo del titolare; da `main` Railway (backend) e Vercel (bluman.vercel.app, copia di riserva) pubblicano da soli | la PR di pubblicazione, unita su «pubblica» di Fabio |
-| blusmart.eu (server Register.it) | la produzione usata dallo studio (`docker-compose.prod.yml`, nginx, backup notturno) | **solo il titolare**, `scripts/distribuisci.sh --solo-vps` |
+| blusmart.eu (server Register.it) | la produzione usata dallo studio (`docker-compose.prod.yml`, nginx, backup notturno) | Fabio, `scripts/aggiorna-blusmart.sh` via ssh, dopo la pubblicazione; oppure il titolare, `scripts/distribuisci.sh --solo-vps` |
 
 ## Chi fa il merge nel fork (pilota automatico)
 - Su ogni PR verso `main`: `ci.yml` (check, test) e `review.yml` (revisore Claude) in parallelo.
@@ -32,13 +32,22 @@ bash scripts/pubblica.sh --merge --backup-fatto   # se la PR porta migrazioni, d
 - Se il titolare ha pubblicato altro su upstream, `pubblica.sh` si ferma: prima si porta `upstream/main` nel fork con una PR normale.
 - Vercel: il manuale (`docs/manuale/19-infra-deploy.md`) dice che il deploy da webhook GitHub resta `BLOCKED` e pubblica solo la CLI (`npx vercel --prod`, del titolare). Da misurare alla prima pubblicazione; finché non è misurato, la copia di riserva potrebbe restare indietro.
 
-## Produzione dello studio (blusmart.eu): del titolare
-`scripts/distribuisci.sh --solo-vps` (codice, frontend, `migrate` + `rls`, backend, reload di nginx), `scripts/backup-vps.sh` (notturno, cifrato, 14 set), `scripts/monitor-vps.sh` (ogni 10 minuti, Telegram del titolare). Dettagli e stati limite: `docs/manuale/19-infra-deploy.md`. Da una sessione: mai `ssh`, mai `railway`, mai `vercel`, mai `distribuisci.sh`.
+## Produzione dello studio (blusmart.eu)
+Il server prende il codice da GitHub (`origin` sul server = `mariobros1987/bluman`), quindi prima si **pubblica**, poi si aggiorna. Fabio entra con la sua chiave (`ssh blusmart`, configurata sul suo PC dal 27/11; il titolare la toglie con `sed -i '/fabio-bluman/d' ~/.ssh/authorized_keys`). Dal PC, in PowerShell:
+```
+ssh blusmart "cd /opt/bluman && git pull --ff-only && bash scripts/aggiorna-blusmart.sh"   # controlla e basta
+ssh blusmart "cd /opt/bluman && bash scripts/aggiorna-blusmart.sh --applica"              # aggiorna
+```
+- Senza argomenti lo script dice cosa cambierebbe: versione su disco e in servizio, migrazioni da applicare, ultima copia, spazio. Si ferma se sul server ci sono file del repo modificati a mano.
+- `--applica`: copia di sicurezza subito (`backup-vps.sh`, se fallisce non tocca niente), frontend con `VITE_API_BASE=/api`, `migrate` + `rls`, container, nginx allineato e ricaricato, sonde (health, pagine HTML, cache, rotte, manuale). Sono i passi di `distribuisci.sh --solo-vps` del titolare, eseguiti sul server.
+- Copiare una copia del database sul PC: `scp "blusmart:/var/backups/bluman/<file>.dump.enc" .` (cifrata con `BACKUP_ENCRYPTION_KEY` del `.env` del server).
+- Durante l'aggiornamento `monitor-vps.sh` (ogni 10 minuti) può avvisare il titolare su Telegram: va avvisato prima.
+- `scripts/backup-vps.sh` (notturno alle 3:17, cifrato, 14 set in `/var/backups/bluman`) e `scripts/monitor-vps.sh` girano da cron sul server. Dettagli e stati limite: `docs/manuale/19-infra-deploy.md`. Una sessione non entra mai nel server e non usa `railway`, `vercel`, `distribuisci.sh`.
 
 ## Rollback
 - Fork: non c'è niente da riportare indietro (nessun deploy). Una PR sbagliata si corregge con una PR nuova.
 - Railway e Vercel: dalla loro dashboard (titolare), o una pubblicazione nuova che riporta il codice.
-- blusmart.eu: del titolare (`distribuisci.sh --solo-vps` su un commit precedente). Lo schema non torna indietro da solo: le migrazioni si fanno compatibili all'indietro.
+- blusmart.eu: `aggiorna-blusmart.sh --applica` stampa alla fine il comando per tornare alla versione di prima (copia dello script in `/tmp`, `git checkout <commit>`, `BLUMAN_DIR=… --applica`, poi `git checkout main`). Lo schema non torna indietro da solo: le migrazioni si fanno compatibili all'indietro; per i dati c'è la copia fatta all'inizio.
 
 ## Segreti
 - Fork (secret di GitHub): `CLAUDE_CODE_OAUTH_TOKEN`, `CI_TELEGRAM_TOKEN`, `CI_TELEGRAM_CHAT` (bot `bluman_ci_bot`), `RUNNER_PROBE_TOKEN` (push del correttore e delle task).

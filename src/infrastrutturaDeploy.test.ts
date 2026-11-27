@@ -277,3 +277,50 @@ describe('🛡️ RLS — lo script permissivo del 15/08 non è più fra quelli 
     expect(script).not.toContain('supabase/migrations/20260815_enable_rls.sql');
   });
 });
+
+describe('🖥️ aggiorna-blusmart.sh — l aggiornamento di blusmart.eu lanciato da Fabio', () => {
+  const script = leggi('scripts', 'aggiorna-blusmart.sh');
+  const posizione = (testo: string) => {
+    const i = script.indexOf(testo);
+    expect(i, `manca «${testo}»`).toBeGreaterThan(-1);
+    return i;
+  };
+
+  it('senza --applica controlla e basta: esce prima della copia e di qualunque modifica', () => {
+    expect(script).toMatch(/^set -euo pipefail$/m);
+    const uscita = posizione('if [ "$APPLICA" != si ]; then');
+    expect(uscita).toBeLessThan(posizione('bash ./scripts/backup-vps.sh'));
+  });
+
+  it('copia di sicurezza prima di frontend, migrazioni e container; migrate prima di rls', () => {
+    const copia = posizione('bash ./scripts/backup-vps.sh');
+    const frontend = posizione('-e VITE_API_BASE=/api');
+    const migrate = posizione('run --rm -T migrate');
+    const rls = posizione('run --rm -T rls');
+    const su = posizione('$COMPOSE up -d </dev/null');
+    expect(copia).toBeLessThan(frontend);
+    expect(frontend).toBeLessThan(migrate);
+    expect(migrate).toBeLessThan(rls);
+    expect(rls).toBeLessThan(su);
+  });
+
+  it('ogni comando docker ha lo stdin chiuso: lanciato via ssh, un container si mangerebbe il terminale', () => {
+    // Le righe spezzate con `\` si leggono intere: il `</dev/null` può stare sulla continuazione.
+    const righe = script.replace(/\\\n/g, ' ').split('\n').filter((r) => /^\s*(\$COMPOSE|docker run)\b/.test(r) || /\$\(\$COMPOSE exec/.test(r));
+    expect(righe.length).toBeGreaterThan(5);
+    for (const r of righe) expect(r, r).toContain('</dev/null');
+  });
+
+  it('si ferma se sul server ci sono file del repo modificati a mano', () => {
+    expect(script).toContain('git status --porcelain --untracked-files=no');
+  });
+
+  it('sonda le pagine che sono state rotte, l indirizzo profondo dell Aiuto e il manuale contato dal repo', () => {
+    expect(script).toMatch(/for PAGINA in [^\n]*\/portal\b/);
+    expect(script).toMatch(/for PAGINA in [^\n]*\/aiuto\/[a-z0-9-]+/);
+    expect(script).toContain('nginx -s reload');
+    expect(script).toContain('ls docs/manuale | wc -l');
+    // Il 20 fisso di distribuisci.sh oggi farebbe fallire un aggiornamento riuscito: le schede sono di più.
+    expect(script).not.toMatch(/"\$TROVATI" = "20"/);
+  });
+});
