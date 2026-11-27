@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motivoMovimentoNonEliminabile } from '../../../src/domain/eliminazioneMovimento';
 import {
   fetchPrimaNotaApi,
   createPrimaNotaApi,
@@ -334,9 +335,13 @@ export function PrimaNotaPage() {
               ) : (
                 filteredMovimenti.map((m) => {
                   const isEntrata = m.tipo === 'entrata';
-                  const dataStr = m.data ? new Date(m.data).toLocaleDateString('it-IT') : new Date().toLocaleDateString('it-IT');
+                  // Data mancante = «—»: prima compariva la data di oggi, cioè un dato inventato.
+                  const dataStr = m.data ? new Date(m.data).toLocaleDateString('it-IT') : '—';
                   const clNome = m.cliente?.nome || (m.fattura?.cliente?.nome) || '—';
-                  const contoNome = m.contoBancario?.nomeConto || 'Cassa / Predefinito';
+                  // Senza conto si dichiara: «Cassa / Predefinito» faceva credere che il denaro fosse
+                  // entrato in un conto, mentre il movimento non tocca nessun saldo di Banche & Conti.
+                  const contoNome: string | null = m.contoBancario?.nomeConto || null;
+                  const motivoBlocco = motivoMovimentoNonEliminabile(m);
 
                   return (
                     <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -365,8 +370,17 @@ export function PrimaNotaPage() {
                       </td>
                       <td style={{ padding: '14px 8px', color: 'var(--text)' }}>{clNome}</td>
                       <td style={{ padding: '14px 8px', fontSize: 13 }}>
-                        <div>{contoNome}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>{m.metodoPagamento || 'bonifico'}</div>
+                        {contoNome ? (
+                          <div>{contoNome}</div>
+                        ) : (
+                          <div
+                            style={{ color: 'var(--pill-amber-fg)', cursor: 'help' }}
+                            title="Questo movimento non è collegato a nessun conto: non entra nel saldo di nessun conto in Banche & Conti."
+                          >
+                            ⚠ Conto non indicato
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'capitalize' }}>{m.metodoPagamento || '—'}</div>
                       </td>
                       <td style={{ padding: '14px 8px', fontFamily: 'monospace', fontSize: 12, color: 'var(--muted)' }}>
                         {m.riferimentoTransazione || '—'}
@@ -375,19 +389,27 @@ export function PrimaNotaPage() {
                         {isEntrata ? '+' : '-'} {fmt((m.importoCentesimi || 0) / 100)}
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleDeleteMovimento(m.id)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            color: 'var(--red)',
-                            fontSize: 14,
-                          }}
-                          title="Elimina movimento"
-                        >
-                          🗑️
-                        </button>
+                        {motivoBlocco ? (
+                          // L'incasso di una fattura non si elimina da qui (lo rifiuta anche il server).
+                          <span role="img" aria-label="Movimento non eliminabile" title={motivoBlocco} style={{ cursor: 'help', fontSize: 14 }}>
+                            🔒
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteMovimento(m.id)}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: 'var(--red)',
+                              fontSize: 14,
+                            }}
+                            title="Elimina movimento"
+                            aria-label="Elimina movimento"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -511,7 +533,7 @@ export function PrimaNotaPage() {
                     onChange={(e) => setNewContoId(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                   >
-                    <option value="">Conto Predefinito Studio</option>
+                    <option value="">Nessun conto (non entra in nessun saldo)</option>
                     {contiBancari.map((cb) => (
                       <option key={cb.id} value={cb.id}>
                         {cb.nomeConto} ({cb.banca})
@@ -602,7 +624,7 @@ export function PrimaNotaPage() {
                   onChange={(e) => setNewContoId(e.target.value)}
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
                 >
-                  <option value="">Conto Predefinito Studio</option>
+                  <option value="">Nessun conto (non entra in nessun saldo)</option>
                   {contiBancari.map((cb) => (
                     <option key={cb.id} value={cb.id}>
                       {cb.nomeConto} ({cb.banca})

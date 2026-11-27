@@ -27,6 +27,10 @@ Un **progetto** è una pratica per un cliente. Dentro ha **moduli** (le prestazi
   consultabile con `?includiArchiviati=true`).
 
 ## 📐 Calcoli & logica (li fa il backend, §16)
+- **Valore dell'incarico** = somma dei prezzi dei moduli del progetto. Lo scrive il server quando i
+  moduli cambiano (avvio del progetto, modulo eliminato, prezzo di un modulo salvato), quindi elenco,
+  Dashboard e dettaglio mostrano lo stesso importo. Con moduli presenti non si scrive a mano: passando
+  il mouse sull'importo lo si legge. Un progetto **senza moduli** tiene il valore scritto a mano.
 - **La cascata sale, mai scende (§16.6)**: lo stato di una micro-voce cambia solo per **azione
   esplicita** (consuntivazione, ritardo, completamento); da lì si ricalcola il modulo, poi il
   progetto. Non si scrive mai lo stato di una micro-voce «dall'alto».

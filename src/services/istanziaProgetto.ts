@@ -167,6 +167,12 @@ export async function istanziaProgetto(
       }
     }
 
+    // Il valore del progetto segue i moduli appena creati (somma dei prezzi), nella stessa
+    // transazione: «il valore nasce a 0 e lo alza l'accettazione del preventivo» (§16).
+    if (tx.riallineaValoreProgetto) {
+      await tx.riallineaValoreProgetto(input.progettoId);
+    }
+
     return { moduliProgettoIds: moduliCreati.map((m) => m.moduloProgettoId) };
   });
 

@@ -38,6 +38,7 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
   `clients` (permesso per ruolo).
 
 ## ⚠️ Stati limite & errori
+- **Campi obbligatori**: nella scheda è obbligatorio solo il **nome**. Gli altri dati (P.IVA, PEC, codice SDI, IBAN…) si compilano quando servono: un campo vuoto resta vuoto, la scheda non propone valori al posto del dato (niente «Italia», niente capitale, niente codice SDI di comodo).
 - Un **collaboratore** che tenta di cambiare la password di un cliente/utente dall'anagrafica → **400**
   («procedura dedicata»): il cambio password non passa da qui.
 - Magic-link e reset password sono riservati (guard di ruolo sul modulo `clients`).

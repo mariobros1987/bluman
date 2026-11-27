@@ -58,6 +58,7 @@ interface PassaggioStored extends NuovoPassaggioProgettoInput {
 
 interface DbState {
   progettiStato: Map<string, string>;
+  progettiValore: Map<string, number>;
   preventiviStato: Map<string, string>;
   moduliProgetto: Map<string, ModuloStored>;
   microvociProgetto: Map<string, MicrovoceStored>;
@@ -68,6 +69,7 @@ interface DbState {
 function dbVuoto(): DbState {
   return {
     progettiStato: new Map(),
+    progettiValore: new Map(),
     preventiviStato: new Map(),
     moduliProgetto: new Map(),
     microvociProgetto: new Map(),
@@ -79,6 +81,7 @@ function dbVuoto(): DbState {
 function clonaDb(db: DbState): DbState {
   return {
     progettiStato: new Map(db.progettiStato),
+    progettiValore: new Map(db.progettiValore),
     preventiviStato: new Map(db.preventiviStato),
     moduliProgetto: new Map(db.moduliProgetto),
     microvociProgetto: new Map(db.microvociProgetto),
@@ -132,6 +135,11 @@ export class FakeIstanziazionePort implements IstanziazionePort, EsecuzionePort 
           throw new TransizioneNonValidaError(`Preventivo ${preventivoId} già accettato: istanziazione duplicata evitata`);
         }
         staging.preventiviStato.set(preventivoId, 'accettato');
+      },
+      riallineaValoreProgetto: async (progettoId) => {
+        const moduli = [...staging.moduliProgetto.values()].filter((m) => m.progettoId === progettoId);
+        if (moduli.length === 0) return;
+        staging.progettiValore.set(progettoId, moduli.reduce((tot, m) => tot + m.prezzo, 0));
       },
       creaModuloProgetto: async (input) => {
         const id = nuovoId('modprog');

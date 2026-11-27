@@ -16,6 +16,7 @@
 - **Prima Nota** (§07), **Scadenzario** (§06), **Fornitori** (§23).
 
 ## ⚠️ Stati limite & errori
+- **Saldo fermo a zero con incassi registrati**: succede se gli incassi sono stati registrati senza conto. In Prima Nota quei movimenti portano «⚠ Conto non indicato».
 - Se la lettura non riesce, la pagina lo dichiara e propone **Riprova**.
 - Senza conti, invita a configurare il primo.
 - Da questa pagina i conti si aggiungono soltanto: non sono presenti comandi per modificarli o eliminarli.

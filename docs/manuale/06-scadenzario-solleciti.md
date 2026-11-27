@@ -13,6 +13,7 @@ scadenze, importi, stato (aperta/parziale/incassata/stornata) e ritardi.
 - **Filtri**: stato, cliente, ricerca e **periodo** (data di scadenza).
 
 ## 📐 Calcoli & logica
+- **Registra Incasso** chiede la **data** in cui il denaro è arrivato (proposta: oggi, mai futura) e il **conto** su cui è entrato (proposto: quello della fattura, altrimenti il predefinito). La data finisce in Prima Nota; il saldo del conto scelto sale dell'importo. Se lo studio non ha conti, il modale avvisa che l'incasso non entra in nessun saldo.
 - **Mora D.Lgs. 231/2002**: giorni di ritardo, maggiorazione **tasso legale BCE +8%** e **indennizzo
   forfettario 40 €** (art. 6). Il motore `sollecitiEngine` calcola importi e testo.
 - **Escalation stretta**: la regola pura `puoInviareSollecito` impedisce che la **diffida** sia il

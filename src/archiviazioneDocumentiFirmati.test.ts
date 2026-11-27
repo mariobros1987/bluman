@@ -76,7 +76,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         stato.moduliCancellati.push(args.where.id);
         return stato.modulo;
       },
+      // E10 — il delete del modulo riallinea il valore del progetto ai moduli rimasti.
+      aggregate: async () => ({ _sum: { prezzo: null }, _count: { _all: 0 } }),
     },
+    progetto: { update: async () => ({}) },
     fatturaRiga: { count: async () => stato.righeFattura },
     accessoRisorsa: { deleteMany: async () => ({ count: 0 }) },
     microvoceProgetto: {

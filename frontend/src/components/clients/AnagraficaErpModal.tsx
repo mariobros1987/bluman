@@ -3,6 +3,7 @@ import { fetchProgetti, creaClienteApi, aggiornaClienteApi, proposteDatiStudioAp
 import type { PropostaDatiFiscale } from '../../api/client';
 import { getCurrentTenantId, getTenantStorageKey } from '../../utils/tenant';
 import { fmt } from '../../utils';
+import { capitaleDaTesto, componiSedeLegale } from '../../utils/anagraficaCliente';
 import type { Cliente } from '../../types';
 import { Modal } from '../ui/Modal';
 import { fetchKycFascicoloApi, creaKycFascicoloApi, aggiornaStatoKycApi, fetchModuliTenant, scaricaReportFascicoloPdf, type FascicoloKyc } from '../../api/kyc';
@@ -102,15 +103,18 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [tipo, setTipo] = useState(client.tipo || 'company');
   const [piva, setPiva] = useState(client.piva || (client as any).partitaIva || refJson.piva || '');
   const [codFisc, setCodFisc] = useState(client.codiceFiscale || (client as any).codFisc || refJson.codiceFiscale || '');
-  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || 'Italia');
-  const [capitale, setCapitale] = useState<number>((client as any).capitale || refJson.capitale || 10000);
+  const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || '');
+  // Vuoto = «non indicato». Prima un cliente nuovo nasceva con giurisdizione «Italia», nazione
+  // «Italia», capitale 10.000 €, codice SDI «0000000» e regime «RF01 - Ordinario»: dati che nessuno
+  // aveva scritto, e che al primo salvataggio diventavano dati del cliente (regola 6).
+  const [capitale, setCapitale] = useState<string>(String((client as any).capitale ?? refJson.capitale ?? ''));
   const [regImprese, setRegImprese] = useState((client as any).regImprese || refJson.regImprese || '');
 
   // Tab 2: Sede & Contatti
   const [indirizzo, setIndirizzo] = useState((client as any).indirizzo || refJson.indirizzo || client.sedeLegale || '');
   const [citta, setCitta] = useState((client as any).citta || refJson.citta || '');
   const [cap, setCap] = useState((client as any).cap || refJson.cap || '');
-  const [nazione, setNazione] = useState((client as any).nazione || refJson.nazione || 'Italia');
+  const [nazione, setNazione] = useState((client as any).nazione || refJson.nazione || '');
   const [email, setEmail] = useState(client.email || refJson.email || '');
   const [pec, setPec] = useState((client as any).pec || refJson.pec || '');
   const [telefono, setTelefono] = useState(client.telefono || refJson.telefono || '');
@@ -124,8 +128,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [referenteNome, setReferenteNome] = useState((client as any).referenteNome || refJson.referenteNome || refJson.referente || '');
 
   // Tab 3: SDI & Fatturazione
-  const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || '0000000');
-  const [regimeFiscale, setRegimeFiscale] = useState((client as any).regimeFiscale || refJson.regimeFiscale || 'RF01 - Ordinario');
+  const [sdiCode, setSdiCode] = useState(client.sdiCode || (client as any).codiceSdi || refJson.sdiCode || '');
+  const [regimeFiscale, setRegimeFiscale] = useState((client as any).regimeFiscale || refJson.regimeFiscale || '');
   // Regime IVA che guida l'aliquota della fattura. Stringa vuota = «non dichiarato»: la fattura
   // ripiega sul comportamento di prima (estero 0, altrimenti 22). 0 è un'aliquota valida (esente),
   // quindi lo stato è una stringa e non un numero, per distinguere «0» da «vuoto».
@@ -202,9 +206,10 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    const capitaleNumero = capitaleDaTesto(capitale);
 
     const referentiObj = {
-      capitale,
+      capitale: capitaleNumero,
       regImprese,
       indirizzo,
       citta,
@@ -248,7 +253,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       codiceFiscale: codFisc,
       codFisc,
       giurisdizione,
-      sedeLegale: `${indirizzo}, ${citta} (${cap}) - ${nazione}`,
+      sedeLegale: componiSedeLegale({ indirizzo, citta, cap, nazione }),
       sdiCode,
       codiceSdi: sdiCode,
       iban,
@@ -270,7 +275,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
       telegramChatId: telegram,
       signal,
       referenteNome,
-      capitale,
+      capitale: capitaleNumero,
       regImprese,
       indirizzo,
       citta,
@@ -438,27 +443,27 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-piva" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number *</label>
+                <label htmlFor="cli-piva" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number</label>
                 <input id="cli-piva" value={piva} onChange={e => setPiva(e.target.value)} placeholder="IT01234567890" />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-codfisc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale *</label>
+                <label htmlFor="cli-codfisc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale</label>
                 <input id="cli-codfisc" value={codFisc} onChange={e => setCodFisc(e.target.value)} placeholder="Codice Fiscale..." />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-giurisdizione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Giurisdizione Costituzione *</label>
+                <label htmlFor="cli-giurisdizione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Giurisdizione Costituzione</label>
                 <input id="cli-giurisdizione" value={giurisdizione} onChange={e => setGiurisdizione(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-regimprese" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Registro Imprese / REA *</label>
+                <label htmlFor="cli-regimprese" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Registro Imprese / REA</label>
                 <input id="cli-regimprese" value={regImprese} onChange={e => setRegImprese(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
                 <label htmlFor="cli-capitale" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Capitale Sociale (€)</label>
-                <input id="cli-capitale" type="number" value={capitale} onChange={e => setCapitale(Number(e.target.value))} />
+                <input id="cli-capitale" type="number" value={capitale} onChange={e => setCapitale(e.target.value)} />
               </div>
             </div>
           </div>
@@ -596,33 +601,33 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
         {tab === 'sede' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div>
-              <label htmlFor="cli-indirizzo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo Sede Legale / Domicilio *</label>
-              <input id="cli-indirizzo" value={indirizzo} onChange={e => setIndirizzo(e.target.value)} required />
+              <label htmlFor="cli-indirizzo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Indirizzo Sede Legale / Domicilio</label>
+              <input id="cli-indirizzo" value={indirizzo} onChange={e => setIndirizzo(e.target.value)} />
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-citta" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Città *</label>
-                <input id="cli-citta" value={citta} onChange={e => setCitta(e.target.value)} required />
+                <label htmlFor="cli-citta" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Città</label>
+                <input id="cli-citta" value={citta} onChange={e => setCitta(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-cap" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CAP *</label>
-                <input id="cli-cap" value={cap} onChange={e => setCap(e.target.value)} required />
+                <label htmlFor="cli-cap" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CAP</label>
+                <input id="cli-cap" value={cap} onChange={e => setCap(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-nazione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nazione *</label>
-                <input id="cli-nazione" value={nazione} onChange={e => setNazione(e.target.value)} required />
+                <label htmlFor="cli-nazione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nazione</label>
+                <input id="cli-nazione" value={nazione} onChange={e => setNazione(e.target.value)} />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-email" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Professionale *</label>
-                <input id="cli-email" type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                <label htmlFor="cli-email" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email Professionale</label>
+                <input id="cli-email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-pec" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email PEC Ufficiale *</label>
-                <input id="cli-pec" type="email" value={pec} onChange={e => setPec(e.target.value)} required />
+                <label htmlFor="cli-pec" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email PEC Ufficiale</label>
+                <input id="cli-pec" type="email" value={pec} onChange={e => setPec(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
                 <label htmlFor="cli-telefono" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Telefono Centralino / Ufficio</label>
@@ -638,8 +643,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <label htmlFor="cli-cellulare" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto *</label>
-                  <input id="cli-cellulare" value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 1234567" required />
+                  <label htmlFor="cli-cellulare" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>🟢 Cellulare / WhatsApp Diretto</label>
+                  <input id="cli-cellulare" value={cellulare} onChange={e => setCellulare(e.target.value)} placeholder="+39 333 1234567" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label htmlFor="cli-telegram" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>✈️ Chat ID Telegram</label>
@@ -677,12 +682,12 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-sdi" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Destinatario SDI (7 caratteri) *</label>
-                <input id="cli-sdi" value={sdiCode} onChange={e => setSdiCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }} required />
+                <label htmlFor="cli-sdi" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Destinatario SDI (7 caratteri)</label>
+                <input id="cli-sdi" value={sdiCode} onChange={e => setSdiCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }} />
               </div>
               <div style={{ flex: 2 }}>
-                <label htmlFor="cli-regime" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale *</label>
-                <input id="cli-regime" value={regimeFiscale} onChange={e => setRegimeFiscale(e.target.value)} required />
+                <label htmlFor="cli-regime" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Regime Fiscale</label>
+                <input id="cli-regime" value={regimeFiscale} onChange={e => setRegimeFiscale(e.target.value)} />
               </div>
             </div>
 
@@ -719,8 +724,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
             </div>
 
             <div>
-              <label htmlFor="cli-iban" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>IBAN Accrediti / Addebiti del Cliente *</label>
-              <input id="cli-iban" value={iban} onChange={e => setIban(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12.5 }} required />
+              <label htmlFor="cli-iban" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>IBAN Accrediti / Addebiti del Cliente</label>
+              <input id="cli-iban" value={iban} onChange={e => setIban(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 12.5 }} />
             </div>
 
             <div style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', borderRadius: 10, padding: 12, fontSize: 11, color: 'var(--green)' }}>
@@ -742,19 +747,19 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 </select>
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-datakyc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Ultimo Rinnovo KYC *</label>
-                <input id="cli-datakyc" value={dataKyc} onChange={e => setDataKyc(e.target.value)} required />
+                <label htmlFor="cli-datakyc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Ultimo Rinnovo KYC</label>
+                <input id="cli-datakyc" value={dataKyc} onChange={e => setDataKyc(e.target.value)} />
               </div>
             </div>
 
             <div>
-              <label htmlFor="cli-ubo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Struttura di Controllo *</label>
-              <input id="cli-ubo" value={ubo} onChange={e => setUbo(e.target.value)} required />
+              <label htmlFor="cli-ubo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Struttura di Controllo</label>
+              <input id="cli-ubo" value={ubo} onChange={e => setUbo(e.target.value)} />
             </div>
 
             <div>
-              <label htmlFor="cli-fonte" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio *</label>
-              <input id="cli-fonte" value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} required />
+              <label htmlFor="cli-fonte" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Provenienza dei Fondi / Origine Patrimonio</label>
+              <input id="cli-fonte" value={fontePatrimonio} onChange={e => setFontePatrimonio(e.target.value)} />
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 4 }}>

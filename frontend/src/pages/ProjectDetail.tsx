@@ -20,6 +20,7 @@ import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettagl
 import { useTeamMembers } from '../hooks/useTeamMembers';
 import { getCurrentTenantId, getTenantStorageKey, BLUECODE_TENANT_ID } from '../utils/tenant';
 import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
+import { SPIEGAZIONE_VALORE_DA_MODULI, valoreProgettoEuroDaServer, valoreProgettoModificabile } from '../utils/valoreProgetto';
 import { inviaAvvisoModuloCompletato } from '../utils/avvisoModuloCompletato';
 import { istanteDaGiornoEOra, eGiornoIso } from '../utils/calendarioDate';
 import { creaEventoCalendario } from '../api/calendario';
@@ -471,10 +472,10 @@ export function ProjectDetail() {
         // Era la rete che rendeva invisibile il caso "modulo vuoto" su tutta la pagina, anche
         // dove i moduli arrivavano davvero dal database.
 
-        // Valore del progetto: somma dei moduli, altrimenti il valore a database. Il ripiego
-        // finale `: 3500` mostrava un importo inventato su un progetto senza moduli e senza
-        // valore in riga — e finiva anche nella redditività.
-        const calculatedVal = finalMods.reduce((acc: number, m: any) => acc + (m.p || 0), 0) || (dbRes.valoreCentesimi ? dbRes.valoreCentesimi / 100 : 0);
+        // Valore del progetto: quello che tiene il server (`valoreTotale`, centesimi). Prima qui
+        // si sommavano i moduli nel browser e il ripiego leggeva `valoreCentesimi`, un campo che
+        // la risposta non ha: il dettaglio e l'elenco mostravano due valori diversi.
+        const calculatedVal = valoreProgettoEuroDaServer(dbRes.valoreTotale, finalMods);
 
         // §52 — La firma della lettera d'incarico, la **stessa riga** che legge il portale:
         // `firma_elettronica`, ambito `engagement_letter`, con `riferimentoId` = questo progetto
@@ -731,8 +732,14 @@ export function ProjectDetail() {
   };
 
   const handleModificaValore = async () => {
+    // Con moduli il valore è la loro somma e lo scrive il server: un importo scritto a mano
+    // veniva sovrascritto al primo salvataggio, e a schermo spariva già alla riapertura.
+    if (!valoreProgettoModificabile(project.mods)) {
+      toast.attenzione(SPIEGAZIONE_VALORE_DA_MODULI);
+      return;
+    }
     const nuovoVal = prompt('Inserisci il nuovo valore totale dell\'incarico (€):', String(project.val));
-    if (nuovoVal && !isNaN(Number(nuovoVal))) {
+    if (nuovoVal && !isNaN(Number(nuovoVal)) && Number(nuovoVal) >= 0) {
       const updated = { ...project, val: Number(nuovoVal) };
       setProject(updated);
       const savedStr = localStorage.getItem(getTenantStorageKey('bluman_custom_projects'));
@@ -866,6 +873,7 @@ export function ProjectDetail() {
         onRinomina={handleRinominaProgetto}
         onApriCliente={() => navigate(`/clients?client=${encodeURIComponent(project.cl)}`)}
         onModificaValore={handleModificaValore}
+        valoreModificabile={valoreProgettoModificabile(project.mods)}
         onApriAccessi={() => setAccessiModalOpen(true)}
         onRicalcola={handleRicalcolaAvanzamento}
         onArchivia={handleArchiviaRipristina}

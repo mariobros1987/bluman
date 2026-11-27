@@ -76,6 +76,33 @@ describe('istanziaProgetto (§15.3) — caso felice', () => {
     });
   });
 
+  // Analisi del 26/11, E10 — il progetto appena avviato restava a valore 0 a database: la somma
+  // dei moduli si vedeva solo nel dettaglio, calcolata dal browser.
+  it('il valore del progetto diventa la somma dei prezzi dei moduli istanziati', async () => {
+    port.registraTemplate(templateSemplice({ id: 'M02', prezzoPacchetto: 1500 }));
+    await istanziaProgetto(
+      {
+        progettoId: 'P1',
+        clienteId: 'C1',
+        righe: [
+          { moduloTemplateId: 'M01', moduloTemplateVersione: 1 },
+          { moduloTemplateId: 'M02', moduloTemplateVersione: 1 },
+        ],
+      },
+      port,
+      notifiche,
+    );
+    expect(port.snapshot().progettiValore.get('P1')).toBe(1800 + 1500);
+  });
+
+  it('una seconda istanziazione sullo stesso progetto (addendum) somma anche i moduli già presenti', async () => {
+    port.registraTemplate(templateSemplice({ id: 'M02', prezzoPacchetto: 1500 }));
+    const riga = (id: string) => ({ moduloTemplateId: id, moduloTemplateVersione: 1 });
+    await istanziaProgetto({ progettoId: 'P1', clienteId: 'C1', righe: [riga('M01')] }, port, notifiche);
+    await istanziaProgetto({ progettoId: 'P1', clienteId: 'C1', righe: [riga('M02')] }, port, notifiche);
+    expect(port.snapshot().progettiValore.get('P1')).toBe(3300);
+  });
+
   it('rispetta il prezzo_pacchetto quando presente, invece della somma righe', async () => {
     port.registraTemplate(templateSemplice({ id: 'M02', prezzoPacchetto: 1500 }));
     const r = await istanziaProgetto(

@@ -18,6 +18,7 @@
 
 import { conContestoInTransazione, contestoTenant, type PrismaConContesto } from '../../util/prismaClient.js';
 import { TransizioneNonValidaError } from '../appErrors.js';
+import { riallineaValoreProgetto } from '../../services/valoreProgetto.js';
 import { notificaStudio } from '../../services/notificheService.js';
 import type {
   IstanziazionePort,
@@ -105,6 +106,10 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
           if (res.count === 0) {
             throw new TransizioneNonValidaError(`Preventivo ${preventivoId} già accettato: istanziazione duplicata evitata`);
           }
+        },
+
+        riallineaValoreProgetto: async (progettoId) => {
+          await riallineaValoreProgetto(tx, progettoId);
         },
 
         creaModuloProgetto: async (input) => {

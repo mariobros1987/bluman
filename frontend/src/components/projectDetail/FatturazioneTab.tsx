@@ -35,9 +35,12 @@ export interface VoceFatturabile {
  * valore: un modulo a 0 o senza valore non dà un importo da fatturare, e non se ne inventa uno.
  */
 function quotaModulo(m: unknown, numVoci: number): number | null {
-  const val = (m as { val?: unknown })?.val;
-  if (typeof val !== 'number' || !(val > 0)) return null;
-  return Math.round(val / (numVoci || 1));
+  // Il prezzo del modulo, in euro, è `p` (`ModuloProgetto`, riempito da `modulo_progetto.prezzo`).
+  // Qui si leggeva `val`, un campo che il modulo non ha: ogni voce risultava «importo mancante»
+  // anche su un modulo con il suo prezzo.
+  const prezzo = (m as { p?: unknown })?.p;
+  if (typeof prezzo !== 'number' || !(prezzo > 0)) return null;
+  return Math.round(prezzo / (numVoci || 1));
 }
 
 // ─── Fatturazione Tab ─────────────────────────────────────────────

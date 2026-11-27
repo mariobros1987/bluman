@@ -67,3 +67,55 @@ describe('AnagraficaErpModal — salvataggio (F3)', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+// Analisi del 26/11, E6 ed F4 — un cliente senza dati nasceva con giurisdizione e nazione «Italia»,
+// capitale 10.000 €, codice SDI «0000000» e regime «RF01 - Ordinario», e al primo salvataggio quei
+// valori diventavano suoi. E tredici campi erano obbligatori per tutti, PEC e codice SDI compresi:
+// per un cliente estero si riempivano con dati finti.
+describe('AnagraficaErpModal — niente dati inventati, niente campi obbligatori che non valgono per tutti (E6, F4)', () => {
+  it('cliente senza dati: il salvataggio non scrive Italia, 10.000, 0000000 né RF01', async () => {
+    vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
+    const onSaved = vi.fn();
+    render(<AnagraficaErpModal client={{ ...CLIENTE }} onClose={vi.fn()} onSaved={onSaved} />);
+
+    salva();
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const inviato = vi.mocked(aggiornaClienteApi).mock.calls[0][1] as any;
+    const testo = JSON.stringify(inviato);
+    expect(testo).not.toMatch(/Italia/);
+    expect(testo).not.toMatch(/10000/);
+    expect(testo).not.toMatch(/0000000/);
+    expect(testo).not.toMatch(/RF01/);
+    expect(inviato.giurisdizione).toBe('');
+    expect(inviato.sdiCode).toBe('');
+    expect(inviato.sedeLegale).toBe('');
+  });
+
+  it('i dati che il cliente ha davvero restano quelli', async () => {
+    vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
+    const onSaved = vi.fn();
+    render(
+      <AnagraficaErpModal
+        client={{ ...CLIENTE, giurisdizione: 'Malta', sdiCode: 'ABC1234', referentiJson: { capitale: 1200, nazione: 'Malta', citta: 'Sliema' } }}
+        onClose={vi.fn()}
+        onSaved={onSaved}
+      />,
+    );
+
+    salva();
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const inviato = vi.mocked(aggiornaClienteApi).mock.calls[0][1] as any;
+    expect(inviato.giurisdizione).toBe('Malta');
+    expect(inviato.sdiCode).toBe('ABC1234');
+    expect(inviato.sedeLegale).toBe('Sliema - Malta');
+    expect(JSON.stringify(inviato)).toContain('1200');
+  });
+
+  it('l’unico campo obbligatorio del modulo è il nome', () => {
+    render(<AnagraficaErpModal client={{ ...CLIENTE }} onClose={vi.fn()} onSaved={vi.fn()} />);
+    const obbligatori = Array.from(document.querySelectorAll('input[required], select[required], textarea[required]')).map((e) => e.id);
+    expect(obbligatori).toEqual(['cli-nome']);
+  });
+});

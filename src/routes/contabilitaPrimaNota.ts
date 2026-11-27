@@ -5,7 +5,8 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { AppPort } from '../services/appPort.js';
-import { prisma } from '../util/prismaClient.js';
+import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
+import { motivoMovimentoNonEliminabile } from '../domain/eliminazioneMovimento.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import {
   creaMovimentoConSaldo,
@@ -356,14 +357,38 @@ export async function registraRotteContabilitaPrimaNota(server: FastifyInstance,
     try {
       const movimento = await prisma.movimentoPrimaNota.findFirst({
         where: { id, tenantId },
+        include: { fattura: { select: { numero: true } }, fatturaRicevuta: { select: { numero: true } } },
       });
       if (!movimento) return reply.code(404).send({ errore: 'Movimento non trovato' });
 
-      // Storno del saldo e cancellazione sono un atto solo (`services/primaNotaMovimento.ts`).
-      await eliminaMovimentoEStornaSaldo(prisma, movimento);
+      // Il movimento di un incasso o di un pagamento non si elimina da solo: la rata resterebbe
+      // «incassata» (o la fattura d'acquisto «pagata») senza il suo denaro (`domain/eliminazioneMovimento.ts`).
+      const motivo = motivoMovimentoNonEliminabile(movimento);
+      if (motivo) return reply.code(409).send({ errore: motivo });
+
+      // Storno del saldo e cancellazione sono un atto solo (`services/primaNotaMovimento.ts`), e
+      // stanno in una transazione: prima erano due scritture separate sul client della richiesta.
+      await prisma.$transaction(async (tx) =>
+        conContestoInTransazione(tx, () => eliminaMovimentoEStornaSaldo(tx, movimento)),
+      );
+
+      // Una scrittura contabile tolta lascia traccia: chi, quando, cosa e quanto.
+      await recordAudit({
+        tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
+        azione: 'MOVIMENTO_PRIMANOTA_ELIMINATO',
+        entita: movimento.descrizione,
+        dettagli:
+          `Eliminato movimento ${movimento.tipo.toUpperCase()} di €${(movimento.importoCentesimi / 100).toFixed(2)} ` +
+          `del ${movimento.data.toISOString().slice(0, 10)} dalla Prima Nota` +
+          (movimento.contoBancarioId ? ` (conto ${movimento.contoBancarioId}, saldo stornato)` : ' (senza conto)'),
+        ipAddress: req.ip,
+      });
 
       return reply.send({ ok: true, message: 'Movimento eliminato con successo' });
     } catch (err: any) {
+      req.log.error(err, 'Errore eliminazione movimento di Prima Nota');
       return reply.code(500).send({ errore: err?.message || 'Errore eliminazione movimento' });
     }
   });

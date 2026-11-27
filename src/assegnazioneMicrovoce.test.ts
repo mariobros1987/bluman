@@ -37,6 +37,9 @@ const stato = {
   aggiornamentiMicrovoce: [] as any[],
   /** Quante volte si è interrogata la tabella utenti: la cache deve tenerla bassa. */
   lettureUtenti: 0,
+  /** E10 — cosa è stato scritto sulla riga del progetto, e quanto vale la somma dei suoi moduli. */
+  aggiornamentiProgetto: [] as any[],
+  sommaPrezziModuli: 0,
 };
 
 /** Le due micro-voci di partenza: una libera, una già assegnata. */
@@ -57,9 +60,16 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
         stato: 'in_progress',
         moduli: [{ id: 'mod-1', nome: 'Modulo A', microvoci: stato.microvoci }],
       }),
-      update: async () => ({}),
+      update: async (args: any) => {
+        stato.aggiornamentiProgetto.push(args.data);
+        return {};
+      },
     },
-    moduloProgetto: { update: async () => ({}) },
+    moduloProgetto: {
+      update: async () => ({}),
+      // E10 — a fine salvataggio il valore del progetto si riallinea alla somma dei moduli.
+      aggregate: async () => ({ _sum: { prezzo: stato.sommaPrezziModuli }, _count: { _all: 1 } }),
+    },
     microvoceProgetto: {
       update: async (args: any) => {
         stato.aggiornamentiMicrovoce.push(args);
@@ -157,6 +167,8 @@ function ultimoAggiornamento(microvoceId: string) {
 beforeEach(() => {
   stato.microvoci = microvociIniziali();
   stato.aggiornamentiMicrovoce.length = 0;
+  stato.aggiornamentiProgetto.length = 0;
+  stato.sommaPrezziModuli = 0;
   stato.lettureUtenti = 0;
   stato.utenti = {
     'usr-membro': TENANT,
@@ -273,5 +285,19 @@ describe('la verifica dello studio costa una query per persona, non per micro-vo
     expect(stato.lettureUtenti).toBe(1);
     expect(ultimoAggiornamento('mv-1')).toMatchObject({ risorsaId: 'usr-membro' });
     expect(ultimoAggiornamento('mv-2')).toMatchObject({ risorsaId: 'usr-membro' });
+  });
+});
+
+// Analisi del 26/11, E10 — il valore di un progetto con moduli è la somma dei loro prezzi e lo
+// scrive il server. Prima la rotta scriveva pari pari il `val` mandato dal browser.
+describe('PUT /progetti/:id/stato-completo — il valore del progetto lo scrive il server (E10)', () => {
+  it('progetto con moduli: il `val` del browser non si scrive, vale la somma dei moduli', async () => {
+    stato.sommaPrezziModuli = 330000;
+    const { body } = await salva({ ...corpo({ dbId: 'mv-1', n: 'Raccolta documenti' }), val: 99999 } as any);
+
+    expect(body.valoreTotale).toBe(330000);
+    expect(stato.aggiornamentiProgetto).toContainEqual({ valoreTotale: 330000 });
+    expect(stato.aggiornamentiProgetto.some(d => d.valoreTotale === 9999900)).toBe(false);
+    expect(body.nonSalvate).toEqual([]);
   });
 });

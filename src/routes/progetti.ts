@@ -29,6 +29,7 @@ import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } f
 import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
 import { livelloFirmaValido } from '../services/livelloFirmaService.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
+import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
@@ -803,6 +804,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               where: { OR: [{ moduloProgettoId: moduloId }, { dipendeDaModuloProgettoId: moduloId }] },
             });
             await tx.moduloProgetto.delete({ where: { id: moduloId } });
+            // Il valore del progetto scende col modulo tolto, nella stessa transazione.
+            await riallineaValoreProgetto(tx, id, { azzeraSeSenzaModuli: true });
           }),
         );
       } catch (err) {
@@ -1322,7 +1325,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     if (typeof body.n === 'string' && body.n.trim() && body.n.trim() !== progetto.nome) {
       datiProgetto.nome = body.n.trim();
     }
-    if (Number.isFinite(body.val)) datiProgetto.valoreTotale = Math.max(0, Math.round(Number(body.val) * 100));
+    // Il valore di un progetto CON moduli è la somma dei loro prezzi e lo scrive il server più
+    // sotto (`riallineaValoreProgetto`): quello mandato dal browser si accetta solo per un
+    // progetto senza moduli, dove non c'è niente da sommare.
+    const progettoConModuli = progetto.moduli.length > 0;
+    if (!progettoConModuli && Number.isFinite(body.val)) {
+      datiProgetto.valoreTotale = Math.max(0, Math.round(Number(body.val) * 100));
+    }
     // Lo stato del progetto si accetta solo per far uscire un progetto da `pre_project`: da lì
     // in poi lo calcola la cascata in fondo a questa funzione, e prenderlo dal client
     // significherebbe sovrascrivere il risultato con una stima fatta nel browser.
@@ -1331,6 +1340,15 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     }
     if (Object.keys(datiProgetto).length > 0) {
       await prisma.progetto.update({ where: { id }, data: datiProgetto });
+    }
+    let valoreTotale: number | null = datiProgetto.valoreTotale ?? progetto.valoreTotale;
+    if (progettoConModuli) {
+      try {
+        valoreTotale = await riallineaValoreProgetto(prisma, id);
+      } catch (err) {
+        req.log.error(err, `Valore del progetto ${id} non riallineato ai moduli`);
+        nonSalvate.push('valore del progetto non aggiornato alla somma dei moduli');
+      }
     }
 
     // §16 — la cascata risale dopo la scrittura: ore nuove significano segnale di rischio,
@@ -1344,6 +1362,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
 
     await recordAudit({
       tenantId,
+      userId: req.userId,
+      userEmail: req.user?.email,
+      ruolo: req.ruolo,
       azione: 'PROGETTO_STATO_AGGIORNATO',
       entita: id,
       dettagli:
@@ -1361,6 +1382,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       microvociSalvate,
       nonSalvate,
       avanzamento,
+      // In centesimi, com'è a database dopo questo salvataggio: la pagina lo mostra così com'è.
+      valoreTotale,
     });
   });
 
