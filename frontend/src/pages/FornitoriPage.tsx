@@ -191,7 +191,7 @@ export const FornitoriPage: React.FC = () => {
             €{(totaleApertoCent / 100).toLocaleString('it-IT', { minimumFractionDigits: 2 })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            {fatture.filter((f) => !f.pagata).length} scadenze passive pendenti
+            {fatture.filter((f) => !f.pagata).length} fatture da pagare
           </div>
         </div>
 

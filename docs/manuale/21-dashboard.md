@@ -1,6 +1,7 @@
 # 21 · Dashboard
 
 ## 👤 Cosa fa e come si usa
+- **Da fare oggi**, in cima: che cosa aspetta, con il pulsante per andarci. Elenca le **rate scadute** da incassare (con quanto resta da incassare), le **rate che scadono entro 7 giorni**, le **fatture d'acquisto da pagare** e i **moduli in ritardo o con ore sforate**. Se non c'è niente lo dice. Compaiono solo le voci delle pagine a cui hai accesso; se una lettura non riesce, il riquadro avvisa che può essere incompleto.
 La **Dashboard** (`/`) è la prima schermata dopo l'accesso: dà il quadro del portafoglio e segnala cosa richiede attenzione.
 
 - **Quattro contatori**: **Progetti attivi** (con il numero di quelli in lavorazione), **Ritardi attivi**, **Valore portafoglio** e **Avanzamento medio**.

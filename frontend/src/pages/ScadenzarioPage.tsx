@@ -108,7 +108,7 @@ export function ScadenzarioPage() {
         riferimentoTransazione: riferimentoTransazione || undefined,
         noteOperatore: noteOperatore || undefined,
       });
-      toast.successo('Incasso registrato con successo e scritto automaticamente in Prima Nota!');
+      toast.successo('Incasso registrato: lo trovi anche in Prima Nota.');
       setSelectedScadenza(null);
       setImportoIncasso('');
       setRiferimentoTransazione('');

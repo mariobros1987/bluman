@@ -1,6 +1,7 @@
 # 02 · Clienti & Anagrafica ERP
 
 ## 👤 Cosa fa e come si usa
+- **La scheda segue il tipo di cliente**: per una **persona fisica** non compaiono i dati societari (Paese di costituzione, Registro Imprese / REA, capitale sociale) e il nome si chiama «Nome e cognome»; per una **società o ente** ci sono tutti. PEC e codice destinatario SDI servono solo per i clienti italiani.
 L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Clienti** (`/clients`).
 
 - **Creare / modificare un cliente**: modale a **5 schede** —

@@ -1,6 +1,7 @@
 # 30 · Aiuto
 
 ## 👤 Cosa fa e come si usa
+- **Il «?» accanto al titolo** di ogni pagina apre direttamente la scheda che spiega quella pagina.
 - **Il menu a sinistra** è diviso in quattro aree che si aprono e chiudono con un clic: **Lavoro**, **Contabilità**, **Documenti**, **Studio**. Dashboard e Aiuto sono sempre visibili. L'area della pagina in cui ci si trova resta aperta; le altre si ricordano come le si è lasciate.
 **Aiuto** (`/aiuto`) è il manuale consultabile dentro l'app.
 

@@ -9,11 +9,16 @@ import { NewProjectWizard } from '../components/NewProjectWizard';
 import { fetchProgetti, isRispostaPaginata } from '../api/client';
 import { usePeriodo } from '../context/PeriodoContext';
 import { getCurrentTenantId } from '../utils/tenant';
+import { DaFareOggi } from '../components/dashboard/DaFareOggi';
 import type { Progetto } from '../types';
 import styles from './Dashboard.module.css';
 
 export function Dashboard() {
   const navigate = useNavigate();
+  // L'utente della sessione, per sapere quali elenchi può vedere il riquadro «Da fare oggi».
+  const utenteCorrente = (() => {
+    try { return JSON.parse(localStorage.getItem('bluman_user') || 'null'); } catch { return null; }
+  })();
   // La Dashboard rispetta lo stesso «Periodo» globale della pagina Progetti, altrimenti i due
   // conteggi divergono (Dashboard mostrava tutti i progetti, Progetti solo quelli del periodo).
   const { dataDa: gDataDa, dataA: gDataA } = usePeriodo();
@@ -65,7 +70,7 @@ export function Dashboard() {
             start: rp.dataInizio
               ? new Date(rp.dataInizio).toLocaleDateString('it-IT')
               : rp.createdAt ? new Date(rp.createdAt).toLocaleDateString('it-IT') : 'n/d',
-            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : 'n/d',
+            due: rp.dataScadenza ? new Date(rp.dataScadenza).toLocaleDateString('it-IT') : '',
             // Regola 7: il valore arriva dal DB (centesimi); se manca o è zero il progetto
             // non contribuisce al portafoglio — mai inventare una cifra verosimile.
             val: rp.valoreTotale != null ? rp.valoreTotale / 100 : 0,
@@ -248,14 +253,17 @@ export function Dashboard() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, fontSize: 11, color: 'var(--muted)' }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)' }} />
         <span>
-          {lettoAlle
-            ? `Dati aggiornati alle ${lettoAlle.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
-            : 'Dati letti dal server'}
+          {/* Senza un'ora di lettura non si scrive niente: «letti dal server» sarebbe un'affermazione
+              su una lettura che non si sa se è riuscita (nota del revisore sulla #7). */}
+          {lettoAlle ? `Dati aggiornati alle ${lettoAlle.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}` : ''}
         </span>
         <button type="button" className="btn btn-sm btn-secondary" onClick={loadProjects} disabled={loading}>
           ↻ Aggiorna
         </button>
       </div>
+
+      {/* Che cosa aspetta l'operatore oggi, prima dei numeri (proposta M1 dell'analisi del 26/11). */}
+      <DaFareOggi user={utenteCorrente} moduliInRitardo={alertRows.length} />
 
       {/* KPI */}
       <div className={styles.kpiGrid}>
@@ -352,7 +360,7 @@ export function Dashboard() {
                       >
                         {p.ct === 'individual' ? '👤' : '🏢'} {p.cl}
                       </span>
-                      <span>📅 {p.start} → {p.due}</span>
+                      <span title={p.due ? 'Data di avvio → scadenza' : 'Data di avvio (nessuna scadenza indicata)'}>📅 {p.start}{p.due ? ` → ${p.due}` : ''}</span>
                       {/* Regola 7: il valore si mostra solo se il progetto lo porta davvero;
                           mai esporre una cifra per un progetto senza valore registrato. */}
                       {p.val > 0 && <span>💶 {fmt(p.val)}</span>}

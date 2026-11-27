@@ -76,7 +76,7 @@ dipendente restano `attesa_dipendenza`; quando quel modulo si chiude, il ricalco
 
 Nella scheda progetto le dipendenze si leggono così: i moduli sono elencati **in ordine di dipendenza**
 (prima quelli da cui gli altri attendono); sotto il nome di un modulo in attesa compare **«⏳ In attesa
-di: «nome del modulo»»**; la scheda **Grafo** mette i moduli in colonne («1 · Si possono iniziare
+di: «nome del modulo»»**; la scheda **Ordine dei moduli** mette i moduli in colonne («1 · Si possono iniziare
 subito», «2 · Dopo i precedenti») e su ogni modulo dice **«Viene dopo: …»** con ✓ se quel modulo è
 chiuso e ⏳ se non lo è. Le etichette di stato: **«Da iniziare»** (si può lavorare) e **«In attesa di
 un altro modulo»** (bloccata finché l'altro non si chiude).

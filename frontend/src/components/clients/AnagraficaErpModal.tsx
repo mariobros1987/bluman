@@ -101,6 +101,8 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
   const [nome, setNome] = useState(client.nome || '');
   const [tipo, setTipo] = useState(client.tipo || 'company');
+  /** Persona fisica o società: decide quali campi hanno senso e come si chiamano. */
+  const persona = tipo === 'individual';
   const [piva, setPiva] = useState(client.piva || (client as any).partitaIva || refJson.piva || '');
   const [codFisc, setCodFisc] = useState(client.codiceFiscale || (client as any).codFisc || refJson.codiceFiscale || '');
   const [giurisdizione, setGiurisdizione] = useState(client.giurisdizione || refJson.giurisdizione || '');
@@ -429,32 +431,36 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 2 }}>
-                <label htmlFor="cli-nome" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Nome / Ragione Sociale *</label>
+                <label htmlFor="cli-nome" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>{persona ? 'Nome e cognome *' : 'Ragione sociale *'}</label>
                 <input id="cli-nome" value={nome} onChange={e => setNome(e.target.value)} required style={{ fontSize: 13, fontWeight: 600 }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-tipo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipologia Soggetto *</label>
+                <label htmlFor="cli-tipo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Tipo di cliente *</label>
                 <select id="cli-tipo" value={tipo} onChange={e => setTipo(e.target.value as any)}>
-                  <option value="company">🏢 Società / Entità (Company)</option>
-                  <option value="individual">👤 Persona Fisica (Individual)</option>
+                  <option value="company">🏢 Società o ente</option>
+                  <option value="individual">👤 Persona fisica</option>
                 </select>
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-piva" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Partita IVA / VAT Number</label>
+                <label htmlFor="cli-piva" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>{persona ? 'Partita IVA (solo se ne ha una)' : 'Partita IVA / VAT number'}</label>
                 <input id="cli-piva" value={piva} onChange={e => setPiva(e.target.value)} placeholder="IT01234567890" />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-codfisc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Fiscale</label>
-                <input id="cli-codfisc" value={codFisc} onChange={e => setCodFisc(e.target.value)} placeholder="Codice Fiscale..." />
+                <label htmlFor="cli-codfisc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice fiscale o numero identificativo</label>
+                <input id="cli-codfisc" value={codFisc} onChange={e => setCodFisc(e.target.value)} placeholder="" />
               </div>
             </div>
 
+            {/* Dati che esistono solo per una società: a una persona fisica non si chiedono
+                (prima comparivano comunque, con l'asterisco: registro imprese e capitale sociale
+                di una persona). I valori già salvati non si toccano: la riga è solo nascosta. */}
+            {!persona && (
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-giurisdizione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Giurisdizione Costituzione</label>
+                <label htmlFor="cli-giurisdizione" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Paese di costituzione</label>
                 <input id="cli-giurisdizione" value={giurisdizione} onChange={e => setGiurisdizione(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
@@ -466,6 +472,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 <input id="cli-capitale" type="number" value={capitale} onChange={e => setCapitale(e.target.value)} />
               </div>
             </div>
+            )}
           </div>
         )}
 
@@ -626,7 +633,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
                 <input id="cli-email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-pec" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Email PEC Ufficiale</label>
+                <label htmlFor="cli-pec" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>PEC (solo clienti italiani)</label>
                 <input id="cli-pec" type="email" value={pec} onChange={e => setPec(e.target.value)} />
               </div>
               <div style={{ flex: 1 }}>
@@ -682,7 +689,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <label htmlFor="cli-sdi" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice Destinatario SDI (7 caratteri)</label>
+                <label htmlFor="cli-sdi" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Codice destinatario SDI (solo fatture elettroniche italiane)</label>
                 <input id="cli-sdi" value={sdiCode} onChange={e => setSdiCode(e.target.value)} style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 700 }} />
               </div>
               <div style={{ flex: 2 }}>
@@ -753,7 +760,7 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
             </div>
 
             <div>
-              <label htmlFor="cli-ubo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolare Effettivo (UBO) & Struttura di Controllo</label>
+              <label htmlFor="cli-ubo" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>{persona ? 'Titolare effettivo (se diverso dal cliente)' : 'Titolare effettivo (UBO) e struttura di controllo'}</label>
               <input id="cli-ubo" value={ubo} onChange={e => setUbo(e.target.value)} />
             </div>
 

@@ -119,3 +119,35 @@ describe('AnagraficaErpModal — niente dati inventati, niente campi obbligatori
     expect(obbligatori).toEqual(['cli-nome']);
   });
 });
+
+// Proposta M4 dell'analisi del 26/11 — la scheda chiede a ciascun tipo di cliente i dati che ha.
+describe('AnagraficaErpModal — campi secondo il tipo di cliente (M4)', () => {
+  it('società: ragione sociale, registro imprese e capitale ci sono', () => {
+    render(<AnagraficaErpModal client={{ ...CLIENTE, tipo: 'company' }} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByLabelText('Ragione sociale *')).toBeTruthy();
+    expect(screen.getByLabelText('Registro Imprese / REA')).toBeTruthy();
+    expect(screen.getByLabelText('Capitale Sociale (€)')).toBeTruthy();
+  });
+
+  it('persona fisica: nome e cognome, e niente registro imprese né capitale sociale', () => {
+    render(<AnagraficaErpModal client={{ ...CLIENTE, tipo: 'individual' }} onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByLabelText('Nome e cognome *')).toBeTruthy();
+    expect(screen.queryByLabelText('Registro Imprese / REA')).toBeNull();
+    expect(screen.queryByLabelText('Capitale Sociale (€)')).toBeNull();
+    expect(screen.getByLabelText('Partita IVA (solo se ne ha una)')).toBeTruthy();
+  });
+
+  it('cambiando tipo i campi seguono, e i dati societari già salvati non si perdono', async () => {
+    vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
+    const onSaved = vi.fn();
+    render(<AnagraficaErpModal client={{ ...CLIENTE, tipo: 'company', giurisdizione: 'Malta' }} onClose={vi.fn()} onSaved={onSaved} />);
+    fireEvent.change(screen.getByLabelText('Tipo di cliente *'), { target: { value: 'individual' } });
+    expect(screen.queryByLabelText('Paese di costituzione')).toBeNull();
+
+    salva();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const inviato = vi.mocked(aggiornaClienteApi).mock.calls[0][1] as any;
+    expect(inviato.tipo).toBe('individual');
+    expect(inviato.giurisdizione).toBe('Malta');
+  });
+});

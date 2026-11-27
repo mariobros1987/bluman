@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { schedaAiutoDellaPagina } from '../../utils/aiutoDellaPagina';
 import { etichettaNotificheNonLette } from '../../utils/etichettaNotifiche';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
@@ -190,6 +191,7 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
     || (location.pathname.startsWith('/projects/') ? 'Dettaglio Progetto' : null)
     || (location.pathname.startsWith('/aiuto/') ? 'Aiuto' : null)
     || 'BluMan';
+  const schedaAiuto = schedaAiutoDellaPagina(location.pathname);
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleMarkAllRead = async () => {
@@ -263,6 +265,19 @@ export function AppLayout({ children, alertCount: _alertCount = 0, user, onLogou
               ☰
             </button>
             <div className={styles.topbarTitle}>{title}</div>
+            {/* «?»: la scheda dell'Aiuto che spiega questa pagina, a un clic. */}
+            {schedaAiuto && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => navigate(`/aiuto/${schedaAiuto}`)}
+                title={`Come funziona «${title}»: apri la spiegazione nell'Aiuto`}
+                aria-label={`Aiuto su ${title}`}
+                style={{ borderRadius: '50%', width: 26, height: 26, padding: 0, fontWeight: 700, flexShrink: 0 }}
+              >
+                ?
+              </button>
+            )}
             <GlobalSearch />
           </div>
           <div className={styles.topbarRight}>
