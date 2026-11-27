@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getModuliDisattivati, ANAGRAFICA_DA_COMPLETARE } from '../../utils/tenant';
+import { useModuloKycAttivo } from '../../hooks/useModuloKycAttivo';
 import styles from './Sidebar.module.css';
 
 const NAV = [
@@ -56,6 +57,11 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
     ? [...NAV, { path: '/admin/tenants', moduleKey: 'admin', label: 'Multi-Tenant Admin', icon: '👑' }]
     : NAV;
 
+  // La Coda KYC ha senso solo a modulo acceso: a modulo spento la voce portava a una pagina che
+  // dice soltanto «il modulo non è attivo». Si nasconde quando il server dice che è spento; se
+  // non si sa (lettura in corso o fallita) resta, e la pagina spiega da sé.
+  const kycAttivo = useModuloKycAttivo(Boolean(user));
+
   // Filtra i moduli bloccati per l'utente loggato in base alla Matrice Permessi RBAC
   const disattivati = getModuliDisattivati();
   const navItems = baseItems.filter(item => {
@@ -65,6 +71,7 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
     // disattivare. L'eccezione è esplicita per lo stesso motivo di `/` — un `moduleKey` messo lì
     // per far contento il filtro è una decisione che poi nessuno ritrova.
     if (item.path === '/aiuto') return true;
+    if (item.path === '/compliance' && kycAttivo === false) return false;
     // Standby moduli deciso dallo studio (Impostazioni non si disattiva, per non chiudersi fuori).
     if (item.moduleKey !== 'settings' && disattivati.includes(item.moduleKey)) return false;
     const perm = getUserPermission(user, item.moduleKey);

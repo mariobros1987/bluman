@@ -4,7 +4,7 @@ import { fetchClienti, fetchProgetti, fetchProgettoDettaglio, fetchTenantInfoApi
 import { getFormattedLogoUrl } from '../utils';
 import { downloadRealPdf, downloadRealWordDoc } from '../utils/pdfGenerator';
 import { getCurrentTenantId, getTenantStorageKey, getBrandLogoFallback } from '../utils/tenant';
-import { datiStudioDocumento, importoEuroTesto, valoreProgettoEuro } from '../utils/datiDocumentoEditor';
+import { datiStudioDocumento, importoEuroTesto, livelloFirmaValido, valoreProgettoEuro } from '../utils/datiDocumentoEditor';
 import { componiDocumento, scomponiDocumento } from '../../../src/util/intestazionePiede';
 import { escapeHtmlTesto, sanitizzaHtmlDocumento } from '../../../src/util/htmlSanitizer';
 import { intestazioneStudioHtml, piedeStudioHtml } from '../utils/intestazioneStudio';
@@ -87,10 +87,15 @@ export function DocumentEditorPage() {
   const [tagDisplayMode, setTagDisplayMode] = useState<'highlight' | 'plain' | 'raw'>('highlight');
   /**
    * Piano firma §3 — livello legale (ses|fea|feq) che il documento corrente esige.
-   * Ereditato dal template selezionato in handleSelectTemplate, salvato su ogni
-   * newVaultDoc/salvaDocumentoApi e su ogni master creato con "Salva come Modello".
+   * Ereditato dal modello con cui la pagina si apre e da ogni modello scelto dopo
+   * (handleSelectTemplate), salvato su ogni newVaultDoc/salvaDocumentoApi e su ogni master
+   * creato con "Salva come Modello". Parte dal modello iniziale e non da «ses»: entrando dalla
+   * Cartella Modelli il modello è già in elenco, handleSelectTemplate non scatta, e un modello
+   * che esige la FEA si salvava come firma semplice.
    */
-  const [livelloFirmaDoc, setLivelloFirmaDoc] = useState<'ses' | 'fea' | 'feq'>('ses');
+  const [livelloFirmaDoc, setLivelloFirmaDoc] = useState<'ses' | 'fea' | 'feq'>(
+    () => livelloFirmaValido(initialTmpl.livelloFirmaRichiesto) ?? 'ses',
+  );
 
   /**
    * §39 — Intestazione e piè di pagina propri di QUESTO documento.
@@ -234,6 +239,10 @@ export function DocumentEditorPage() {
         if (foundDoc) {
           if (foundDoc.titolo) setTitoloDocumento(foundDoc.titolo);
           if (foundDoc.categoria) setCategoria(foundDoc.categoria);
+          // Il documento salvato riparte dal SUO livello di firma: riaprirlo e salvarlo di nuovo
+          // non deve riportarlo a quello del modello d'apertura.
+          const livelloSalvato = livelloFirmaValido(foundDoc.livelloFirmaRichiesto);
+          if (livelloSalvato) setLivelloFirmaDoc(livelloSalvato);
           if (foundDoc.contenutoHtml) {
             // §39 — l'HTML salvato può portare intestazione e piede propri: si rimettono al loro
             // posto, e nell'area editabile va solo il corpo. Un documento salvato prima di §39 non
@@ -944,6 +953,7 @@ export function DocumentEditorPage() {
             <button
               key={l.id}
               type="button"
+              aria-pressed={livelloFirmaDoc === l.id}
               onClick={() => setLivelloFirmaDoc(l.id)}
               style={{
                 background: livelloFirmaDoc === l.id ? 'var(--pill-indigo-bg)' : 'var(--card)',

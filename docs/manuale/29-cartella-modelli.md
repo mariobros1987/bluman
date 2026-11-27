@@ -14,6 +14,7 @@ La **Cartella Modelli** (`/modelli`) è l'archivio dei modelli di documento dell
 - **Modificare un modello approvato fa decadere l'approvazione.**
 - Un modello **di serie** viene adottato dallo studio nel momento in cui se ne registra la revisione.
 - **Eliminare un modello non cambia i documenti già generati** nei progetti.
+- **Livello di firma**: aprendo un modello in Document Studio, il documento parte dal livello di firma del modello (SES, FEA o FEQ); l'operatore può cambiarlo prima di salvare. Un documento salvato, riaperto, mantiene il suo livello.
 
 ## 🔗 Collegamenti
 - **Document Studio** (§10), **Libreria** (§03), **Firma** (§11).

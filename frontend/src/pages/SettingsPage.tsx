@@ -19,6 +19,7 @@ import { TabSicurezza } from '../components/settings/TabSicurezza';
 import { TabCompliance } from '../components/settings/TabCompliance';
 import { TabServiziEsterni } from '../components/settings/TabServiziEsterni';
 import { fetchModuliTenant } from '../api/kyc';
+import { EVENTO_MODULI_CAMBIATI } from '../hooks/useModuloKycAttivo';
 import { InviteUserModal } from '../components/settings/InviteUserModal';
 import { ResetPasswordModal } from '../components/settings/ResetPasswordModal';
 import { ArchiviaOperatoreModal } from '../components/settings/ArchiviaOperatoreModal';
@@ -79,6 +80,7 @@ export function SettingsPage() {
       let info: any = {};
       try { info = JSON.parse(localStorage.getItem(getTenantStorageKey('bluman_tenant_info', tid)) || '{}'); } catch { /* storage vuoto */ }
       saveTenantInfoToStorage(tid, { ...info, moduliDisattivati: moduliStandby });
+      window.dispatchEvent(new Event(EVENTO_MODULI_CAMBIATI));
       setModuliMsg('Salvato: i moduli in standby sono nascosti dalla navigazione per lo studio.');
     } catch (e: any) {
       setModuliMsg(e?.message || 'Errore nel salvataggio dei moduli');

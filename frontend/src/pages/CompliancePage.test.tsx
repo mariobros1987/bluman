@@ -107,6 +107,52 @@ describe('CompliancePage — cosa è approvabile', () => {
   });
 });
 
+// Analisi del 26/11, E3 — un errore di lettura non è una coda vuota. A modulo spento il server
+// risponde 403 alla coda: letta insieme ai moduli, quella risposta copriva tutto e la pagina
+// mostrava «tutte gestite» con il pannello di approvazione.
+describe('CompliancePage — errore di lettura distinto dalla coda vuota (E3)', () => {
+  it('modulo spento e coda rifiutata dal server → dice che il modulo è spento, e la coda non viene chiesta', async () => {
+    mockModuli.mockResolvedValue({ concessi: [], disattivati: [], attivi: [] });
+    mockCoda.mockRejectedValue(new Error('Il modulo Compliance/KYC non è attivo per questo studio.'));
+    render(<CompliancePage />);
+    expect(await screen.findByText(/Si attiva da Impostazioni/i)).toBeTruthy();
+    expect(mockCoda).not.toHaveBeenCalled();
+    expect(screen.queryByText(/tutte quelle aperte sono già state gestite/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Approva selezionate/i })).toBeNull();
+  });
+
+  it('coda non letta → errore con «Riprova», niente «tutte gestite», niente pannello di approvazione', async () => {
+    mockCoda.mockRejectedValue(new Error('Errore lettura coda KYC'));
+    render(<CompliancePage />);
+    const avviso = await screen.findByRole('alert');
+    expect(avviso.textContent).toContain('Errore lettura coda KYC');
+    expect(screen.queryByText(/tutte quelle aperte sono già state gestite/i)).toBeNull();
+    expect(screen.queryByText(/in coda$/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Approva selezionate/i })).toBeNull();
+
+    // «Riprova» rilegge davvero: alla seconda risposta la coda compare.
+    mockCoda.mockResolvedValue({ profiloConfigurato: true, totale: 1, fascicoli: [PRONTA] });
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByText('Rossi Srl')).toBeTruthy();
+  });
+
+  it('moduli non letti → errore, non «modulo spento» né coda vuota', async () => {
+    mockModuli.mockRejectedValue(new Error('Errore lettura moduli dello studio'));
+    render(<CompliancePage />);
+    const avviso = await screen.findByRole('alert');
+    expect(avviso.textContent).toContain('Errore lettura moduli dello studio');
+    expect(screen.queryByText(/non è attivo per questo studio/i)).toBeNull();
+    expect(screen.queryByText(/tutte quelle aperte sono già state gestite/i)).toBeNull();
+  });
+
+  it('coda letta e davvero vuota → lo dice, senza errori', async () => {
+    mockCoda.mockResolvedValue({ profiloConfigurato: true, totale: 0, fascicoli: [] });
+    render(<CompliancePage />);
+    expect(await screen.findByText(/tutte quelle aperte sono già state gestite/i)).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
 describe('CompliancePage — l’approvazione massiva', () => {
   it('«tutte le approvabili» seleziona solo quelle e l’API riceve solo i loro id', async () => {
     render(<CompliancePage />);

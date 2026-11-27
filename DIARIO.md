@@ -20,6 +20,12 @@ README.md e `docs/storico/`.
 - Documenti in radice del titolare (ISTRUZIONI_PER_IA, LAVORO_RIMANENTE, guide, specifiche) lasciati dove stanno: spostarli in `docs/storico/` cambia i rimandi di README, manuale e `credenziali.test.ts`, ed è lavoro da concordare col titolare (PIANO, step Standard S.4 e 5.1) (Claude).
 - Vercel: Fabio dice che all'unione pubblica da solo; `docs/manuale/19-infra-deploy.md` dice che il deploy Vercel da webhook GitHub resta `BLOCKED` e che pubblica solo la CLI. Da misurare alla prima pubblicazione (dichiarato, non misurato).
 
+## 2026-11-27
+- Giro di correzioni dopo l'analisi del 26/11 (Fabio: «vai così»): si corregge tutto ciò che non chiede una regola di business nuova; blocchi, storni, IVA trimestrale e fatturazione fuori Italia aspettano il titolare. Numerazione E/F/G/M del rapporto `BluMan_Analisi_26-11-2026.pdf`.
+- E1 — Document Studio parte dal livello di firma del modello con cui si apre, e un documento salvato riparte dal suo: prima il livello si ereditava solo scegliendo il modello dalla barra laterale, quindi un modello FEA aperto dalla Cartella Modelli si salvava come firma semplice. Nessuna regola nuova: il livello resta modificabile dall'operatore (se imporre un minimo è la domanda D11 per il titolare).
+- E3 — la Coda KYC legge prima i moduli dello studio e poi la coda, e una coda non letta è un errore con «Riprova»: a modulo spento il server risponde 403 alla coda, e letta insieme ai moduli quella risposta faceva comparire «nessuna pratica in coda: tutte gestite» con il pannello di approvazione sotto.
+- F6 — la voce di menu «Coda KYC / AML» segue il modulo: sparisce quando il server dice che è spento (non concesso, o in standby), resta quando non si sa. Deciso da Claude: è la stessa regola dello standby degli altri moduli, non una regola nuova.
+
 ## 2026-11-18
 - Fornitori, fatture d'acquisto e liquidazione IVA seguono la chiave `invoices` anche via API (Fabio: «sistema tutto», proposta di Claude): l'app le nascondeva già a chi non ha Fatture, ma le rotte erano fuori matrice e senza controllo di ruolo. Nessuna voce nuova in matrice; le giurisdizioni restano leggibili da tutti e si scrivono con `library = write`.
 - Una fattura d'acquisto è «la stessa» se ha stesso fornitore, stesso numero e stesso anno del documento: la seconda registrazione o il secondo import rispondono 409. Controllo applicativo, senza vincolo UNIQUE a database: metterlo chiede una migrazione e prima va verificato che in produzione non esistano già doppioni (deciso da Claude, da riprendere col titolare).

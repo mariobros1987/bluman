@@ -19,10 +19,12 @@ La **Coda KYC / AML** (`/compliance`) raccoglie in un'unica vista le pratiche di
 - **Impostazioni** (§16): profilo regolatorio e attivazione del modulo.
 
 ## ⚠️ Stati limite & errori
-- **Modulo non attivo**: la pagina indica di attivarlo da Impostazioni → Moduli.
+- **Modulo non attivo**: la voce **Coda KYC / AML** non compare nel menu; chi apre comunque l'indirizzo legge che il modulo si attiva da Impostazioni → Moduli.
+- **Coda non letta**: se la lettura dal server non riesce, la pagina lo dice e propone **Riprova**. Non mostra «nessuna pratica in coda» né il pannello di approvazione: un errore di lettura non vuol dire che non ci siano pratiche in attesa.
+- **Nessuna pratica in coda**: compare solo quando la coda è stata letta ed è davvero vuota.
 - **Profilo regolatorio mancante**: nessuna pratica si può approvare finché non viene impostato in Impostazioni → Compliance & AML.
 - **Pratiche respinte durante l'approvazione**: un riquadro elenca ciascun cliente con il motivo; le altre vengono approvate normalmente.
 
 ## 🔧 Nota tecnica
-- Frontend: `pages/CompliancePage.tsx`, `api/kyc.ts`. Chiave RBAC `clients`.
+- Frontend: `pages/CompliancePage.tsx`, `api/kyc.ts`, `hooks/useModuloKycAttivo.ts` (voce di menu in `components/layout/Sidebar.tsx`). Chiave RBAC `clients`.
 - Rotte: `src/routes/kyc.ts` (coda e approvazione massiva).

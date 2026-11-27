@@ -69,8 +69,18 @@ export function CompliancePage() {
     setLoading(true);
     setErrore('');
     try {
-      const [moduli, datiCoda] = await Promise.all([fetchModuliTenant(), fetchCodaKycApi()]);
-      setModuloAttivo(moduli.attivi.includes('kyc'));
+      // Prima i moduli, poi la coda: a modulo spento il server risponde 403 alla coda, e letti
+      // insieme quel 403 nascondeva anche la risposta sui moduli. La pagina finiva a mostrare
+      // «nessuna pratica in coda: tutte gestite» con il pannello di approvazione sotto.
+      const moduli = await fetchModuliTenant();
+      const attivo = moduli.attivi.includes('kyc');
+      setModuloAttivo(attivo);
+      if (!attivo) {
+        setCoda(null);
+        setSelezionati(new Set());
+        return;
+      }
+      const datiCoda = await fetchCodaKycApi();
       setCoda(datiCoda);
       // Dopo un caricamento la selezione può riferirsi a righe approvate: si tiene solo ciò che
       // è ancora approvabile, invece di svuotare sempre (l'operatore ricarica e ritrova la scelta).
@@ -155,6 +165,22 @@ export function CompliancePage() {
     );
   }
 
+  // Coda non letta: è un errore, non una coda vuota. Niente contatori a zero, niente pannello di
+  // approvazione, niente «tutte gestite»: solo cosa è successo e come riprovare (regola 13).
+  if (!coda) {
+    return (
+      <div role="alert" style={{ background: 'var(--pill-red-bg)', border: '1px solid var(--pill-red-bd)', color: 'var(--pill-red-fg)', borderRadius: 16, padding: 32, textAlign: 'center' }}>
+        <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 8 }}>🛡️ Coda KYC non letta</div>
+        <p style={{ fontSize: 13, margin: '0 0 14px' }}>
+          {(errore || 'La coda non è stata caricata').replace(/\.$/, '')}. Non è stato possibile leggere le pratiche: questo non vuol dire che non ce ne siano in attesa.
+        </p>
+        <button type="button" className="btn" onClick={() => void carica()} disabled={loading}>
+          {loading ? 'Nuovo tentativo…' : 'Riprova'}
+        </button>
+      </div>
+    );
+  }
+
   const rifiutatoPerId = new Map(ultimiRifiutati.map((r) => [r.id, r.motivo]));
 
   return (
@@ -170,7 +196,7 @@ export function CompliancePage() {
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, background: 'var(--pill-indigo-bg)', color: 'var(--pill-indigo-fg)', padding: '6px 14px', borderRadius: 20, fontWeight: 600 }}>
-            {coda?.totale ?? 0} in coda
+            {coda.totale} in coda
           </span>
           <span style={{ fontSize: 11, background: 'var(--pill-green-bg)', color: 'var(--pill-green-fg)', padding: '6px 14px', borderRadius: 20, fontWeight: 600 }}>
             {approvabili.length} approvabili ora
@@ -179,10 +205,13 @@ export function CompliancePage() {
       </div>
 
       {errore && (
-        <div style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)' }}>{errore}</div>
+        <div role="alert" style={{ padding: 12, borderRadius: 8, background: 'var(--pill-red-bg)', color: 'var(--pill-red-fg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span>{errore.replace(/\.$/, '')}. L’elenco qui sotto è quello dell’ultima lettura riuscita e può non essere aggiornato.</span>
+          <button type="button" className="btn" onClick={() => void carica()} disabled={loading}>Riprova</button>
+        </div>
       )}
 
-      {coda && !coda.profiloConfigurato && (
+      {!coda.profiloConfigurato && (
         <div style={{ padding: 14, borderRadius: 10, background: 'var(--pill-amber-bg)', color: 'var(--pill-amber-fg)', fontSize: 12 }}>
           ⚠ Il profilo regolatorio non è configurato: nessuna pratica può essere approvata finché non lo
           imposti in <strong>Impostazioni → Compliance &amp; AML</strong>. Le pratiche restano qui, in attesa.
@@ -194,7 +223,7 @@ export function CompliancePage() {
           <div style={{ fontWeight: 700, marginBottom: 6 }}>L’ultima approvazione ha lasciato fuori {ultimiRifiutati.length} {ultimiRifiutati.length === 1 ? 'pratica' : 'pratiche'}:</div>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {ultimiRifiutati.map((r) => {
-              const riga = coda?.fascicoli.find((f) => f.id === r.id);
+              const riga = coda.fascicoli.find((f) => f.id === r.id);
               return <li key={r.id}>{riga?.cliente.nome ?? r.id}: {r.motivo}</li>;
             })}
           </ul>
@@ -245,7 +274,7 @@ export function CompliancePage() {
       </div>
 
       <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 16, padding: 20 }}>
-        {!coda || coda.fascicoli.length === 0 ? (
+        {coda.fascicoli.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>
             Nessuna pratica in coda: tutte quelle aperte sono già state gestite.
           </div>
