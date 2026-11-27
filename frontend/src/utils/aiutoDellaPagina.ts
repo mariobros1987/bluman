@@ -21,6 +21,7 @@ const SCHEDA_PER_PAGINA: Record<string, string> = {
   '/library': '03-libreria',
   '/audit': '28-log-audit',
   '/settings': '16-impostazioni',
+  '/note-beta': '30-aiuto',
   '/admin/tenants': '31-multi-tenant-admin',
 };
 

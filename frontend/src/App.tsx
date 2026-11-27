@@ -28,6 +28,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { TimesheetPage } from './pages/TimesheetPage';
 // Il manuale in-app: legge le schede di `docs/manuale/` dal backend.
 import { AiutoPage } from './pages/AiutoPage';
+import { NoteBetaPage } from './pages/NoteBetaPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -201,6 +202,7 @@ function AppContent() {
           {/* L'aiuto **non** passa da `ProtectedModule`: non è un modulo, non c'è una chiave RBAC da
               consultare e non c'è niente da disattivare — è il manuale di quello che si sta usando,
               e chi è dentro l'app lo vede. Il `:slug` rende una scheda ricaricabile e linkabile. */}
+          <Route path="/note-beta"     element={<NoteBetaPage />} />
           <Route path="/aiuto"         element={<AiutoPage />} />
           <Route path="/aiuto/:slug"   element={<AiutoPage />} />
           <Route path="*"              element={<Navigate to="/" replace />} />

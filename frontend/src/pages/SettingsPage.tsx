@@ -53,6 +53,8 @@ export function SettingsPage() {
     { key: 'scadenzario', label: 'Scadenzario' }, { key: 'primanota', label: 'Prima Nota' },
     { key: 'banks', label: 'Banche' }, { key: 'retainers', label: 'Retainer' },
     { key: 'documents', label: 'Documenti' }, { key: 'reports', label: 'Report' },
+    // Non è solo una pagina del menu: è il pulsante 📝 presente in ogni pagina. In standby spariscono entrambi.
+    { key: 'notebeta', label: '📝 Note della beta (pulsante in ogni pagina)' },
   ];
   const [moduliStandby, setModuliStandby] = useState<string[]>([]);
   // null = stato dei moduli non ancora noto (o lettura fallita). In quel caso il modulo si considera

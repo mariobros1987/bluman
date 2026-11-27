@@ -116,8 +116,23 @@ describe('Sidebar — aree a tendina', () => {
       '/', '/projects', '/clients', '/compliance', '/calendar', '/timesheet',
       '/invoices', '/fornitori', '/liquidazione-iva', '/scadenzario', '/primanota', '/banks', '/retainers',
       '/documents', '/modelli', '/archivio',
-      '/reports', '/library', '/audit', '/settings', '/admin/tenants',
+      '/reports', '/library', '/audit', '/note-beta', '/settings', '/admin/tenants',
       '/aiuto',
     ]);
+  });
+});
+
+describe('Sidebar — la raccolta «Note della beta»', () => {
+  beforeEach(() => {
+    mockModuli.mockResolvedValue({ concessi: [], disattivati: [], attivi: [] });
+    localStorage.setItem('bluman_menu_aree', JSON.stringify({ studio: true }));
+  });
+
+  it('la vede chi risponde dello studio, non il collaboratore', () => {
+    const { unmount } = render(<MemoryRouter><Sidebar user={UTENTE} /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: /Note della beta/ })).toBeTruthy();
+    unmount();
+    render(<MemoryRouter><Sidebar user={{ ...UTENTE, ruolo: 'collaboratore_interno' }} /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: /Note della beta/ })).toBeNull();
   });
 });

@@ -53,6 +53,8 @@
 .topbarTitle {
   font-size: 14px;
   font-weight: 600;
+  /* Il titolo resta su una riga: con «?» e note accanto, a capo occuperebbe tutta la barra. */
+  white-space: nowrap;
 }
 
 .topbarRight {

@@ -4,6 +4,7 @@ import { getFormattedLogoUrl } from '../../utils';
 import { getUserPermission } from '../../utils/rbac';
 import { getCurrentTenantId, getTenantStorageKey, getStudioInfoForTenant, getModuliDisattivati, ANAGRAFICA_DA_COMPLETARE } from '../../utils/tenant';
 import { useModuloKycAttivo } from '../../hooks/useModuloKycAttivo';
+import { raccoltaNoteBetaVisibile } from '../../utils/noteBetaVisibili';
 import styles from './Sidebar.module.css';
 
 // Le voci del menu, per area. Dashboard e Aiuto stanno fuori dalle aree (sempre visibili); le
@@ -40,6 +41,8 @@ const NAV: VoceMenu[] = [
   { path: '/reports',    moduleKey: 'reports',     label: 'Report',                 icon: '📈', area: 'studio' },
   { path: '/library',    moduleKey: 'library',     label: 'Libreria moduli',        icon: '📚', area: 'studio' },
   { path: '/audit',      moduleKey: 'audit',       label: 'Log Audit',              icon: '📋', area: 'studio' },
+  // La raccolta delle note della beta: solo per chi risponde dello studio (vedi il filtro sotto).
+  { path: '/note-beta',  moduleKey: 'settings',    label: 'Note della beta',        icon: '📝', area: 'studio' },
   { path: '/settings',   moduleKey: 'settings',    label: 'Impostazioni',           icon: '⚙️', area: 'studio' },
   // Il manuale in-app (§docs/manuale). `moduleKey: 'settings'` è una scelta, non una svista: le
   // schede spiegano anche le sezioni, quindi l'aiuto non può essere spento dal modulo che spiega —
@@ -118,6 +121,7 @@ export function Sidebar({ alertCount = 0, user, onLogout, onOpenProfile }: Sideb
     // per far contento il filtro è una decisione che poi nessuno ritrova.
     if (item.path === '/aiuto') return true;
     if (item.path === '/compliance' && kycAttivo === false) return false;
+    if (item.path === '/note-beta') return raccoltaNoteBetaVisibile(user);
     // Standby moduli deciso dallo studio (Impostazioni non si disattiva, per non chiudersi fuori).
     if (item.moduleKey !== 'settings' && disattivati.includes(item.moduleKey)) return false;
     const perm = getUserPermission(user, item.moduleKey);
