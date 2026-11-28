@@ -94,6 +94,7 @@ sensibile frontend/src/test/*
 sempre src/credenziali.test.ts
 sempre src/ripieghiCredenziali.test.ts
 sempre src/infrastrutturaDeploy.test.ts
+sempre src/pubblicaGithub.test.ts
 sempre src/manuale.test.ts
 sempre src/cartellaTemplate.test.ts
 sempre src/collocazioneDocumento.test.ts
