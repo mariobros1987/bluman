@@ -94,6 +94,11 @@ export function TabPassaggi({
                       <div>
                         <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{s.title}</div>
                         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{s.desc}</div>
+                        {s.rispostaClienteAt && s.stato !== 'done' && (
+                          <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--amber)', marginTop: 4 }} title="Il cliente ha risposto dal portale. Il passaggio resta aperto finché non lo chiudi tu col ✓: è lo studio a dire che la risposta va bene.">
+                            📨 Il cliente ha risposto il {new Date(s.rispostaClienteAt).toLocaleDateString('it-IT')}: da controllare
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                         <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, textTransform: 'uppercase', ...tc }}>

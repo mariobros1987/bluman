@@ -71,6 +71,15 @@ segreto sia ancora in circolazione.
 > In produzione questa durata è tipicamente 60-480 minuti. Verifica il valore
 > attuale nel file `src/util/serverHelpers.ts`.
 
+### Passo 4 bis — Tieni il vecchio segreto per il canale protetto
+
+I messaggi e gli allegati del portale sono cifrati con una chiave ricavata da `JWT_SECRET`
+(`src/services/cifraturaCanale.ts`), a meno che non sia impostata `CANALE_PROTETTO_CHIAVE`.
+Durano anni, non un giorno: prima di togliere `JWT_PREVIOUS_SECRETS` aggiungi il vecchio segreto a
+`CANALE_PROTETTO_CHIAVI_PRECEDENTI` (più segreti separati da virgola) e **lascialo lì**. Senza, i
+messaggi scritti prima della rotazione compaiono come «non leggibile su questo server» finché il
+vecchio segreto non torna in elenco.
+
 ### Passo 5 — Rimuovi `JWT_PREVIOUS_SECRETS`
 
 Su Railway, rimuovi completamente la variabile `JWT_PREVIOUS_SECRETS`.

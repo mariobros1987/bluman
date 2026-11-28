@@ -57,6 +57,7 @@ import { registraRotteClienti } from './routes/clienti.js';
 // Rotte progetti ed esecuzione (split dei monoliti): la registrazione avviene
 // dentro il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteProgetti } from './routes/progetti.js';
+import { registraRotteCanaleProtetto } from './routes/canaleProtetto.js';
 // Rotte contabilità (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteContabilita } from './routes/contabilita.js';
@@ -91,6 +92,7 @@ import { registraRotteServiziEsterni } from './routes/serviziEsterni.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
+import { registraRottePortaleRiepilogo } from './routes/portaleRiepilogo.js';
 // Rotte firma FEA+OTP (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteFirma } from './routes/firma.js';
@@ -748,6 +750,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // estratte in src/routes/progetti.ts: stessa registrazione, sempre dentro
   // questo wrapper.
   await registraRotteProgetti(server, app);
+  // Scarico autenticato degli allegati del canale protetto (cifrati in archivio).
+  await registraRotteCanaleProtetto(server);
 
   // ─── COLLEGAMENTO CHAT → PRATICA (LINK TELEGRAM) ──────────────────
   // Rotte in src/routes/collegamentoChat.ts: il link firmato per agganciare la chat
@@ -847,6 +851,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // Rotte portale cliente estratte in src/routes/portale.ts: stessa
   // registrazione, sempre dentro questo wrapper.
   await registraRottePortale(server);
+  // La pagina personale del cliente (stato degli incarichi, «tocca a te») e le richieste per fase.
+  await registraRottePortaleRiepilogo(server);
 
   // ── FIRMA: CANALI, RICHIESTA/VERIFICA OTP, FIRMA CON FILE, ELENCO, GRAFOMETRICA ──
   // Rotte estratte in src/routes/firma.ts, registrata nella sezione FEA/firma (più sopra).

@@ -57,6 +57,12 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
     abbinato) resta l'unica parte non cablata: dipende dal payload del provider e va verificata per
     canale.
 - I canali si configurano in **Impostazioni** (§16).
+- **Canale protetto (Portale).** I messaggi scambiati sul canale **Portale** e i loro allegati sono
+  il canale riservato fra studio e cliente: il cliente scrive dalla scheda **Messaggi** del portale
+  (§12), lo studio risponde da qui scegliendo il canale Portale. Testo e file sono **conservati
+  cifrati**, e accanto al messaggio compare «🔒 cifrato». Un allegato del canale protetto non ha un
+  link: si scarica col tasto, solo da chi è entrato (il cliente della pratica, gli operatori con il
+  permesso Comunicazioni). Gli avvisi (campanella, email) dicono che c'è un messaggio, non cosa dice.
 
 ### Posta dei clienti (l'accentratore delle mail)
 La voce di menu **📬 Posta dei clienti** raccoglie in un elenco solo la posta che arriva nelle
@@ -104,6 +110,21 @@ cancella. Per il cliente la sua posta resta com'era.
   `RAILWAY_PUBLIC_DOMAIN` → `APP_BASE_URL` → dominio di produzione. Un errore qui **non produce un
   errore**: produce un webhook che punta a un altro backend, con un altro database — e ce ne si accorge
   solo quando un cliente scrive e non riceve risposta.
+- **Cifratura del canale protetto.** È cifratura **a riposo**: nel database e nell'archivio dei file
+  il messaggio e l'allegato sono testo cifrato (AES-256-GCM), con una chiave derivata per ogni studio
+  da un segreto del server. Chi mette le mani su una copia del database o su un backup non legge la
+  corrispondenza; un messaggio spostato a mano su un altro studio o su un'altra pratica non si apre.
+  **Non è cifratura «da capo a capo»**: il server decifra per chi ha titolo a leggere, perché lo
+  studio deve poter consultare e conservare la corrispondenza della pratica e il cliente entra con
+  un link, senza una chiave sua.
+- **La chiave** si ricava da `JWT_SECRET`, che in produzione c'è sempre: il canale è cifrato senza
+  niente da impostare. `CANALE_PROTETTO_CHIAVE`, se presente, la sostituisce; se è presente ma non
+  valida (meno di 32 caratteri) il canale **rifiuta di scrivere** invece di ripiegare. Solo senza
+  nessuna delle due (sviluppo) il canale funziona in chiaro, e il portale lo dice: «Canale
+  riservato, non ancora cifrato», senza lucchetto.
+- **Sul portale il cliente scrive solo nel canale protetto**: il canale non lo sceglie lui, e gli
+  allegati che dichiara a mano si ignorano. I messaggi scritti prima dell'attivazione restano
+  leggibili e non vengono cifrati a posteriori.
 - **Regola 7**: un invio fallito **non** lascia la riga «inviato»; il collegamento chat è unico per
   pratica (un secondo `/start` **sposta** il collegamento).
 
@@ -149,6 +170,12 @@ arriva al giro successivo. Di ogni messaggio salva fino a 20 allegati, ciascuno 
 
 ## ⚠️ Stati limite & errori
 - Relay non configurato → invio email non parte (fail-closed).
+- Chiave del canale protetto non valida → il messaggio non parte (**503**) e lo dice. Segreto
+  cambiato senza tenere il vecchio in `CANALE_PROTETTO_CHIAVI_PRECEDENTI` → i messaggi scritti prima
+  compaiono come «non leggibile su questo server» (non spariscono: tornano quando il vecchio
+  segreto è di nuovo in elenco) e l'allegato risponde **409**.
+- Allegato del canale protetto oltre 15 MB, più di 5 per messaggio, o di un tipo non ammesso →
+  rifiutato con il motivo (**400**), e il testo scritto resta nel compositore del portale.
 - Bot Telegram con username errato / id numerico → messaggi guidati diversi per rimedi diversi.
 - Chi non ha il permesso `communications=write` → invio bloccato; chi non ha nemmeno `read` non vede
   né la scheda del fascicolo né la linguetta «Messaggi» della micro-voce, e le rotte rispondono **403**
@@ -193,6 +220,9 @@ arriva al giro successivo. Di ogni messaggio salva fino a 20 allegati, ciascuno 
   studio sì; su un servizio che blocca le porte della posta la casella risulterà «non risponde».
 
 ## 🔧 Nota tecnica
+- Canale protetto: `src/services/cifraturaCanale.ts` (chiavi, AES-256-GCM), `canaleProtetto.ts`
+  (allegati, lettura), `avvisiCanaleProtetto.ts` (avvisi senza contenuto), rotta di scarico in
+  `src/routes/canaleProtetto.ts`; frontend `api/canaleProtetto.ts`, `components/AllegatiMessaggio.tsx`.
 - Servizi: `src/services/emailRelay.ts`, `imapInbound.ts`, `collegamentoChat.ts`,
   `comunicazioniMicrovoci.ts`; funzione Vercel `api/send-email.ts` (relay). Rotte: comunicazioni
   (`/comunicazioni/invia-*`), webhooks, `collegamentoChat.ts`, `progetti.ts`.

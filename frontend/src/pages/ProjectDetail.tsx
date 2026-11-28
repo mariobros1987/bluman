@@ -6,6 +6,7 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal, etichettaTipoAttivita, type PianificazioneScadenza } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { passaggioDaDb } from '../utils/passaggioDaDb';
 import { ModuliTab } from '../components/projectDetail/ModuliTab';
 import { FatturazioneTab } from '../components/projectDetail/FatturazioneTab';
 import { GateKycProgetto } from '../components/kyc/GateKycProgetto';
@@ -395,22 +396,7 @@ export function ProjectDetail() {
               risorsaId,
               d: mv.passaggi?.length || 0,
               vn: mv.causaNota || undefined,
-              proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
-                id: p.id,
-                title: p.titolo,
-                // Il database enumera il tipo con i valori Prisma («documento», «verifica»);
-                // la UI parla «doc»/«check». La traduzione avviene qui al confine, così il
-                // rendering (bottone allegato, etichette, colori) riconosce la riga.
-                type: p.tipo === 'documento' ? 'doc' : p.tipo === 'verifica' ? 'check' : p.tipo,
-                who: p.chi,
-                stato: p.stato,
-                desc: p.descrizione,
-                file: p.documentoAllegatoUrl,
-                fields: p.campiFormJson,
-                // Le risposte raccolte: senza questa riga la scheda «Compila / Visualizza
-                // Form» riaprirebbe vuota su dati che a database ci sono già.
-                risposte: p.risposteFormJson ?? undefined,
-              })) : undefined),
+              proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map(passaggioDaDb) : undefined),
               note: savedNotes,
             };
           });

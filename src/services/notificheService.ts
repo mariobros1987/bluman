@@ -58,6 +58,14 @@ export const EVENTI_NOTIFICA = [
   // aveva due progetti aperti. Senza questa notifica l'operatore non saprebbe che il problema che
   // lo aveva spinto a mandare il link è rientrato.
   'chat_collegata_progetto',
+  // Canale protetto del portale: lo studio ha scritto al cliente. La notifica dice che c'è un
+  // messaggio e su quale incarico, mai cosa dice — il testo si legge solo dentro il portale.
+  'messaggio_studio',
+  // Lo studio ha preparato per il cliente qualcosa da compilare o da mandare (un passaggio
+  // «del cliente» di un'attività): tocca a lui, e deve saperlo senza aprire il portale per caso.
+  'richiesta_cliente',
+  // …e il cliente l'ha evasa dal portale: lo studio deve controllarla e chiudere il passaggio.
+  'risposta_cliente',
 ] as const;
 
 export type TipoEventoNotifica = (typeof EVENTI_NOTIFICA)[number];
@@ -234,6 +242,9 @@ export async function avvisaClienteViaCanali(
   tenantId: string,
   clienteId: string,
   msg: { oggetto: string; corpo: string; link?: string },
+  // `soloEmail`: per gli avvisi che possono ripetersi (un messaggio in chat) WhatsApp resta fuori,
+  // perché ogni invio lì ha un costo; `etichetta` nomina l'invio nei log della posta.
+  opzioni: { soloEmail?: boolean; etichetta?: string } = {},
 ): Promise<{ email: 'inviata' | 'saltata' | 'errore'; whatsapp: 'inviato' | 'saltato' | 'errore' }> {
   const esiti: { email: 'inviata' | 'saltata' | 'errore'; whatsapp: 'inviato' | 'saltato' | 'errore' } = {
     email: 'saltata',
@@ -257,7 +268,7 @@ export async function avvisaClienteViaCanali(
           smtp: cred.smtp,
           fromEmail: cred.smtpFromEmail ?? undefined,
           fromName: cred.smtpFromName ?? undefined,
-          etichetta: 'documento_da_firmare',
+          etichetta: opzioni.etichetta ?? 'documento_da_firmare',
         });
         esiti.email = r.ok ? 'inviata' : 'errore';
       } catch {
@@ -265,7 +276,7 @@ export async function avvisaClienteViaCanali(
       }
     }
 
-    if (cliente.cellulare) {
+    if (cliente.cellulare && !opzioni.soloEmail) {
       try {
         const testo = msg.link ? `${msg.corpo}\n\n${msg.link}` : msg.corpo;
         const r = await inviaTestoWhatsapp(cred, cliente.cellulare, testo);

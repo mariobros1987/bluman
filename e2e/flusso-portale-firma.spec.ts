@@ -27,10 +27,11 @@ test('magic link → firma SES della lettera d\'incarico con OTP email', async (
   const { magicUrl } = await resLink.json();
   expect(magicUrl).toContain('/portal?magic_token=');
 
-  // Il cliente apre il link: il token viene consumato e la sessione portale parte
-  // sulla tab di default (la proposta).
+  // Il cliente apre il link: il token viene consumato e la sessione portale parte dal
+  // riepilogo («tocca a te»); la firma dell'incarico sta nella scheda della proposta.
   await page.goto(magicUrl);
-  await expect(page.getByRole('tab', { name: '✍️ Proposta e firma' })).toBeVisible();
+  await expect(page.getByRole('tab', { name: '🏠 Riepilogo' })).toBeVisible();
+  await page.getByRole('tab', { name: '✍️ Proposta e firma' }).click();
 
   // Scelta della modalità di firma: online con codice OTP.
   await page.getByText('Firma online con codice OTP').first().click();

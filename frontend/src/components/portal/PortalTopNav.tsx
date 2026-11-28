@@ -183,6 +183,8 @@ export function PortalTopNav({
                       : n.tipoEvento === 'fattura_incassata' ? '💶'
                       : n.tipoEvento === 'risposta_addendum' ? '📄'
                       : n.tipoEvento === 'risposta_proposta_dati' ? '🗂️'
+                      : n.tipoEvento === 'messaggio_studio' ? '💬'
+                      : n.tipoEvento === 'richiesta_cliente' ? '📝'
                       : 'ℹ️';
                     const ts = n.createdAt ? new Date(n.createdAt).getTime() : 0;
                     return (

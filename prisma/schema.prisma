@@ -686,6 +686,12 @@ model PassaggioProgetto {
   documentoId           String?           @unique @map("documento_id")
   documento             Documento?        @relation(fields: [documentoId], references: [id])
   risposteFormJson      Json?             @map("risposte_form_json")
+  // Ciò che il CLIENTE ha risposto dal portale (campo → valore) e quando. Sta in colonne sue e
+  // non in `risposteFormJson` per due ragioni: lo studio salva l'elenco intero dei passaggi e
+  // riscriverebbe con la sua copia, magari vecchia, una risposta arrivata nel frattempo; e chi
+  // ha detto cosa deve restare leggibile — il cliente propone, l'operatore conferma e chiude.
+  risposteClienteJson   Json?             @map("risposte_cliente_json")
+  rispostaClienteAt     DateTime?         @map("risposta_cliente_at")
   noteOperatoreJson     Json?             @map("note_operatore_json")
   richiedeFirmaCliente  Boolean           @default(false) @map("richiede_firma_cliente")
   // Piano firma §3.1 (Fase 2) — valore legale richiesto (ses|fea|feq) per la conferma

@@ -4,7 +4,7 @@ import React from 'react';
  * Il segno di recapito di un messaggio, con il suo significato vero.
  *
  * Questo pezzo di interfaccia era duplicato in due posti — la chat dell'operatore
- * (`ComunicazioniTab`) e quella del portale (`TabContatti`) — con lo stesso difetto in entrambi:
+ * (`ComunicazioniTab`) e quella del portale (allora `TabContatti`, oggi `TabMessaggi`) — con lo stesso difetto in entrambi:
  * un ternario a due rami e un `else` finale che disegnava ✓✓ «consegnato» per **qualunque** stato
  * non riconosciuto, `undefined` compreso. Una riga senza stato diventava così una consegna
  * dichiarata da nessuno. Il 17/09/2026 se ne sono contate sei in un giorno solo, tutte su invii

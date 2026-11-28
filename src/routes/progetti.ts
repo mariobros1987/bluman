@@ -19,7 +19,8 @@ import type { AppPort } from '../services/appPort.js';
 import { conContestoInTransazione, prisma } from '../util/prismaClient.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { messaggioBloccoKyc, operativitaBloccataDaKyc } from '../services/kycGate.js';
-import { notificaStudio } from '../services/notificheService.js';
+import { avvisaDopoMessaggio } from '../services/avvisiCanaleProtetto.js';
+import { contenutoMessaggio, ingressoMessaggio, messaggioLeggibile } from '../services/canaleProtetto.js';
 // §16 — le percentuali e gli stati aggregati arrivano da qui, non dal frontend.
 import { arricchisciProgetti, calcolaAvanzamento, ricalcolaProgetto } from '../services/calcoloService.js';
 import { ricercaGlobale, MODULO_DEL_GRUPPO } from '../services/ricercaGlobaleService.js';
@@ -30,6 +31,7 @@ import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaT
 import { salvaPassaggiMicrovoce } from '../services/passaggiMicrovoce.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
+import { progettoPerRuolo } from '../services/proiezioneProgetto.js';
 import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } from '../schemas/progetti.schema.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
@@ -82,7 +84,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     // *perché* quel messaggio è lì — `origine` distingue un abbinamento che qualcuno ha dichiarato
     // da uno che il contesto ha dedotto, ed è la differenza che permette di correggere il secondo.
     const abbinamenti = await mappaAbbinamentiDelProgetto(req.tenantId, req.params.id);
-    return msgs.map((m) => {
+    // I messaggi del canale protetto stanno a database cifrati: `messaggioLeggibile` li apre.
+    return msgs.map(messaggioLeggibile).map((m) => {
       // Lo stato di recapito, con la sua unica deduzione («in entrata ⇒ consegnato»), sta in
       // `proiettaRecapito`: la stessa regola serve alla scheda della micro-voce, e duplicarla qui
       // sarebbe la terza copia di una cosa già sbagliata due volte (le spunte blu su messaggi che
@@ -179,11 +182,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     }
     const body = parseComm.data;
     const clienteId = req.ruolo === 'cliente' ? clienteDellaRichiesta(req) : null;
-    const canale = (body.canale ?? '').trim().slice(0, 50);
-    const testo = (body.testo ?? '').trim();
-    if (!canale || !testo) {
-      return reply.code(400).send({ errore: 'Canale e testo sono obbligatori.' });
-    }
+    const ingresso = ingressoMessaggio(body, Boolean(clienteId));
+    if ('errore' in ingresso) return reply.code(400).send({ errore: ingresso.errore });
+    const { canale, testo } = ingresso;
 
     // Un messaggio può **nascere abbinato**: chi scrive da dentro una micro-voce non sta abbinando
     // niente a posteriori, sta scrivendo *lì*, e il legame è la conseguenza di dove è stato scritto.
@@ -242,6 +243,13 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         ? (clienteId ?? await clienteDellaPratica(tenantId, req.params.id))
         : null;
 
+      // Nel canale protetto testo e allegati si cifrano prima di scriverli (`services/canaleProtetto.ts`).
+      const contenuto = await contenutoMessaggio(tenantId, req.params.id, ingresso, body.allegatiJson, Boolean(clienteId));
+      if (!contenuto.ok) {
+        req.log.warn({ err: contenuto.err, progettoId: req.params.id }, 'canale protetto: messaggio rifiutato');
+        return reply.code(contenuto.stato).send({ errore: contenuto.errore });
+      }
+
       const msg = await prisma.$transaction(async (tx) =>
         conContestoInTransazione(tx, async () => {
           const creato = await tx.comunicazioneProgetto.create({
@@ -252,9 +260,9 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               mittente,
               destinatario,
               direzione,
-              testo,
+              testo: contenuto.testo,
               chatId,
-              allegatiJson: body.allegatiJson ? (typeof body.allegatiJson === 'string' ? body.allegatiJson : JSON.stringify(body.allegatiJson)) : null,
+              allegatiJson: contenuto.allegatiJson,
               externalId: JSON.stringify(statoIniziale),
             },
           });
@@ -280,21 +288,10 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
           return creato;
         }),
       );
-      // Blocco 3 — messaggio in arrivo dal cliente: lo studio viene avvisato subito.
-      if (direzione === 'entrata' || direzione === 'ingresso') {
-        const progetto = await prisma.progetto.findUnique({
-          where: { id: req.params.id },
-          include: { cliente: { select: { nome: true } } },
-        });
-        if (progetto) {
-          await notificaStudio(tenantId, {
-            tipoEvento: 'messaggio_cliente',
-            oggetto: 'Nuovo messaggio dal cliente',
-            corpo: `${progetto.cliente.nome} ha scritto su «${progetto.nome}»: ${(body.testo || '').slice(0, 120)}`,
-            link: `/projects/${progetto.id}`,
-          }).catch(() => {});
-        }
-      }
+      // Blocco 3 — chi deve saperlo viene avvisato subito, senza il testo se il canale è protetto. Un
+      // avviso non riuscito va nel log e non annulla il messaggio, che è già nel fascicolo.
+      await avvisaDopoMessaggio(tenantId, { progettoId: req.params.id, canale, inEntrata, conAllegati: contenuto.conAllegati, testoInChiaro: testo })
+        .catch((err) => req.log.error({ err, progettoId: req.params.id }, 'avviso del nuovo messaggio non riuscito'));
       // Qui c'era un secondo invio WhatsApp, fatto di nascosto da questa rotta con
       // `process.env.WHATSAPP_ACCESS_TOKEN` e `process.env.WA_PHONE_ID`. Tre guasti in venti
       // righe: il browser spediva già il messaggio per conto suo, quindi al cliente arrivavano
@@ -307,7 +304,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       // si chiede a `POST /comunicazioni/invia-whatsapp`, che legge le credenziali dello studio
       // e risponde con il motivo quando WhatsApp non accetta.
 
-      return reply.code(201).send(msg);
+      return reply.code(201).send(messaggioLeggibile(msg));
     } catch (err: any) {
       // progettoId inesistente: niente fascicolo in cui registrare, non un 201 fasullo.
       if (err?.code === 'P2003') {
@@ -467,7 +464,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
     };
     if (!paginazione.paginata) {
       const projs = await prisma.progetto.findMany({ where, include, orderBy: { createdAt: 'desc' } });
-      return arricchisciProgetti(projs);
+      return arricchisciProgetti(projs).map((p) => progettoPerRuolo(p, req.ruolo));
     }
 
     const { page, limit, search, sortBy, sortOrder, skip, dataDa, dataA } = paginazione.parametri;
@@ -499,7 +496,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
       prisma.progetto.count({ where }),
     ]);
     return reply.send({
-      data: arricchisciProgetti(projs),
+      data: arricchisciProgetti(projs).map((p) => progettoPerRuolo(p, req.ruolo)),
       meta: creaMetaPaginazione(page, limit, totale),
     });
   });
@@ -585,7 +582,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
       }
     }
-    return reply.send({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) });
+    return reply.send(progettoPerRuolo({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) }, req.ruolo));
   });
 
   // §1.1 (docs/storico/PIANO_DI_MIGLIORAMENTO.md) — l'eliminazione transazionale esisteva già

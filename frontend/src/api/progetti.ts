@@ -542,7 +542,7 @@ export async function fetchComunicazioniApi(progettoId: string) {
   }
 }
 
-export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any; microvoceProgettoId?: string }) {
+export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any; allegatiProtetti?: Array<{ nome: string; contentBase64: string }>; microvoceProgettoId?: string }) {
   // §3.3 — una comunicazione nel fascicolo cliente è un invio reale: se non viene persistita
   // il messaggio non esiste. L'errore si propaga (i chiamanti fire-and-forget lo catturano).
   const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {
