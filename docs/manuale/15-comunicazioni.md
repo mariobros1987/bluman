@@ -177,6 +177,12 @@ arriva al giro successivo. Di ogni messaggio salva fino a 20 allegati, ciascuno 
 - **Posta dei clienti — un allegato non salvato si dichiara** (troppo grande, tipo rifiutato dal
   controllo dei file, archivio non raggiungibile): resta il nome con il motivo, senza un link vuoto.
   Il messaggio si salva comunque.
+- **Posta dei clienti — la casella viene rinumerata dal fornitore** (migrazione, ripristino): BluMan
+  rilegge gli ultimi 30 giorni e riconosce ciò che aveva già raccolto, dall'identificativo del
+  messaggio o, se manca, da mittente, data e oggetto. Niente doppioni.
+- **Posta dei clienti — il database cade mentre si salvano gli allegati**: il messaggio resta con gli
+  allegati scritti fin lì e la casella mostra l'errore. La raccolta non lo supera: dopo un quarto
+  d'ora lo riprende e aggiunge gli allegati che mancavano, poi prosegue con i messaggi successivi.
 - **Posta dei clienti — il fornitore non consegna gli indirizzi con il «+»**: i messaggi arrivano lo
   stesso nella casella di raccolta e si attribuiscono dall'indirizzo del cliente in anagrafica; quelli
   che non si riconoscono restano in «Da smistare».

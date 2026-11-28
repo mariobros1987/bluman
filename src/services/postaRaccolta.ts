@@ -13,6 +13,9 @@
  *   messaggio saltato, e l'indice unico `(casella, uidValidity, uid)` impedisce i doppioni;
  * - **un allegato non salvabile non ferma il messaggio**: resta la riga con il motivo
  *   (`motivoNonSalvato`), così l'operatore sa che c'era e lo chiede al cliente;
+ * - **un messaggio rimasto a metà si completa** (`riprendiAllegati`): se il database cade mentre
+ *   si scrivono gli allegati, il giro dopo ritrova il messaggio già salvato e aggiunge solo quelli
+ *   che mancano, invece di superarlo lasciandolo senza;
  * - **l'errore di una casella resta scritto sulla casella** (`ultimoErrore`), già spiegato: una
  *   raccolta ferma non deve sembrare «nessun messaggio nuovo» (regola 13).
  */
@@ -30,6 +33,11 @@ export const MAX_MESSAGGI_PER_GIRO = 50;
 export const MAX_ALLEGATI_PER_MESSAGGIO = 20;
 export const MAX_ALLEGATO_BYTE = 15 * 1024 * 1024;
 const GIORNI_PRIMA_LETTURA = 30;
+/**
+ * Per quanto un messaggio già salvato ma con meno allegati del dovuto si considera ancora in
+ * lavorazione (un altro processo lo sta salvando). Dopo, è un salvataggio interrotto e si completa.
+ */
+const MINUTI_SALVATAGGIO_IN_CORSO = 15;
 const MAX_CARATTERI_TESTO = 200_000;
 const MAX_CARATTERI_HTML = 500_000;
 
@@ -129,7 +137,43 @@ async function salvaAllegato(
   });
 }
 
-/** Salva un messaggio con i suoi allegati. `false` se c'era già (stesso UID, o stesso Message-ID nella casella). */
+/**
+ * `nuovo`: salvato adesso. `gia_salvato`: c'era già (stesso UID, o lo stesso messaggio prima di
+ * una rinumerazione). `in_corso`: c'è, ma i suoi allegati li sta ancora salvando qualcun altro:
+ * il giro si ferma lì e il segnalibro non lo supera.
+ */
+type EsitoSalvataggio = 'nuovo' | 'gia_salvato' | 'in_corso';
+
+/**
+ * Il messaggio con questo UID esiste già. Se ha tutti gli allegati non c'è niente da fare. Se ne
+ * ha meno, il salvataggio di prima si è interrotto dopo aver scritto il messaggio (database
+ * caduto a metà): si aggiungono quelli che mancano. Gli allegati si salvano uno alla volta e in
+ * ordine, quindi «quelli che mancano» sono quelli dopo gli N già scritti.
+ */
+async function riprendiAllegati(
+  lettore: LettoreCasella,
+  carica: typeof uploadDocumento,
+  casella: RigaCasella,
+  uidValidity: string,
+  uid: number,
+  allegati: AllegatoGrezzo[],
+  adesso: Date,
+): Promise<EsitoSalvataggio> {
+  const esistente = await prisma.messaggioPosta.findFirst({
+    where: { tenantId: casella.tenantId, casellaId: casella.id, uidValidity, uid },
+    select: { id: true, raccoltoAt: true, _count: { select: { allegati: true } } },
+  });
+  if (!esistente || esistente._count.allegati >= allegati.length) return 'gia_salvato';
+  // Salvato da poco: può essere un altro processo che sta ancora scrivendo gli allegati.
+  // Completarlo adesso li raddoppierebbe.
+  if (adesso.getTime() - esistente.raccoltoAt.getTime() < MINUTI_SALVATAGGIO_IN_CORSO * 60 * 1000) return 'in_corso';
+  for (const allegato of allegati.slice(esistente._count.allegati)) {
+    await salvaAllegato(lettore, carica, casella, esistente.id, uid, allegato);
+  }
+  return 'gia_salvato';
+}
+
+/** Salva un messaggio con i suoi allegati, o riconosce che c'era già. */
 async function salvaMessaggio(
   lettore: LettoreCasella,
   carica: typeof uploadDocumento,
@@ -138,16 +182,24 @@ async function salvaMessaggio(
   grezzo: MessaggioGrezzo,
   clienti: ClientePerPosta[],
   adesso: Date,
-): Promise<boolean> {
-  if (grezzo.messageId) {
-    // Dopo un cambio di UIDVALIDITY il server rinumera tutto: il Message-ID è ciò che resta uguale.
-    // Solo contro le righe della numerazione vecchia: con la stessa numerazione due copie dello
-    // stesso messaggio sono due consegne vere (due clienti che inoltrano la stessa comunicazione).
+): Promise<EsitoSalvataggio> {
+  // Dopo un cambio di UIDVALIDITY il server rinumera tutto: il Message-ID è ciò che resta uguale.
+  // Solo contro le righe della numerazione vecchia: con la stessa numerazione due copie dello
+  // stesso messaggio sono due consegne vere (due clienti che inoltrano la stessa comunicazione).
+  const numerazioneVecchia = { tenantId: casella.tenantId, casellaId: casella.id, uidValidity: { not: uidValidity } };
+  const messageId = taglia(grezzo.messageId, 990);
+  const oggetto = taglia(grezzo.oggetto, 990);
+  if (messageId) {
+    const gia = await prisma.messaggioPosta.findFirst({ where: { ...numerazioneVecchia, messageId }, select: { id: true } });
+    if (gia) return 'gia_salvato';
+  } else if (grezzo.data) {
+    // Senza Message-ID resta l'impronta del messaggio: mittente, data e oggetto. Senza nemmeno la
+    // data non c'è niente di affidabile da confrontare, e il messaggio si salva.
     const gia = await prisma.messaggioPosta.findFirst({
-      where: { tenantId: casella.tenantId, casellaId: casella.id, messageId: grezzo.messageId, uidValidity: { not: uidValidity } },
+      where: { ...numerazioneVecchia, messageId: null, mittenteEmail: grezzo.mittenteEmail, ricevutoAt: grezzo.data, oggetto },
       select: { id: true },
     });
-    if (gia) return false;
+    if (gia) return 'gia_salvato';
   }
 
   // La casella di un cliente è tutta sua: non c'è niente da riconoscere. Su quella di raccolta
@@ -166,11 +218,11 @@ async function salvaMessaggio(
         casellaId: casella.id,
         uid: grezzo.uid,
         uidValidity,
-        messageId: taglia(grezzo.messageId, 990),
+        messageId,
         mittenteEmail: grezzo.mittenteEmail,
         mittenteNome: taglia(grezzo.mittenteNome, 255),
         destinatari: taglia(grezzo.destinatari, 2000),
-        oggetto: taglia(grezzo.oggetto, 990),
+        oggetto,
         testo: taglia(grezzo.testo, MAX_CARATTERI_TESTO),
         html: taglia(grezzo.html, MAX_CARATTERI_HTML),
         // Senza data nel messaggio vale il momento della raccolta: una data assente lo
@@ -185,15 +237,15 @@ async function salvaMessaggio(
       select: { id: true },
     });
   } catch (err: any) {
-    // Lo stesso UID salvato da un giro concorrente (due processi): non è un errore.
-    if (err?.code === 'P2002') return false;
-    throw err;
+    // Lo stesso UID c'è già: un giro concorrente (due processi), o un salvataggio interrotto.
+    if (err?.code !== 'P2002') throw err;
+    return riprendiAllegati(lettore, carica, casella, uidValidity, grezzo.uid, allegati, adesso);
   }
 
   for (const allegato of allegati) {
     await salvaAllegato(lettore, carica, casella, creato.id, grezzo.uid, allegato);
   }
-  return true;
+  return 'nuovo';
 }
 
 async function raccogliCasella(casella: RigaCasella, clienti: ClientePerPosta[], dip: Required<DipendenzeRaccolta>): Promise<EsitoCasella> {
@@ -260,6 +312,7 @@ async function raccogliCasella(casella: RigaCasella, clienti: ClientePerPosta[],
       data: { uidValidity: aperta.uidValidity, ultimoUid },
     });
 
+    let inSospeso = false;
     for (const uid of daLeggere.slice(0, MAX_MESSAGGI_PER_GIRO)) {
       let grezzo: MessaggioGrezzo | null;
       try {
@@ -268,16 +321,21 @@ async function raccogliCasella(casella: RigaCasella, clienti: ClientePerPosta[],
         throw new Error(`messaggio ${uid}: ${messaggioErrore(err, casella)}`);
       }
       // `null`: cancellato fra la ricerca e la lettura. Il segnalibro lo supera lo stesso.
-      if (grezzo && (await salvaMessaggio(lettore, dip.carica, casella, aperta.uidValidity, grezzo, clienti, dip.adesso))) {
-        esito.nuovi += 1;
+      const salvato = grezzo ? await salvaMessaggio(lettore, dip.carica, casella, aperta.uidValidity, grezzo, clienti, dip.adesso) : 'gia_salvato';
+      if (salvato === 'in_corso') {
+        inSospeso = true;
+        break;
       }
+      if (salvato === 'nuovo') esito.nuovi += 1;
       ultimoUid = uid;
       await prisma.casellaPosta.update({ where: { id: casella.id }, data: { ultimoUid } });
     }
 
     await prisma.casellaPosta.update({
       where: { id: casella.id },
-      data: { ultimaRaccoltaAt: dip.adesso, ultimoSuccessoAt: dip.adesso, ultimoErrore: null },
+      // Fermi su un messaggio ancora in lavorazione il giro non è fallito, ma non è nemmeno
+      // arrivato in fondo: l'errore di prima, se c'era, resta scritto finché non si completa.
+      data: inSospeso ? { ultimaRaccoltaAt: dip.adesso } : { ultimaRaccoltaAt: dip.adesso, ultimoSuccessoAt: dip.adesso, ultimoErrore: null },
     });
     esito.ok = true;
   } catch (err) {

@@ -8,6 +8,11 @@ const db = vi.hoisted(() => ({
   clienti: [] as any[],
   messaggi: [] as any[],
   allegati: [] as any[],
+  /** Quando il messaggio finto risulta salvato (`raccolto_at`, che nel database vero è `now()`). */
+  raccoltoAt: new Date(0),
+  /** Fa fallire la scrittura dell'allegato numero N (da 1), come un database che cade a metà. */
+  rompiAllegatoNumero: 0,
+  allegatiTentati: 0,
 }));
 
 vi.mock('./util/prismaClient.js', () => {
@@ -22,19 +27,42 @@ vi.mock('./util/prismaClient.js', () => {
     },
     cliente: { findMany: async () => db.clienti },
     messaggioPosta: {
-      findFirst: async (args: any) =>
-        db.messaggi.find((m) => m.casellaId === args.where.casellaId && m.messageId === args.where.messageId && m.uidValidity !== args.where.uidValidity.not) ?? null,
+      findFirst: async (args: any) => {
+        const w = args.where;
+        const stessa = (campo: string) => !(campo in w) || m_uguale(w[campo]);
+        let riga: any;
+        const m_uguale = (atteso: any) => {
+          const valore = riga[cercato];
+          if (atteso instanceof Date) return valore instanceof Date && valore.getTime() === atteso.getTime();
+          if (atteso && typeof atteso === 'object' && 'not' in atteso) return valore !== atteso.not;
+          return (valore ?? null) === atteso;
+        };
+        let cercato = '';
+        const trovato = db.messaggi.find((m) => {
+          riga = m;
+          return ['casellaId', 'uid', 'uidValidity', 'messageId', 'mittenteEmail', 'oggetto', 'ricevutoAt'].every((campo) => { cercato = campo; return stessa(campo); });
+        });
+        if (!trovato) return null;
+        return { ...trovato, _count: { allegati: db.allegati.filter((a) => a.messaggioId === trovato.id).length } };
+      },
       create: async (args: any) => {
         const d = args.data;
         if (db.messaggi.some((m) => m.casellaId === d.casellaId && m.uidValidity === d.uidValidity && m.uid === d.uid)) {
           throw Object.assign(new Error('unique'), { code: 'P2002' });
         }
-        const riga = { id: `m-${db.messaggi.length + 1}`, ...d };
+        const riga = { id: `m-${db.messaggi.length + 1}`, raccoltoAt: db.raccoltoAt, ...d };
         db.messaggi.push(riga);
         return riga;
       },
     },
-    allegatoPosta: { create: async (args: any) => { db.allegati.push(args.data); return args.data; } },
+    allegatoPosta: {
+      create: async (args: any) => {
+        db.allegatiTentati += 1;
+        if (db.allegatiTentati === db.rompiAllegatoNumero) throw new Error('database non raggiungibile');
+        db.allegati.push(args.data);
+        return args.data;
+      },
+    },
   };
   return { prisma, contestoTenant: { run: (_c: unknown, fn: () => unknown) => fn() }, prismaAmministrativo: () => prisma };
 });
@@ -92,6 +120,9 @@ beforeEach(() => {
   db.clienti = [{ id: 'c-rossi', email: 'mario.rossi@example.com', aliasPosta: 'k7m2p9xq' }];
   db.messaggi = [];
   db.allegati = [];
+  db.raccoltoAt = ADESSO;
+  db.rompiAllegatoNumero = 0;
+  db.allegatiTentati = 0;
 });
 
 describe('raccogliPostaDelTenant', () => {
@@ -164,6 +195,63 @@ describe('raccogliPostaDelTenant', () => {
     expect(chiamate.dal).not.toBeNull();
     expect(esito.nuovi).toBe(1);
     expect(db.caselle[0]).toMatchObject({ uidValidity: '200', ultimoUid: 2 });
+  });
+
+  it('dopo una rinumerazione, un messaggio senza Message-ID già raccolto non si risalva', async () => {
+    // Senza Message-ID resta l'impronta: stesso mittente, stessa data, stesso oggetto.
+    db.caselle = [casella({ uidValidity: '100', ultimoUid: 40 })];
+    db.messaggi = [{
+      id: 'm-0', casellaId: 'cas-1', uidValidity: '100', uid: 40, messageId: null,
+      mittenteEmail: 'banca@example.org', oggetto: 'Oggetto 1', ricevutoAt: new Date('2026-11-27T09:00:00.000Z'),
+    }];
+    const { crea } = lettoreFinto([messaggio(1, { messageId: null }), messaggio(2, { messageId: null })], { uidValidity: '200' });
+    const esito = await raccogliPostaDelTenant(TENANT, { creaLettore: crea, carica: caricaOk as any, adesso: ADESSO });
+
+    expect(esito.nuovi).toBe(1);
+    expect(db.messaggi.map((m) => [m.uidValidity, m.oggetto])).toEqual([['100', 'Oggetto 1'], ['200', 'Oggetto 2']]);
+    expect(db.caselle[0]).toMatchObject({ uidValidity: '200', ultimoUid: 2 });
+  });
+
+  it('nella stessa numerazione due messaggi uguali senza Message-ID sono due consegne vere: restano entrambi', async () => {
+    const uguali = { messageId: null, oggetto: 'Avviso' };
+    const { crea } = lettoreFinto([messaggio(1, uguali), messaggio(2, uguali)]);
+    const esito = await raccogliPostaDelTenant(TENANT, { creaLettore: crea, carica: caricaOk as any, adesso: ADESSO });
+    expect(esito.nuovi).toBe(2);
+    expect(db.messaggi).toHaveLength(2);
+  });
+
+  it('allegati rimasti a metà per un errore del database: il giro dopo li completa, senza doppioni e senza saltarli', async () => {
+    const allegati = [
+      { parte: '2', nome: 'uno.pdf', mime: 'application/pdf', dimensioneByte: 9 },
+      { parte: '3', nome: 'due.pdf', mime: 'application/pdf', dimensioneByte: 9 },
+      { parte: '4', nome: 'tre.pdf', mime: 'application/pdf', dimensioneByte: 9 },
+    ];
+    const { crea } = lettoreFinto([messaggio(1, { allegati }), messaggio(2)]);
+    const fra = (minuti: number) => new Date(ADESSO.getTime() + minuti * 60_000);
+
+    // Primo giro: il database cade mentre scrive il secondo allegato.
+    db.rompiAllegatoNumero = 2;
+    const primo = await raccogliPostaDelTenant(TENANT, { creaLettore: crea, carica: caricaOk as any, adesso: ADESSO });
+    expect(primo.caselle[0]).toMatchObject({ ok: false, nuovi: 0 });
+    expect(primo.caselle[0]!.errore).toContain('database non raggiungibile');
+    expect(db.allegati.map((a) => a.nome)).toEqual(['uno.pdf']);
+    expect(db.caselle[0].ultimoUid).toBe(0);
+
+    // Subito dopo il messaggio può essere ancora in lavorazione (un altro processo): ci si ferma
+    // lì senza toccarlo, senza superarlo e senza cancellare l'errore di prima.
+    const presto = await raccogliPostaDelTenant(TENANT, { creaLettore: crea, carica: caricaOk as any, adesso: fra(5) });
+    expect(presto.caselle[0]).toMatchObject({ ok: true, nuovi: 0 });
+    expect(db.allegati.map((a) => a.nome)).toEqual(['uno.pdf']);
+    expect(db.messaggi.map((m) => m.uid)).toEqual([1]);
+    expect(db.caselle[0].ultimoUid).toBe(0);
+    expect(db.caselle[0].ultimoErrore).toContain('database non raggiungibile');
+
+    // Passato il tempo di un salvataggio, quel messaggio è fermo: si completano gli allegati mancanti.
+    const dopo = await raccogliPostaDelTenant(TENANT, { creaLettore: crea, carica: caricaOk as any, adesso: fra(20) });
+    expect(dopo.caselle[0]).toMatchObject({ ok: true, nuovi: 1 });
+    expect(db.allegati.map((a) => [a.nome, a.messaggioId])).toEqual([['uno.pdf', 'm-1'], ['due.pdf', 'm-1'], ['tre.pdf', 'm-1']]);
+    expect(db.messaggi.map((m) => m.uid)).toEqual([1, 2]);
+    expect(db.caselle[0]).toMatchObject({ ultimoUid: 2, ultimoErrore: null });
   });
 
   it('un allegato troppo grande o rifiutato non ferma il messaggio: resta la riga con il motivo', async () => {
