@@ -311,6 +311,18 @@ describe('🖥️ aggiorna-blusmart.sh — l aggiornamento di blusmart.eu lancia
     for (const r of righe) expect(r, r).toContain('</dev/null');
   });
 
+  it('con --applica si stacca dalla connessione e restituisce l esito vero', () => {
+    // Il 27/11 ssh è caduto a metà della build delle immagini e lo script si è fermato, col
+    // frontend nuovo già servito davanti al backend vecchio.
+    expect(script).toMatch(/BLUMAN_STACCATO=1 setsid nohup bash "\$0" --applica > "\$LOG" 2>&1 <\/dev\/null &/);
+    expect(posizione('wait "$FIGLIO"')).toBeLessThan(posizione('titolo "1. Copia di sicurezza"'));
+  });
+
+  it('la versione in servizio è quella registrata dallo script, non dedotta da git', () => {
+    // Un git pull cambia i file su disco, non il sito: il 27/11 ORIG_HEAD indicava la versione sbagliata.
+    expect(script).not.toContain('ORIG_HEAD');
+  });
+
   it('si ferma se sul server ci sono file del repo modificati a mano', () => {
     expect(script).toContain('git status --porcelain --untracked-files=no');
   });
@@ -322,5 +334,64 @@ describe('🖥️ aggiorna-blusmart.sh — l aggiornamento di blusmart.eu lancia
     expect(script).toContain('ls docs/manuale | wc -l');
     // Il 20 fisso di distribuisci.sh oggi farebbe fallire un aggiornamento riuscito: le schede sono di più.
     expect(script).not.toMatch(/"\$TROVATI" = "20"/);
+  });
+});
+
+describe('🔄 aggiornamento automatico — pubblicazione dal fork e cron di blusmart.eu (28/11)', () => {
+  const auto = leggi('scripts', 'aggiorna-blusmart-auto.sh');
+  const pubblica = leggi('scripts', 'pubblica.sh');
+  const deploy = leggi('.github', 'workflows', 'deploy.yml');
+  const installa = leggi('scripts', 'installa-aggiornamento-automatico.sh');
+
+  it('con migrazioni --automatico non unisce: esce prima di gh pr merge', () => {
+    // Railway applica le migrazioni all'avvio senza backup: quella pubblicazione aspetta Fabio.
+    const fermo = pubblica.indexOf('if [[ "$AUTO" == si && -n "$migr" ]]; then');
+    expect(fermo).toBeGreaterThan(-1);
+    expect(pubblica.slice(fermo, fermo + 200)).toContain('exit 3');
+    expect(fermo).toBeLessThan(pubblica.indexOf('gh pr merge "$pr"'));
+    expect(pubblica).toContain('--match-head-commit');
+  });
+
+  it('deploy.yml pubblica solo nel fork, col suo token, e non scrive mai su upstream con git', () => {
+    expect(deploy).toContain("if: github.repository == 'wolftradesystem-tech/bluman'");
+    expect(deploy).toContain('bash scripts/pubblica.sh --automatico');
+    expect(deploy).toContain('GH_TOKEN: ${{ secrets.PUBBLICA_TOKEN }}');
+    expect(deploy).toContain('git remote set-url --push upstream NO_PUSH');
+    expect(deploy).not.toMatch(/git push/);
+  });
+
+  it('il cron aggiorna con lo script che fa la copia prima, e senza staccarsi', () => {
+    expect(auto).toContain('BLUMAN_STACCATO=1 bash ./scripts/aggiorna-blusmart.sh --applica');
+    expect(auto).toContain('git merge --quiet --ff-only');
+    expect(auto).toContain('flock -n 9');
+    // Corpo in una funzione: il merge che sostituisce il file a metà giro non cambia il codice in corsa.
+    expect(auto).toMatch(/^principale "\$@"$/m);
+  });
+
+  it('il cron si ferma da solo dove servono occhi: pausa, fuori da main, file toccati, storia riscritta', () => {
+    const applica = auto.indexOf('BLUMAN_STACCATO=1 bash ./scripts/aggiorna-blusmart.sh --applica');
+    for (const guardia of [
+      'if [ -e "$FILE_PAUSA" ]; then',
+      'if [ "$RAMO" != main ]; then',
+      'git status --porcelain --untracked-files=no',
+      'git merge-base --is-ancestor "$SU_DISCO" "$REMOTO"',
+      'if [ -z "$IN_SERVIZIO" ]; then',
+      '= "$REMOTO" ]; then',
+    ]) {
+      const i = auto.indexOf(guardia);
+      expect(i, `manca «${guardia}»`).toBeGreaterThan(-1);
+      expect(i, guardia).toBeLessThan(applica);
+    }
+  });
+
+  it('niente segreti nei messaggi: stderr di curl soppresso, del log solo la riga ERRORE', () => {
+    expect(auto).toMatch(/sendMessage" 2>\/dev\/null\)"/);
+    expect(auto).toContain("grep -m1 '^ERRORE:'");
+    expect(auto).not.toMatch(/tail[^\n]*\$LOG/);
+  });
+
+  it('l installatore non scrive sopra un cron che non è riuscito a leggere', () => {
+    expect(installa).toContain("grep -qi 'no crontab'");
+    expect(installa).toContain('le altre righe del cron sono cambiate');
   });
 });

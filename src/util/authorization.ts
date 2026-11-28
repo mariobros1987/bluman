@@ -50,6 +50,11 @@ export const ROTTE_CLIENTE_CONSENTITE = new Set<string>([
   'POST /portal/change-password',
   'GET /clienti/:id',
   'GET /portal/contatti',
+  // K6/3 — documenti d'identità caricati dal cliente sul proprio fascicolo KYC. Le rotte legano
+  // il cliente alla sessione (`clienteDellaRichiesta`): fuori da questo elenco il portale riceveva
+  // 403 e la sezione «Documenti KYC» mostrava un errore anche a modulo attivo.
+  'GET /portal/kyc/documenti',
+  'POST /portal/kyc/documento',
   'GET /portal/fatture',
   'GET /portal/proposte-dati',
   'POST /portal/proposte-dati',

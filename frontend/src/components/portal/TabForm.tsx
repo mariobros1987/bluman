@@ -37,7 +37,7 @@ export function TabForm({
     <div style={docBoxStyle}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 4 }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📋 Dati Societari e KYC</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📋 Dati societari</div>
           <div style={{ fontSize: 11, color: 'var(--muted)' }}>
             Le modifiche diventano una <b>proposta</b>: i nuovi valori entrano in anagrafica solo dopo la conferma dello studio. IBAN e titolare effettivo sono mascherati.
           </div>

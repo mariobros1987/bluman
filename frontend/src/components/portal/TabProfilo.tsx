@@ -36,7 +36,7 @@ export function TabProfilo({
 }: TabProfiloProps) {
   return (
     <div style={docBoxStyle}>
-      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>👤 Profilo Riservato & Sicurezza Accesso</div>
+      <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 4 }}>👤 Profilo e accesso</div>
       <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 20 }}>
         Gestisci i dati anagrafici del tuo account, i recapiti per le notifiche di sicurezza e imposta la tua password personale per accedere direttamente al portale.
       </div>
@@ -45,7 +45,7 @@ export function TabProfilo({
         {/* Card Dati Anagrafici & Contatti */}
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>🏛</span> Dati Intestatario & Recapiti
+            <span>🏛</span> I tuoi dati e recapiti
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -81,14 +81,14 @@ export function TabProfilo({
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            ℹ️ Per modificare i dati anagrafici fiscali (P.IVA, SDI, Sede), puoi compilare la scheda <strong>📋 3. Form Dati Societari</strong> o richiedere l'aggiornamento all'Advisor.
+            ℹ️ Per modificare i dati anagrafici fiscali (P.IVA, SDI, Sede), puoi usare la scheda <strong>📋 Dati societari</strong> o chiedere l'aggiornamento allo studio.
           </div>
         </div>
 
         {/* Card Imposta / Cambia Password Portale */}
         <div style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 14, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>🔐</span> Imposta / Modifica Password Portale
+            <span>🔐</span> Password del portale
           </div>
 
           <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.4 }}>
@@ -138,7 +138,7 @@ export function TabProfilo({
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)' }}>
-                  Nuova Password Portale * (min. 6 caratteri)
+                  Nuova password * (almeno 8 caratteri)
                 </label>
                 <button
                   type="button"
@@ -188,6 +188,12 @@ export function TabProfilo({
                   boxSizing: 'border-box',
                 }}
               />
+              {/* La stessa regola del server (`POST /portal/change-password`): prima la pagina diceva 6. */}
+              {clientPassNew && clientPassNew.length < 8 && (
+                <span style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, display: 'block' }}>
+                  Ancora {8 - clientPassNew.length} {8 - clientPassNew.length === 1 ? 'carattere' : 'caratteri'}.
+                </span>
+              )}
               {clientPassConfirm && clientPassNew !== clientPassConfirm && (
                 <span style={{ fontSize: 10, color: 'var(--pill-red-fg)', marginTop: 4, display: 'block' }}>
                   ⚠ Le due password non coincidono.
@@ -197,7 +203,7 @@ export function TabProfilo({
 
             <button
               type="submit"
-              disabled={clientPassLoading || !clientPassNew || clientPassNew !== clientPassConfirm}
+              disabled={clientPassLoading || clientPassNew.length < 8 || clientPassNew !== clientPassConfirm}
               style={{
                 background: 'var(--indigo)',
                 color: '#fff',
@@ -208,7 +214,7 @@ export function TabProfilo({
                 fontWeight: 700,
                 cursor: 'pointer',
                 boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
-                opacity: (!clientPassNew || clientPassNew !== clientPassConfirm || clientPassLoading) ? 0.6 : 1,
+                opacity: (clientPassNew.length < 8 || clientPassNew !== clientPassConfirm || clientPassLoading) ? 0.6 : 1,
                 marginTop: 6,
               }}
             >

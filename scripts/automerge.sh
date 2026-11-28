@@ -119,6 +119,12 @@ $(jq -r .html_url <<<"$pr")"
 fi
 # Un merge fatto con GITHUB_TOKEN non fa partire i workflow su push: il deploy
 # si lancia esplicitamente (workflow_dispatch è l'eccezione ammessa).
+# Un progetto senza deploy (lo Standard, un repo solo di controlli) non ha
+# deploy.yml nel ramo di produzione, dove gira questo script: il merge basta.
+if [[ ! -f .github/workflows/deploy.yml ]]; then
+  log "merge fatto; niente deploy.yml in questo progetto: nessun deploy da lanciare"
+  exit 0
+fi
 lanciato=no
 for tentativo in 1 2 3; do
   gh workflow run deploy.yml --ref "$PROD" && { lanciato=si; break; }

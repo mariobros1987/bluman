@@ -17,6 +17,9 @@
 #      Un tempo scaduto DENTRO una prova è una CI rossa (punto 3), non si rilancia;
 #   5. review-da-correggere senza correttore dopo il commento del revisore, da più
 #      di ATTESA_FIX minuti: rilancia il correttore (con i giri di review-label.sh);
+#   Rami dei thread (Projects di Claude Code, dal 27/11, ramo_thread): il correttore è il thread che
+#   ha scritto la PR, non fix.yml. Ai punti 3 e 5, se il thread non manda un commit
+#   entro ATTESA_THREAD minuti dalla richiesta, serve-fabio e avviso;
 #   6. altrimenti automerge.sh, che mergia se è tutto verde e avvia l'allineamento
 #      se c'è un conflitto (un evento perso non lascia la PR ferma).
 # Con GH_TOKEN e GH_REPO. Un errore su una PR non ferma il giro sulle altre.
@@ -24,12 +27,16 @@ set -Eeuo pipefail
 export LC_ALL=C   # confronti fra date ISO come stringhe
 ATTESA_MIN="${ATTESA_MIN:-45}"
 ATTESA_FIX="${ATTESA_FIX:-30}"
+ATTESA_THREAD="${ATTESA_THREAD:-60}"
 RILANCI=2
 MAX_GIRI=2
 # shellcheck disable=SC1091
 [[ -f scripts/progetto.env ]] && source scripts/progetto.env
 NOME="${NOME_PROGETTO:-${GH_REPO##*/}}"
 PROD="${PROD:-$(gh api "repos/$GH_REPO" --jq .default_branch)}"
+# Rami dei thread dei Projects di Claude Code (00-metodo, punto 10): quello che dà
+# Claude Code (claude/project-thread-…) o thread/…. Lì il correttore è il thread.
+ramo_thread() { [[ "$1" == thread/* || "$1" == claude/project-thread-* ]]; }
 log() { printf '[sentinella] %s\n' "$*"; }
 ora="$(date -u +%s)"
 minuti_da() { local t; t="$(date -u -d "$1" +%s 2>/dev/null)" || { echo 0; return 0; }; echo $(( (ora - t) / 60 )); }
@@ -58,8 +65,19 @@ correttori="$( { for st in queued pending waiting in_progress; do
   gh api "repos/$GH_REPO/actions/workflows/fix.yml/runs?status=$st&per_page=50" --jq '.workflow_runs[] | "\(.display_title)\t\(.created_at)"' </dev/null || true
 done; } | sed -nE 's/^fix #([0-9]+)\t/\1\t/p')"
 
-controlla() {  # controlla <pr> <sha> <etichette> <titolo>
-  local pr="$1" sha="$2" labels="$3" titolo="$4"
+# Il thread che doveva correggere non ha mandato niente: serve Fabio (una volta: poi
+# l'etichetta serve-fabio ferma i punti 3 e 5).
+thread_fermo() {  # thread_fermo <pr> <titolo> <cosa>
+  log "#$1: $3: serve-fabio"
+  gh api -X POST "repos/$GH_REPO/issues/$1/labels" -f "labels[]=serve-fabio" >/dev/null </dev/null || { log "#$1: etichetta non messa"; return 0; }
+  commenta "$1" "**Ferma: $3.** Apri il thread nel progetto e chiedigli di correggere (un commit nuovo fa ripartire tutto), o decidi tu."
+  bash scripts/ci-notify.sh "🔴 $NOME: #$1 ferma, $3
+${2:0:120}
+https://github.com/$GH_REPO/pull/$1" </dev/null || true
+}
+
+controlla() {  # controlla <pr> <sha> <etichette> <ramo> <titolo>
+  local pr="$1" sha="$2" labels="$3" ramo="$4" titolo="$5"
   # 2. Un correttore già in coda o in corso: si aspetta lui (o si avvisa se è fermo).
   local fix; fix="$(awk -F'\t' -v p="$pr" '$1 == p {print $2}' <<<"$correttori" | sort | head -n1)"
   if [[ -n "$fix" ]]; then
@@ -96,7 +114,10 @@ controlla() {  # controlla <pr> <sha> <etichette> <titolo>
   if [[ "$esito" == failure ]]; then
     local dopo; dopo="$(ultimo "$pr" "**Correzione delle prove")" || { non_letti "$pr"; return 0; }
     if [[ ",$labels," == *",serve-fabio,"* ]]; then log "#$pr: prove rosse, già serve-fabio"
-    elif [[ -n "$dopo" ]] && ! [[ "$dopo" < "$agg" ]]; then log "#$pr: prove rosse, correttore già passato"
+    elif [[ -n "$dopo" ]] && ! [[ "$dopo" < "$agg" ]]; then
+      if ramo_thread "$ramo" && (( $(minuti_da "$dopo") >= ATTESA_THREAD )); then
+        thread_fermo "$pr" "$titolo" "prove rosse da $(minuti_da "$dopo") minuti e il thread non ha mandato correzioni"
+      else log "#$pr: prove rosse, correttore già passato"; fi
     elif (( $(minuti_da "$agg") < ATTESA_FIX )); then log "#$pr: prove rosse da poco, ci pensa automerge.yml"
     else
       log "#$pr: prove rosse senza correttore da $(minuti_da "$agg") minuti: ci-rossa.sh"
@@ -137,6 +158,13 @@ CI $esito (non dice niente sul codice): rilanciata."
   if [[ ",$labels," == *",review-da-correggere,"* && ",$labels," != *",serve-fabio,"* ]]; then
     local chiesto fatto giri
     chiesto="$(ultimo "$pr" "**Revisione automatica — review-da-correggere**")" || { non_letti "$pr"; return 0; }
+    if ramo_thread "$ramo"; then
+      # Un commit nuovo toglie l'etichetta: se c'è ancora, il thread non ha corretto.
+      if [[ -n "$chiesto" ]] && (( $(minuti_da "$chiesto") >= ATTESA_THREAD )); then
+        thread_fermo "$pr" "$titolo" "il revisore ha chiesto correzioni $(minuti_da "$chiesto") minuti fa e il thread non ha mandato commit"
+      else log "#$pr: correzioni chieste al thread"; fi
+      return 0
+    fi
     fatto="$(ultimo "$pr" "**Correzione automatica")" || { non_letti "$pr"; return 0; }
     giri="$(quanti "$pr" "**Correzione automatica")" || { non_letti "$pr"; return 0; }
     if [[ -n "$chiesto" ]] && { [[ -z "$fatto" ]] || [[ "$fatto" < "$chiesto" ]]; } && (( $(minuti_da "$chiesto") >= ATTESA_FIX )) && (( giri < MAX_GIRI )); then
@@ -152,8 +180,10 @@ CI $esito (non dice niente sul codice): rilanciata."
 }
 
 gh api --paginate "repos/$GH_REPO/pulls?state=open&base=$PROD&per_page=100" \
-  --jq '.[] | select(.draft == false) | "\(.number)\t\(.head.sha)\t\([.labels[].name] | join(","))\t\(.title)"' |
-while IFS=$'\t' read -r pr sha labels titolo; do
+  --jq '.[] | select(.draft == false) | [.number, .head.sha, ([.labels[].name] | join(",")), .head.ref, .title] | map(tostring) | join("\u001f")' |
+# Separatore \x1f, non il tab: il tab per read è uno spazio, e un campo vuoto (una
+# PR senza etichette, il caso normale finché la CI gira) spostava i campi dopo.
+while IFS=$'\x1f' read -r pr sha labels ramo titolo; do
   [[ "$pr" =~ ^[0-9]+$ ]] || continue
-  controlla "$pr" "$sha" "$labels" "$titolo" || log "#$pr: controllo interrotto da un errore"
+  controlla "$pr" "$sha" "$labels" "$ramo" "$titolo" || log "#$pr: controllo interrotto da un errore"
 done

@@ -7,6 +7,8 @@
 #     legge i log del run, corregge sullo stesso ramo o, se il codice non c'entra
 #     (rete, runner, tempo scaduto), rilancia le sole parti fallite;
 #   - oltre: serve-fabio e avviso Telegram.
+#   - ramo di un thread (dal 27/11, ramo_thread): niente fix.yml, corregge il thread; qui si contano
+#     i giri e oltre MAX_GIRI serve-fabio.
 # Giri contati dai commenti «**Correzione delle prove — giro N**», che scrive fix.yml.
 set -Eeuo pipefail
 PR="$1"; RUN="$2"
@@ -14,6 +16,9 @@ MAX_GIRI=2
 # shellcheck disable=SC1091
 [[ -f scripts/progetto.env ]] && source scripts/progetto.env
 NOME="${NOME_PROGETTO:-${GH_REPO##*/}}"
+# Rami dei thread dei Projects di Claude Code (00-metodo, punto 10): quello che dà
+# Claude Code (claude/project-thread-…) o thread/…. Lì il correttore è il thread.
+ramo_thread() { [[ "$1" == thread/* || "$1" == claude/project-thread-* ]]; }
 log() { printf '[ci-rossa #%s] %s\n' "$PR" "$*"; }
 
 pr="$(gh api "repos/$GH_REPO/pulls/$PR")"
@@ -23,10 +28,28 @@ testa="$(jq -r .head.sha <<<"$pr")"
 run_sha="$(gh api "repos/$GH_REPO/actions/runs/$RUN" --jq .head_sha)"
 [[ "$run_sha" == "$testa" ]] || { log "run di ${run_sha:0:7}, la PR è a ${testa:0:7}: niente"; exit 0; }
 prod="$(jq -r .base.ref <<<"$pr")"
+ramo="$(jq -r .head.ref <<<"$pr")"
+conta() { gh api --paginate "repos/$GH_REPO/issues/$PR/comments" --jq \
+  "[.[] | select(.user.type == \"Bot\" and (.body | startswith(\"**Correzione delle prove\")) and (.body | contains(\"$1\")))] | length" \
+  | awk '{s+=$1} END {print s+0}'; }
 
-giri="$(gh api --paginate "repos/$GH_REPO/issues/$PR/comments" --jq \
-  '[.[] | select(.user.type == "Bot" and (.body | startswith("**Correzione delle prove")))] | length' \
-  | awk '{s+=$1} END {print s+0}')"
+# Ramo di un thread (Projects di Claude Code, dal 27/11): le prove le corregge il thread
+# che ha scritto la PR e la segue, non fix.yml (due correttori sullo stesso ramo si
+# scriverebbero addosso). Qui si conta il giro con un commento, uno per run (lo script
+# lo chiamano sia automerge.yml sia la sentinella), e oltre MAX_GIRI serve-fabio. Se
+# il thread non manda un commit, se ne accorge la sentinella (ATTESA_THREAD).
+if ramo_thread "$ramo"; then
+  (( $(conta "(run $RUN)") == 0 )) || { log "run $RUN già segnalato al thread"; exit 0; }
+  giri="$(conta "— thread")"
+  if (( giri < MAX_GIRI )); then
+    log "ramo di un thread: corregge il thread, giro $((giri + 1)) di $MAX_GIRI"
+    gh pr comment "$PR" --body "**Correzione delle prove — thread, giro $((giri + 1)) di $MAX_GIRI (run $RUN)**
+Prove rosse: le corregge il thread che ha scritto questa PR, sullo stesso ramo. Se non arriva un commit nuovo, la sentinella mette serve-fabio." >/dev/null
+    exit 0
+  fi
+else
+  giri="$(conta "")"
+fi
 if (( giri < MAX_GIRI )); then
   log "prove rosse: correttore, giro $((giri + 1)) di $MAX_GIRI"
   gh workflow run fix.yml --ref "$prod" -f pr="$PR" -f motivo=prove -f run="$RUN"

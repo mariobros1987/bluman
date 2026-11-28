@@ -1,12 +1,14 @@
-# deploy.yml di BluMan: nel fork NON C'È DEPLOY. Questo workflow esiste perché
-# scripts/automerge.sh (comune, identico in ogni progetto) lo lancia dopo ogni merge
-# e, se non lo trova, avvisa «mergiata ma il deploy non è partito» a ogni PR.
-# Qui fa una cosa sola: dice su Telegram che main del fork è avanzato, quanti commit
-# aspettano la pubblicazione e se portano migrazioni dello schema (backup del DB di
-# produzione PRIMA di unire la pubblicazione: Railway le applica all'avvio senza backup).
-# La produzione si aggiorna con scripts/pubblica.sh (PR verso mariobros1987/bluman):
-# DEPLOY.md. Niente push, niente server, niente segreti oltre a quelli di Telegram.
-# Gira SOLO nel fork wolftradesystem-tech/bluman (guardia sul repository): con la
+# deploy.yml di BluMan: dal fork si PUBBLICA, non si deploya su un server.
+# scripts/automerge.sh (comune, identico in ogni progetto) lo lancia dopo ogni merge.
+# Dal 28/11 (Fabio: «tutto automatico», d'accordo il titolare) fa la pubblicazione da solo:
+# `scripts/pubblica.sh --automatico` apre la PR da wolftradesystem-tech:main verso
+# mariobros1987/bluman main e la unisce se NON porta migrazioni dello schema. All'unione
+# Railway e Vercel pubblicano da soli, e blusmart.eu si aggiorna dal suo cron entro 10
+# minuti (scripts/aggiorna-blusmart-auto.sh, con la copia del database prima).
+# Con migrazioni NON unisce: Railway le applica all'avvio senza backup, quindi la PR aspetta
+# il backup del DB e il «pubblica» di Fabio (pubblica.sh --merge --backup-fatto). DEPLOY.md.
+# Token: PUBBLICA_TOKEN, di Fabio, solo per questo job (PR e merge sul repo del titolare,
+# sync del fork); mai nei log. Gira SOLO nel fork (guardia sul repository): con la
 # pubblicazione il file arriva anche nel repo del titolare (docs/adozione-standard.md).
 name: deploy
 
@@ -21,10 +23,10 @@ permissions:
   contents: read
 
 jobs:
-  nessun-deploy:
+  pubblica:
     if: github.repository == 'wolftradesystem-tech/bluman'
     runs-on: [self-hosted, ci]
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - name: cartella di lavoro pulita
         run: |
@@ -32,21 +34,30 @@ jobs:
           find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
       - uses: actions/checkout@v4
         with: { ref: main, fetch-depth: 0, persist-credentials: false }
-      - name: Cosa aspetta la pubblicazione
+      - name: Pubblica verso il repo del titolare
         env:
+          GH_TOKEN: ${{ secrets.PUBBLICA_TOKEN }}
           CI_TELEGRAM_TOKEN: ${{ secrets.CI_TELEGRAM_TOKEN }}
           CI_TELEGRAM_CHAT: ${{ secrets.CI_TELEGRAM_CHAT }}
         run: |
-          set -euo pipefail
-          # Il repo del titolare è pubblico: si legge senza credenziali, in sola lettura.
-          git remote add upstream https://github.com/mariobros1987/bluman.git
-          git fetch --quiet upstream main
-          n="$(git rev-list --count upstream/main..HEAD)"
-          migr="$(git diff --name-only "upstream/main...HEAD" -- prisma/migrations | sed -nE 's#^prisma/migrations/([^/]+)/.*#\1#p' | sort -u)"
+          set -uo pipefail
           a=$'\n'
-          msg="📦 bluman: main del fork a $(git rev-parse --short HEAD), $n commit da pubblicare. Nessun deploy dal fork: si pubblica con «pubblica» (scripts/pubblica.sh)."
-          if [[ -n "$migr" ]]; then
-            msg="$msg$a⚠️ La pubblicazione porta migrazioni dello schema: backup del DB di produzione PRIMA di unirla.$a$migr"
+          if [[ -z "$GH_TOKEN" ]]; then
+            bash scripts/ci-notify.sh "⚠️ bluman: main del fork a $(git rev-parse --short HEAD), ma manca il secret PUBBLICA_TOKEN: la pubblicazione automatica non parte (DEPLOY.md, «Segreti»)."
+            exit 1
           fi
-          echo "$msg"
+          # Il repo del titolare è pubblico: si legge senza credenziali; scrive solo `gh` col token.
+          git remote add upstream https://github.com/mariobros1987/bluman.git
+          git remote set-url --push upstream NO_PUSH
+          uscita="$(mktemp)"
+          bash scripts/pubblica.sh --automatico 2>&1 | tee "$uscita"
+          esito="${PIPESTATUS[0]}"
+          # Solo le righe [pubblica] dello script: commit, numero della PR, migrazioni. Niente token.
+          righe="$(grep '^\[pubblica\]' "$uscita" | sed 's/^\[pubblica\] //' | tail -n 4)"
+          case "$esito" in
+            0) msg="📦 bluman pubblicato:$a$righe" ;;
+            3) msg="⚠️ bluman: la pubblicazione porta migrazioni dello schema e NON è stata unita. Prima il backup del DB di Railway, poi «pubblica».$a$righe" ;;
+            *) msg="🔴 bluman: pubblicazione automatica non riuscita (uscita $esito).$a$righe" ;;
+          esac
           bash scripts/ci-notify.sh "$msg"
+          [[ "$esito" == 0 || "$esito" == 3 ]]

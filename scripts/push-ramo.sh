@@ -13,7 +13,7 @@
 #                 ramo di produzione rinominato, che ha un nome ammesso come feat/…)
 #
 # Rifiuta: il ramo di produzione, `main`, `master` e RAMI_VIETATI; nomi fuori da fix/ feat/ docs/ test/
-# chore/ ci/ refactor/ claude/; una storia riscritta (HEAD che non discende dal
+# chore/ ci/ refactor/ claude/ thread/; una storia riscritta (HEAD che non discende dal
 # ramo remoto, se esiste). Niente da mandare = esce 0 senza fare niente.
 #
 # Il workflow lo copia fuori dalla cartella di lavoro PRIMA di lanciare Claude e
@@ -38,7 +38,7 @@ fi
 
 [[ "$RAMO" != "$PROD" && "$RAMO" != main && "$RAMO" != master ]] || { log "rifiutato: $RAMO è un ramo di produzione"; exit 1; }
 for v in ${RAMI_VIETATI:-}; do [[ "$RAMO" != "$v" ]] || { log "rifiutato: $RAMO è fra i rami da non toccare"; exit 1; }; done
-[[ "$RAMO" =~ ^(fix|feat|docs|test|chore|ci|refactor|claude)/[A-Za-z0-9._/-]+$ ]] || { log "rifiutato: nome di ramo non ammesso ($RAMO)"; exit 1; }
+[[ "$RAMO" =~ ^(fix|feat|docs|test|chore|ci|refactor|claude|thread)/[A-Za-z0-9._/-]+$ ]] || { log "rifiutato: nome di ramo non ammesso ($RAMO)"; exit 1; }
 
 git fetch --quiet origin "$PROD"
 if git ls-remote --exit-code --heads origin "$RAMO" >/dev/null 2>&1; then

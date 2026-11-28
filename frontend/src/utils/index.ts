@@ -4,7 +4,10 @@ import { API_BASE } from '../api/http';
 import type { CategoriaModulo, StatoModulo, StatoMicrovoce, StatoProgetto, Articolo, ModuloTemplate, Progetto } from '../types';
 
 // ─── Formatters ───────────────────────────────────────────────────
-export const fmt = (n: number) => '€ ' + n.toLocaleString('it-IT');
+// Il separatore delle migliaia sempre: in italiano `toLocaleString` lo omette sotto le 10.000
+// («€ 3500» accanto a «€ 11.500» nella stessa schermata). Decimali come prima: solo se ci sono.
+const FORMATO_EURO = new Intl.NumberFormat('it-IT', { useGrouping: 'always', maximumFractionDigits: 3 } as Intl.NumberFormatOptions);
+export const fmt = (n: number) => '€ ' + FORMATO_EURO.format(n);
 
 // Normalizza un URL logo già scelto. NON inventa un default: un logo mancante
 // resta vuoto, e sta al chiamante decidere il ripiego (per Bluecode `/logo.png`

@@ -25,9 +25,11 @@ export const topNavStyle: CSSProperties = {
   paddingBottom: 14, borderBottom: '1px solid var(--border)',
 };
 
+// Colori dai token del tema: il fondo scuro scritto a mano rendeva illeggibile il nome
+// dell'incarico nel tema chiaro (testo scuro del tema su fondo sempre scuro).
 export const heroBannerStyle: CSSProperties = {
-  background: 'linear-gradient(135deg,#13162b,#1a1d3b)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px',
-  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, boxShadow: '0 8px 30px rgba(0,0,0,.3)',
+  background: 'var(--card)', border: '1px solid var(--border)', borderLeft: '4px solid var(--indigo)', borderRadius: 16, padding: '20px 24px',
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, boxShadow: 'var(--shadow)',
 };
 
 export const tabsBarStyle: CSSProperties = {

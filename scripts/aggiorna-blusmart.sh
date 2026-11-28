@@ -8,6 +8,10 @@
 #   ssh blusmart "cd /opt/bluman && git pull --ff-only && bash scripts/aggiorna-blusmart.sh"
 #   ssh blusmart "cd /opt/bluman && bash scripts/aggiorna-blusmart.sh --applica"
 #
+# Con `--applica` lo script si stacca dalla connessione: gira in una sessione sua e scrive in
+# /var/log/bluman/aggiorna-<data>.log, mentre il terminale segue il log. Se ssh cade (il 27/11 è
+# caduto a metà della build delle immagini) l'aggiornamento continua, e il log si rilegge.
+#
 # Senza argomenti controlla e basta: dice cosa cambierebbe (versione in servizio, versione su
 # disco, migrazioni da applicare, spazio, ultima copia) e non tocca niente. Con `--applica`:
 #
@@ -38,6 +42,21 @@ for a in "$@"; do
   esac
 done
 
+# Staccarsi dalla connessione. `setsid` mette lo script in una sessione nuova, che la caduta di ssh
+# non raggiunge; il processo resta figlio di questa shell, quindi `wait` ne legge l'esito.
+if [ "$APPLICA" = si ] && [ -z "${BLUMAN_STACCATO:-}" ]; then
+  DIR_LOG=/var/log/bluman
+  [ -w "$DIR_LOG" ] || DIR_LOG=/tmp
+  LOG="$DIR_LOG/aggiorna-$(date +%Y%m%d_%H%M%S).log"
+  BLUMAN_STACCATO=1 setsid nohup bash "$0" --applica > "$LOG" 2>&1 </dev/null &
+  FIGLIO=$!
+  echo "Aggiornamento avviato sul server. Se la connessione cade continua lo stesso;"
+  echo "per rileggere il log: ssh blusmart \"tail -40 $LOG\""
+  tail -n +1 -f --pid="$FIGLIO" "$LOG"
+  wait "$FIGLIO"
+  exit $?
+fi
+
 titolo() { printf '\n== %s\n' "$1"; }
 ok() { printf '✔ %s\n' "$1"; }
 errore() { printf 'ERRORE: %s\n' "$1" >&2; exit 1; }
@@ -53,16 +72,13 @@ set -a; . ./.env; set +a
 titolo "Situazione"
 SU_DISCO="$(git rev-parse HEAD)"
 IN_SERVIZIO="$(cat "$FILE_ULTIMO" 2>/dev/null || true)"
-# Prima volta con questo script: la versione in servizio è quella da cui è partito l'ultimo pull.
-DA_PULL=no
-if [ -z "$IN_SERVIZIO" ] && git rev-parse -q --verify ORIG_HEAD >/dev/null; then
-  IN_SERVIZIO="$(git rev-parse ORIG_HEAD)"; DA_PULL=si
-fi
 echo "• Versione su disco:      $(git log -1 --format='%h %ad %s' --date=short)"
 if [ -n "$IN_SERVIZIO" ]; then
-  echo "• In servizio prima:      $(git log -1 --format='%h %ad %s' --date=short "$IN_SERVIZIO" 2>/dev/null || echo "$IN_SERVIZIO")$([ "$DA_PULL" = si ] && echo ' (dedotta dall\'ultimo git pull)')"
+  # È l'ultimo commit messo in servizio da questo script: un `git pull` cambia i file su disco,
+  # non il sito, quindi la versione «di prima» non si ricava da git.
+  echo "• In servizio:            $(git log -1 --format='%h %ad %s' --date=short "$IN_SERVIZIO" 2>/dev/null || echo "$IN_SERVIZIO")"
 else
-  echo "• In servizio prima:      non registrata"
+  echo "• In servizio:            non registrata (nessun aggiornamento fatto con questo script)"
 fi
 
 # I file tracciati devono essere quelli di GitHub: una modifica fatta a mano sul server

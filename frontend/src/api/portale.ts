@@ -14,6 +14,22 @@ export interface ContattiStudio {
   telefono: string | null;
   emailStudio: string | null;
   sedeLegale: string | null;
+  /** L'anagrafica dello studio stampata nella lettera d'incarico, dal database. */
+  anagrafica?: AnagraficaStudioPortale | null;
+}
+
+export interface AnagraficaStudioPortale {
+  ragioneSociale: string;
+  piva: string;
+  codiceFiscale: string;
+  sedeLegale: string;
+  sedeOperativa: string;
+  giurisdizione: string;
+  iban: string;
+  email: string;
+  telefono: string;
+  leadAdvisor: string;
+  logoUrl: string;
 }
 
 export async function contattiPortaleApi(clienteId?: string): Promise<ContattiStudio> {
@@ -24,7 +40,7 @@ export async function contattiPortaleApi(clienteId?: string): Promise<ContattiSt
     throw new Error(data.errore ?? 'Errore lettura contatti dello studio');
   }
   const data = await res.json();
-  return data.contatti;
+  return { ...data.contatti, anagrafica: data.anagrafica ?? null };
 }
 
 export interface PropostaDatiFiscale {

@@ -1,3 +1,4 @@
+import { faseModulo } from './faseModulo';
 import type { DocumentoPortale } from '../../api/client';
 import type { CategoriaModulo } from '../../types';
 import type { ModuloDeliverable, ModuloPassaggio, ModuloProposta, TotaleModuli } from './types';
@@ -85,6 +86,7 @@ export function mapProjectToPortalModules(project: any, portalDocs: DocumentoPor
       righeCount: passaggi.length,
       descrizione: m.descrizione || undefined,
       stato: isDone ? 'completato' : 'in_corso',
+      fase: faseModulo(statoModulo),
       operatore: microvoci.find((mv: any) => mv.risorsa?.nome)?.risorsa?.nome || undefined,
       percentuale: av?.percentuale ?? 0,
       passaggi,
