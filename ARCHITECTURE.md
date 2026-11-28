@@ -27,6 +27,7 @@ browser ──► frontend React 19 + Vite (frontend/)
 | Isolamento | `src/util/prismaClient.ts`, `supabase/migrations/20260819_rls_effettiva.sql` | client con contesto tenant (RLS); `prismaAmministrativo()` solo fuori dalle richieste |
 | Schema | `prisma/schema.prisma`, `prisma/migrations/` (69 migrazioni, misurato 17/11) | migrazioni versionate, ogni tabella con `tenant_id` porta la sua policy |
 | Frontend | `frontend/src/pages/`, `components/`, `api/client.ts` | pagine per modulo, portale cliente, aiuto in-app |
+| Posta dei clienti | `src/routes/posta*.ts`, `src/services/posta*.ts`, `src/scripts/raccogliPosta.ts` | accentratore delle mail: legge in sola lettura le caselle collegate (di raccolta, o dei clienti), attribuisce i messaggi ai clienti, li mostra in `/posta`; giro a intervalli dentro il processo dell'API |
 | Relay email | `api/send-email.ts` | funzione serverless su Vercel (invio a nome dello studio) |
 | Prove | `src/**/*.test.ts` (159 file), `frontend/src/**/*.test.tsx` (56), `e2e/` (Playwright, non in CI) | la suite backend non vuole un DB (`vitest.setup.ts`); misurato 17/11 |
 
@@ -34,6 +35,7 @@ browser ──► frontend React 19 + Vite (frontend/)
 - **Fattura → SdI**: `src/routes/contabilitaFatture.ts` → `fatturaEngine.ts` (importi in centesimi) → `sdiXmlGenerator.ts` → `sdiService.ts`; stato e numerazione per anno dal DB.
 - **Firma**: `src/routes/firma.ts` → `livelloFirmaService.ts` → OTP (`otpService.ts`) → `verbaleFirma.ts`, `copiaFirmata.ts`, sigillo HMAC-SHA256, marca temporale (`marcaTemporaleService.ts`).
 - **KYC/AML**: `src/routes/kyc.ts` → `kycCaseService.ts`, `kycGate.ts` (blocca la fatturazione da progetto senza KYC) → `src/domain/kycStateMachine.ts`, `calcoloRischio.ts`, `segnalazioneFiau*`.
+- **Posta dei clienti**: timer in `src/index.ts` (o `npm run cron:posta`) → `raccogliPosta.ts` (uno studio alla volta, nel suo contesto RLS) → `postaRaccolta.ts` → `postaImap.ts` (IMAP in sola lettura) → `postaAttribuzione.ts` → `messaggio_posta`; l'operatore smista da `/posta` (`src/routes/posta.ts`).
 - **Avanzamento progetto**: ogni scrittura su moduli e micro-voci passa da `calcoloService.ts`, che applica `stateEngine.ts`.
 
 ## Dati
@@ -44,6 +46,7 @@ browser ──► frontend React 19 + Vite (frontend/)
 | Servizio | A cosa serve | Autenticazione | Se cade |
 |---|---|---|---|
 | SMTP/IMAP dello studio | email in uscita e in entrata | credenziali nella riga `Tenant` | invii in coda, diagnosi posta in Impostazioni |
+| Caselle IMAP dei clienti e di raccolta | posta dei clienti (sola lettura, porta 993) | credenziali per casella nel DB, password cifrata (`cifraturaSegreti.ts`) | la casella risulta «non risponde» con il motivo, le altre continuano |
 | WhatsApp Cloud API, Telegram, Signal | comunicazioni col cliente | token per studio (DB) | il canale risulta non configurato, nessun invio inventato |
 | SdI | fatture elettroniche | webhook con `WEBHOOK_SECRET_SDI` | stato «da inviare» resta tale |
 | Supabase Storage | documenti (facoltativo) | `SUPABASE_SERVICE_KEY` | ripiego su `uploads/` locale |

@@ -22,6 +22,7 @@ const SCHEDA_PER_PAGINA: Record<string, string> = {
   '/audit': '28-log-audit',
   '/settings': '16-impostazioni',
   '/note-beta': '30-aiuto',
+  '/posta': '15-comunicazioni',
   '/admin/tenants': '31-multi-tenant-admin',
 };
 

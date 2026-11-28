@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { moduloDellaRotta, PREFISSI_VIETATI_ESTERNO, rottaVietataAllEsterno } from './util/rbacModuli.js';
+import { moduloDellaRotta, permessoDefaultPerRuolo, PREFISSI_VIETATI_ESTERNO, rottaVietataAllEsterno } from './util/rbacModuli.js';
 
 // La mappa rotta → modulo è il cuore dell'enforcement RBAC: se una rotta finisce
 // nel modulo sbagliato, la matrice dello studio restringe (o lascia aperto) il
@@ -113,5 +113,30 @@ describe('rottaVietataAllEsterno — rotte fuori matrice chiuse al collaboratore
     expect(rottaVietataAllEsterno('/progetti/:id')).toBe(false);
     expect(rottaVietataAllEsterno('/documenti')).toBe(false);
     expect(rottaVietataAllEsterno(undefined)).toBe(false);
+  });
+});
+
+// L'accentratore delle mail ha una chiave sua: dentro c'è tutta la posta di un cliente, non la sua
+// conversazione con lo studio, quindi non eredita il default «write» di `communications`.
+describe('posta dei clienti — chiave `posta`, negata finché lo studio non la concede', () => {
+  it('ogni rotta /posta passa dalla matrice con la chiave posta, non communications', () => {
+    expect(moduloDellaRotta('/posta/messaggi')).toBe('posta');
+    expect(moduloDellaRotta('/posta/messaggi/:id')).toBe('posta');
+    expect(moduloDellaRotta('/posta/caselle/:id/scollega')).toBe('posta');
+    expect(moduloDellaRotta('/posta/clienti/:id/inoltro')).toBe('posta');
+    // Un prefisso simile non la cattura.
+    expect(moduloDellaRotta('/postali')).toBeUndefined();
+  });
+
+  it('senza una riga in matrice la vede solo chi risponde dello studio', () => {
+    expect(permessoDefaultPerRuolo('advisor', 'posta')).toBe('write');
+    expect(permessoDefaultPerRuolo('collaboratore_interno', 'posta')).toBe('denied');
+    expect(permessoDefaultPerRuolo('operator', 'posta')).toBe('denied');
+    expect(permessoDefaultPerRuolo('collaboratore_esterno', 'posta')).toBe('denied');
+  });
+
+  it('il collaboratore esterno è fuori prima della matrice: nessuna riga gliela apre', () => {
+    expect(rottaVietataAllEsterno('/posta')).toBe(true);
+    expect(rottaVietataAllEsterno('/posta/messaggi/:id')).toBe(true);
   });
 });

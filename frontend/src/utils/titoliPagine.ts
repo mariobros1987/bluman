@@ -27,6 +27,7 @@ export const TITOLI_PAGINE: Record<string, string> = {
   '/retainers': 'Contratti Retainer',
   '/reports':   'Report',
   '/note-beta': 'Note della beta',
+  '/posta':     'Posta dei clienti',
   '/admin/tenants': 'Multi-Tenant Admin',
 };
 

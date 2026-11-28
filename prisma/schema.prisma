@@ -157,6 +157,9 @@ model Tenant {
 
   @@map("tenant")
   noteBeta             NotaBeta[]
+  casellePosta         CasellaPosta[]
+  messaggiPosta        MessaggioPosta[]
+  allegatiPosta        AllegatoPosta[]
 }
 
 enum RuoloUtente {
@@ -298,6 +301,12 @@ model Cliente {
   indirizzoResidenza     String?  @map("indirizzo_residenza")
   indirizzoAlloggio      String?  @map("indirizzo_alloggio")
   referentiJson          Json?    @map("referenti_json")
+  // Accentratore delle mail: il pezzo dopo il «+» nell'indirizzo di inoltro del cliente verso la
+  // casella di raccolta dello studio. Null = la raccolta non è attiva per questo cliente. Chi l'ha
+  // attivata e quando restano scritti qui: monitorare la posta di un cliente è una scelta dichiarata.
+  aliasPosta             String?   @map("alias_posta")
+  postaAttivataAt        DateTime? @map("posta_attivata_at")
+  postaAttivataDa        String?   @map("posta_attivata_da")
   createdAt              DateTime @default(now()) @map("created_at")
 
   progetti             Progetto[]
@@ -316,9 +325,12 @@ model Cliente {
   eventiCalendario     EventoCalendario[]           @relation("EventiCliente")
   fascicoliKyc         FascicoloKyc[]
   soggettiKyc          SoggettoKyc[]
+  messaggiPosta        MessaggioPosta[]
+  casellePosta         CasellaPosta[]
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, nome])
+  @@unique([tenantId, aliasPosta])
   @@map("cliente")
 }
 
@@ -542,6 +554,7 @@ model Progetto {
   eventi              EventoCalendario[]
   accessiRisorsa      AccessoRisorsa[]           @relation("AccessoProgetto")
   comunicazioni       ComunicazioneProgetto[]
+  messaggiPosta       MessaggioPosta[]
   contrattiRicorrenti ContrattoRicorrente[]
   richiesteAddendum   RichiestaAddendum[]
   oreTimesheet        OraTimesheet[]
@@ -2339,6 +2352,120 @@ model TenantComplianceSettings {
   updatedAt               DateTime @updatedAt @map("updated_at")
 
   @@map("tenant_compliance_settings")
+}
+
+/// Accentratore delle mail (28/11/2026) — la posta dei clienti raccolta in un posto solo.
+/// Una riga per casella IMAP letta dal gestionale, di due tipi (mattia, 28/11: si sceglie per cliente):
+/// - `raccolta`: una casella dello studio a cui i clienti inoltrano la loro posta, ognuno verso il
+///   proprio indirizzo `locale+alias@dominio` (`Cliente.aliasPosta`);
+/// - `cliente`: la casella di un cliente, letta con le credenziali che ha dato lui. Tutto ciò che
+///   contiene è di quel cliente (`clienteId`), e chi la collega dichiara che il cliente ha
+///   autorizzato (`consensoDichiaratoAt`/`Da`).
+/// La password sta in
+/// `passwordCifrata` (AES-256-GCM, `src/util/cifraturaSegreti.ts`): non esce MAI dalle API, e
+/// «Scollega» la cancella lasciando i messaggi già raccolti. `uidValidity` e `ultimoUid` sono il
+/// segnalibro della raccolta: la casella si apre in sola lettura e non si marca niente come letto,
+/// così chi la apre anche dal suo programma di posta non trova i messaggi già segnati.
+model CasellaPosta {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  nome             String
+  indirizzo        String
+  host             String
+  /// Nome che il certificato deve attestare quando è diverso dall'host (come `Tenant.imapServername`).
+  servername       String?
+  porta            Int       @default(993)
+  utente           String
+  passwordCifrata  String?   @map("password_cifrata")
+  cartella         String    @default("INBOX")
+  tipo             String    @default("raccolta") // raccolta | cliente
+  /// Solo per `tipo = cliente`. Se il cliente viene eliminato resta null e la raccolta si ferma.
+  clienteId        String?   @map("cliente_id")
+  cliente          Cliente?  @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  consensoDichiaratoAt DateTime? @map("consenso_dichiarato_at")
+  consensoDichiaratoDa String?   @map("consenso_dichiarato_da")
+  /// Da quale giorno raccogliere alla prima lettura. Null = gli ultimi 30 giorni.
+  raccogliDal      DateTime? @map("raccogli_dal")
+  attiva           Boolean   @default(true)
+  uidValidity      String?   @map("uid_validity")
+  ultimoUid        Int       @default(0) @map("ultimo_uid")
+  ultimaRaccoltaAt DateTime? @map("ultima_raccolta_at")
+  ultimoSuccessoAt DateTime? @map("ultimo_successo_at")
+  /// Il motivo dell'ultima raccolta fallita, già scritto per l'operatore. Null dopo un successo.
+  ultimoErrore     String?   @map("ultimo_errore")
+  creataDa         String?   @map("creata_da")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  messaggi MessaggioPosta[]
+
+  @@index([tenantId, attiva])
+  @@map("casella_posta")
+}
+
+/// Un messaggio raccolto da una casella. `(casellaId, uidValidity, uid)` è la chiave con cui la
+/// raccolta non salva due volte lo stesso messaggio. `attribuzione` dice come è arrivato al
+/// cliente: `automatica` (alias di inoltro, oppure indirizzo del cliente fra destinatari o mittente),
+/// `manuale` (smistato da un operatore), `da_smistare` (nessun cliente riconosciuto). `criterio`
+/// spiega l'automatica in una parola (alias | destinatario | mittente) e `consegnatoA` conserva
+/// l'intestazione che portava l'alias: è il primo posto dove guardare se un inoltro non viene riconosciuto.
+model MessaggioPosta {
+  id            String       @id @default(uuid())
+  tenantId      String       @map("tenant_id")
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  casellaId     String       @map("casella_id")
+  casella       CasellaPosta @relation(fields: [casellaId], references: [id])
+  uid           Int
+  uidValidity   String       @map("uid_validity")
+  messageId     String?      @map("message_id")
+  mittenteEmail String       @map("mittente_email")
+  mittenteNome  String?      @map("mittente_nome")
+  destinatari   String?
+  oggetto       String?
+  testo         String?
+  html          String?
+  /// La data scritta nel messaggio, non il momento della raccolta: è quella che l'operatore cerca.
+  ricevutoAt    DateTime     @map("ricevuto_at")
+  raccoltoAt    DateTime     @default(now()) @map("raccolto_at")
+  clienteId     String?      @map("cliente_id")
+  cliente       Cliente?     @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+  progettoId    String?      @map("progetto_id")
+  progetto      Progetto?    @relation(fields: [progettoId], references: [id], onDelete: SetNull)
+  attribuzione  String       @default("da_smistare") // automatica | manuale | da_smistare
+  criterio      String?
+  consegnatoA   String?      @map("consegnato_a")
+  lettoAt       DateTime?    @map("letto_at")
+  lettoDa       String?      @map("letto_da")
+  archiviatoAt  DateTime?    @map("archiviato_at")
+  haAllegati    Boolean      @default(false) @map("ha_allegati")
+
+  allegati AllegatoPosta[]
+
+  @@unique([casellaId, uidValidity, uid])
+  @@index([tenantId, ricevutoAt(sort: Desc)])
+  @@index([tenantId, clienteId])
+  @@index([tenantId, progettoId])
+  @@map("messaggio_posta")
+}
+
+/// Un allegato di un messaggio raccolto. Il file sta nell'archivio (`uploadDocumento`), qui c'è
+/// l'indirizzo. `url` null = l'allegato esisteva ma non è stato salvato, e `motivoNonSalvato` dice
+/// perché (troppo grande, tipo non ammesso): l'operatore sa che c'era e lo chiede al cliente.
+model AllegatoPosta {
+  id               String         @id @default(uuid())
+  tenantId         String         @map("tenant_id")
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  messaggioId      String         @map("messaggio_id")
+  messaggio        MessaggioPosta @relation(fields: [messaggioId], references: [id], onDelete: Cascade)
+  nome             String
+  mime             String?
+  dimensioneByte   Int?           @map("dimensione_byte")
+  url              String?
+  motivoNonSalvato String?        @map("motivo_non_salvato")
+
+  @@index([tenantId, messaggioId])
+  @@map("allegato_posta")
 }
 
 /// Credenziali dei servizi esterni usati dallo studio (KYC/AML e firma).

@@ -107,6 +107,8 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // studio lette dal database: prima le faceva il browser chiamando le funzioni
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
+import { registraRottePosta } from './routes/posta.js';
+import { registraRottePostaConfigurazione } from './routes/postaConfigurazione.js';
 // Il link che collega la chat di un cliente alla sua pratica. Registrato dentro il
 // wrapper register di buildServer, accanto alle rotte progetti: richiede un JWT.
 import { registraRotteCollegamentoChat } from './routes/collegamentoChat.js';
@@ -722,6 +724,9 @@ export function buildServer(app: AppPort): FastifyInstance {
   // `localStorage`. Registrate dentro questo wrapper e assenti da
   // ROTTE_PUBBLICHE: richiedono un JWT come tutto il resto.
   await registraRotteComunicazioni(server);
+  // Accentratore delle mail: messaggi raccolti dalle caselle dei clienti, e la loro configurazione.
+  await registraRottePosta(server);
+  await registraRottePostaConfigurazione(server);
 
   // ─── WEBHOOK COMUNICAZIONI: META WHATSAPP & TELEGRAM ──────────────
   // Rotte webhook (Meta WhatsApp verify+ingestion eventi, Telegram bot

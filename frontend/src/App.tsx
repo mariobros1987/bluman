@@ -29,6 +29,7 @@ import { TimesheetPage } from './pages/TimesheetPage';
 // Il manuale in-app: legge le schede di `docs/manuale/` dal backend.
 import { AiutoPage } from './pages/AiutoPage';
 import { NoteBetaPage } from './pages/NoteBetaPage';
+import { PostaPage } from './pages/PostaPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -196,6 +197,9 @@ function AppContent() {
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
           <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
           <Route path="/timesheet"     element={<ProtectedModule user={currentUser} moduleKey="timesheet" element={<TimesheetPage />} />} />
+          {/* La posta dei clienti ha una chiave RBAC sua (`posta`), negata ai collaboratori finché
+              lo studio non la concede: è posta privata dei clienti, non la casella dello studio. */}
+          <Route path="/posta"         element={<ProtectedModule user={currentUser} moduleKey="posta" element={<PostaPage />} />} />
           <Route path="/admin/tenants" element={<SuperAdminPage />} />
           <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
           <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />

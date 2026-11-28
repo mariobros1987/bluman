@@ -6,6 +6,9 @@ export function getUserPermission(user: any, moduleKey: string): PermissionLevel
   if (!user) return 'denied';
   if (user.ruolo === 'super_admin') return 'write';
   if (moduleKey === 'dashboard') return 'write';
+  // La posta dei clienti non si apre a chi è fuori dallo studio, nemmeno dalla matrice: è lo
+  // stesso divieto che il server applica prima di guardarla (`PREFISSI_VIETATI_ESTERNO`).
+  if (moduleKey === 'posta' && user.ruolo === 'collaboratore_esterno') return 'denied';
 
   const userKey = (user.id || '').toString().toLowerCase();
   const emailKey = (user.email || '').toLowerCase().trim();
