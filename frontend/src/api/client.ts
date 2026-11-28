@@ -7,6 +7,8 @@ export * from './documenti';
 // §41 — cartella modelli dello studio: `/documenti-template` e lo stato di revisione.
 export * from './modelliDocumento';
 export * from './libreria';
+// I form che il cliente compila per un articolo (titolare, 28/11/2026).
+export * from './formMaster';
 export * from './fatturazione';
 export * from './portale';
 export * from './firma';

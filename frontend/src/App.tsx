@@ -16,7 +16,6 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { FornitoriPage } from './pages/FornitoriPage';
 import { LiquidazioneIvaPage } from './pages/LiquidazioneIvaPage';
-import { PaymentsPage } from './pages/PaymentsPage';
 import { ScadenzarioPage } from './pages/ScadenzarioPage';
 import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { BanksPage } from './pages/BanksPage';
@@ -184,7 +183,6 @@ function AppContent() {
           <Route path="/scadenzario"   element={<ProtectedModule user={currentUser} moduleKey="scadenzario" element={<ScadenzarioPage />} />} />
           <Route path="/primanota"     element={<ProtectedModule user={currentUser} moduleKey="primanota" element={<PrimaNotaPage />} />} />
           <Route path="/banks"         element={<ProtectedModule user={currentUser} moduleKey="banks" element={<BanksPage />} />} />
-          <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
           <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
           <Route path="/editor"        element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />

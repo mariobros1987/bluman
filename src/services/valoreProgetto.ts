@@ -1,4 +1,5 @@
-// Il valore di un progetto è la somma dei prezzi dei suoi moduli (centesimi).
+// Il valore di un progetto è la somma dei prezzi dei suoi moduli meno lo sconto concordato
+// (centesimi; lo sconto è del titolare, 28/11/2026).
 //
 // È la regola che la pagina del progetto applicava già a schermo, ma solo lì: a database il
 // valore nasceva a 0 e nessuno lo alzava, quindi elenco, Dashboard e report mostravano un
@@ -10,6 +11,8 @@
 // e azzerarlo qui vorrebbe dire cancellare un dato che nessun modulo sostituisce. Fa eccezione
 // chi ha appena tolto l'ultimo modulo (`azzeraSeSenzaModuli`): lì il valore di prima era la
 // somma di moduli che non ci sono più.
+
+import { scontoApplicabile } from '../domain/importiFatturabili.js';
 
 /**
  * Il pezzo di client che serve, scritto a mano: `prisma` qui è un client esteso (contesto dello
@@ -24,12 +27,14 @@ export interface ClientValoreProgetto {
     }>;
   };
   progetto: {
+    findUnique(args: { where: { id: string }; select: { scontoCentesimi: true } }): PromiseLike<{ scontoCentesimi: number } | null>;
     update(args: { where: { id: string }; data: { valoreTotale: number } }): PromiseLike<unknown>;
   };
 }
 
 /**
- * Riscrive `progetto.valoreTotale` come somma di `modulo_progetto.prezzo`.
+ * Riscrive `progetto.valoreTotale` come somma di `modulo_progetto.prezzo` meno lo sconto del
+ * progetto (mai sotto zero: uno sconto più alto della somma si applica fino a zero).
  * Ritorna il valore scritto, oppure `null` se il progetto non ha moduli e non si è chiesto di
  * azzerarlo (niente scritto).
  */
@@ -44,7 +49,9 @@ export async function riallineaValoreProgetto(
     _count: { _all: true },
   });
   if (somma._count._all === 0 && !opzioni.azzeraSeSenzaModuli) return null;
-  const valoreTotale = somma._sum.prezzo ?? 0;
+  const sommaModuli = somma._sum.prezzo ?? 0;
+  const progetto = await client.progetto.findUnique({ where: { id: progettoId }, select: { scontoCentesimi: true } });
+  const valoreTotale = sommaModuli - scontoApplicabile(sommaModuli, progetto?.scontoCentesimi ?? 0);
   await client.progetto.update({ where: { id: progettoId }, data: { valoreTotale } });
   return valoreTotale;
 }

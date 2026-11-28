@@ -28,6 +28,14 @@ import {
 import { recordAudit } from '../util/serverHelpers.js';
 import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 import { EmettiFatturaSchema } from '../schemas/contabilita.schema.js';
+import { rifiutoDatiClienteMancanti, type TipoClienteFiscale } from '../domain/datiFiscaliCliente.js';
+
+/** Porta fuori dalla transazione il rifiuto «mancano i dati del cliente», col suo corpo già pronto. */
+class ErroreDatiClienteMancanti extends Error {
+  constructor(readonly corpo: NonNullable<ReturnType<typeof rifiutoDatiClienteMancanti>>) {
+    super(corpo.errore);
+  }
+}
 
 export async function registraRotteContabilitaFatture(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── CREAZIONE NUOVA FATTURA O BOZZA ───────────────────────────────
@@ -349,6 +357,12 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
               if (fattura.stato !== 'bozza') {
                 throw new Error(`La fattura è già in stato '${fattura.stato}'`);
               }
+              // Senza i dati fiscali del cliente la fattura non si emette (titolare, 28/11/2026).
+              // Una nota di credito no: corregge un documento già uscito, e fermarla lo lascerebbe sbagliato.
+              if (fattura.tipoDocumento !== 'nota_credito') {
+                const rifiuto = rifiutoDatiClienteMancanti(fattura.cliente, fattura.tipoClienteFiscale as TipoClienteFiscale);
+                if (rifiuto) throw new ErroreDatiClienteMancanti(rifiuto);
+              }
 
               // Numerazione progressiva ufficiale atomica per serie (FT o NC), **e per anno**:
               // il numero legale riparte da `001` a ogni gennaio (art. 21 DPR 633/72). Il confine
@@ -442,6 +456,7 @@ export async function registraRotteContabilitaFatture(server: FastifyInstance, a
         message: `Fattura ${numeroUfficiale} emessa con successo. Generate ${rateCount} rate nello scadenzario.`,
       });
     } catch (err: any) {
+      if (err instanceof ErroreDatiClienteMancanti) return reply.code(409).send(err.corpo);
       if (err?.message === 'Fattura non trovata') {
         return reply.code(404).send({ errore: 'Fattura non trovata' });
       }

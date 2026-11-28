@@ -119,34 +119,66 @@ describe('F2 — niente righe o conferme fabbricate', () => {
   });
 });
 
-describe('2.7 — l’importo ricavato dal modulo si dichiara', () => {
+// Titolare, 28/11/2026 (risposta 3) — l'importo proposto è il listino dell'articolo, o il prezzo
+// del modulo in proporzione al listino: lo calcola il server e qui lo si legge. Prima la pagina
+// divideva il prezzo del modulo per il numero delle voci (queste prove lo confermavano).
+describe('importo proposto dal server — da dove viene si dichiara', () => {
   const conValore = () => progetto({
-    mods: [{ id: 1, n: 'Modulo A', st: 'in_progress', p: 1000, v: [
-      { id: 11, n: 'Parere', s: 'done', hA: 5 },
-      { id: 12, n: 'Memoria', s: 'done', hA: 2 },
+    mods: [{ id: 1, dbId: 'm-1', n: 'Modulo A', st: 'in_progress', p: 1000, v: [
+      { id: 11, dbId: 'v-1', n: 'Parere', s: 'done', hA: 5 },
+      { id: 12, dbId: 'v-2', n: 'Memoria', s: 'done', hA: 2 },
     ] }],
   });
+  const dalServer = (criterio: string, importi: Array<number | null>) => ({
+    id: 'p-1',
+    fatture: [],
+    moduli: [{ id: 'm-1', prezzoNettoCentesimi: 100000, criterioRipartizione: criterio, microvoci: [
+      { id: 'v-1', importoPropostoCentesimi: importi[0] },
+      { id: 'v-2', importoPropostoCentesimi: importi[1] },
+    ] }],
+  });
+  const apri = (raw: unknown) => {
+    render(<FatturazioneTab project={conValore()} rawDbProject={raw} onRefresh={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Componi Fattura da Microvoci/ }));
+  };
 
-  it('accanto alla quota del modulo c’è «ripartito dal modulo», con la spiegazione nel title', () => {
-    apriCompositore(conValore());
+  it('propone gli importi del server, non il prezzo del modulo diviso in parti uguali', () => {
+    apri(dalServer('proporzionale_listino', [64286, 35714]));
 
-    const etichette = screen.getAllByText('ripartito dal modulo');
+    expect(screen.getByLabelText('Importo Parere')).toHaveValue(642.86);
+    expect(screen.getByLabelText('Importo Memoria')).toHaveValue(357.14);
+    const etichette = screen.getAllByText('in proporzione al listino');
     expect(etichette).toHaveLength(2);
-    expect(etichette[0]).toHaveAttribute('title', expect.stringMatching(/diviso per il numero delle sue voci/));
-    expect(screen.getByLabelText('Importo Parere')).toHaveValue(500);
+    expect(etichette[0]).toHaveAttribute('title', expect.stringMatching(/in proporzione al listino/));
   });
 
-  it('sparisce quando l’operatore modifica l’importo a mano', () => {
-    apriCompositore(conValore());
+  it('listino pieno → «da listino»', () => {
+    apri(dalServer('listino', [60000, 40000]));
+    expect(screen.getAllByText('da listino')).toHaveLength(2);
+  });
+
+  it('l’etichetta sparisce quando l’operatore modifica l’importo a mano', () => {
+    apri(dalServer('listino', [60000, 40000]));
 
     fireEvent.change(screen.getByLabelText('Importo Parere'), { target: { value: '650' } });
 
-    expect(screen.getAllByText('ripartito dal modulo')).toHaveLength(1);
+    expect(screen.getAllByText('da listino')).toHaveLength(1);
     expect(screen.getByLabelText('Importo Parere')).toHaveValue(650);
   });
 
-  it('una voce senza importo non ha l’etichetta: non c’è nulla di ripartito', () => {
-    apriCompositore();
-    expect(screen.queryByText('ripartito dal modulo')).toBeNull();
+  it('l’importo con i centesimi arriva al server in centesimi interi', async () => {
+    vi.mocked(emettiFatturaApi).mockResolvedValue({ numero: 'FT-2026/009' });
+    apri(dalServer('proporzionale_listino', [64286, 35714]));
+
+    fireEvent.click(screen.getByRole('button', { name: /Emetti Fattura Fiscale/ }));
+
+    await waitFor(() => expect(emettiFatturaApi).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(emettiFatturaApi).mock.calls[0]![0].righe.map((r: any) => r.importo)).toEqual([64286, 35714]);
+  });
+
+  it('se il server non propone un importo la voce resta «importo mancante», anche se il modulo ha un prezzo', () => {
+    apri({ id: 'p-1', fatture: [] });
+    expect(screen.getAllByText('importo mancante')).toHaveLength(2);
+    expect(screen.queryByText(/listino|parti uguali/)).toBeNull();
   });
 });

@@ -28,6 +28,7 @@ import { livelloModuloUtente } from '../util/permessiModulo.js';
 import type { ModuloChiaveRbac } from '../util/rbacModuli.js';
 import { STATI_MICROVOCE, STATI_PROGETTO, recordAudit, clienteDellaRichiesta } from '../util/serverHelpers.js';
 import { microvociDaDistinta, risolviRigheDistinta } from '../services/distintaTemplate.js';
+import { creaPassaggioDaTemplate, formDegliArticoli } from '../services/formArticolo.js';
 import { salvaPassaggiMicrovoce } from '../services/passaggiMicrovoce.js';
 import { caricoPerRisorse } from '../services/compitiAssegnati.js';
 import { riallineaValoreProgetto } from '../services/valoreProgetto.js';
@@ -36,6 +37,8 @@ import { CreaProgettoSchema, ConsuntivaOreSchema, NuovaComunicazioneSchema } fro
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
 import { leggiIntervalloData } from '../util/intervalloData.js';
 import { conStatoComunicazione, leggiMetaComunicazione, proiettaRecapito } from '../util/statoComunicazione.js';
+import { conImportiProposti, senzaListino } from '../domain/importiFatturabili.js';
+import { registraRottaScontoProgetto } from './progettiSconto.js';
 import {
   abbinaAlContesto,
   abbinaManuale,
@@ -64,6 +67,7 @@ async function clienteDellaPratica(tenantId: string, progettoId: string): Promis
 
 // ─── PROGETTI, COMUNICAZIONI, TIMESHEET, CHECKLIST & ESECUZIONE ─────
 export async function registraRotteProgetti(server: FastifyInstance, app: AppPort): Promise<void> {
+  await registraRottaScontoProgetto(server);
   // Comunicazioni Progetto API (Multicanale Ingestion)
   server.get<{ Params: { id: string } }>('/progetti/:id/comunicazioni', async (req, reply) => {
     if (req.ruolo === 'cliente') {
@@ -582,7 +586,11 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         return reply.code(404).send({ errore: `Progetto ${id} non trovato` });
       }
     }
-    return reply.send(progettoPerRuolo({ ...dbProj, avanzamento: calcolaAvanzamento(dbProj) }, req.ruolo));
+    // Gli importi proposti in fattura (listino, sconto) li calcola il server e la pagina li legge;
+    // al cliente non vanno né quelli né il listino degli articoli. Poi la proiezione per ruolo
+    // toglie i segreti a tutti e, al cliente, il lavoro interno dello studio.
+    const letto = req.ruolo === 'cliente' ? senzaListino(dbProj) : conImportiProposti(dbProj);
+    return reply.send(progettoPerRuolo({ ...letto, avanzamento: calcolaAvanzamento(dbProj) }, req.ruolo));
   });
 
   // §1.1 (docs/storico/PIANO_DI_MIGLIORAMENTO.md) — l'eliminazione transazionale esisteva già
@@ -883,7 +891,8 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
         });
       }
 
-      const righe = risolviRigheDistinta(template.righeDistinta);
+      const form = await formDegliArticoli(prisma, tenantId, template.righeDistinta.map((r) => r.articolo.formMasterId));
+      const righe = risolviRigheDistinta(template.righeDistinta, form);
       if (righe.length === 0) {
         return reply.code(409).send({
           errore:
@@ -920,19 +929,7 @@ export async function registraRotteProgetti(server: FastifyInstance, app: AppPor
               },
             });
             for (const passaggio of passaggi) {
-              await tx.passaggioProgetto.create({
-                data: {
-                  tenantId,
-                  microvoceProgettoId: creata.id,
-                  titolo: passaggio.titolo,
-                  tipo: passaggio.tipo,
-                  chi: passaggio.chi,
-                  ordine: passaggio.ordine,
-                  descrizione: passaggio.descrizione,
-                  campiFormJson: passaggio.campiFormJson as never,
-                  stato: 'pending',
-                },
-              });
+              await creaPassaggioDaTemplate(tx, { tenantId, microvoceProgettoId: creata.id }, passaggio);
             }
           }
 

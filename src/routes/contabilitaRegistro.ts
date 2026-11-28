@@ -13,6 +13,7 @@ import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util
 import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
 import { moduloKycAttivo } from '../util/guardiaModuli.js';
 import { messaggioBloccoKyc, operativitaBloccataDaKyc } from '../services/kycGate.js';
+import { rifiutoDatiClienteMancanti } from '../domain/datiFiscaliCliente.js';
 
 export async function registraRotteContabilitaRegistro(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── COMPATIBILITÀ ROTTE PRECEDENTI ────────────────────────────────
@@ -59,6 +60,16 @@ export async function registraRotteContabilitaRegistro(server: FastifyInstance, 
           return reply.code(409).send({ errore: messaggioBloccoKyc(gate, 'La fatturazione') });
         }
       }
+    }
+    // Senza i dati fiscali del cliente la fattura non parte (titolare, 28/11/2026): il rifiuto
+    // elenca cosa manca e nomina il cliente, così la pagina porta alla sua scheda.
+    if (prog.clienteId) {
+      const cliente = await prisma.cliente.findFirst({
+        where: { id: prog.clienteId, tenantId: req.tenantId },
+        select: { id: true, nome: true, piva: true, codiceFiscale: true, sedeLegale: true, indirizzoResidenza: true },
+      });
+      const rifiuto = rifiutoDatiClienteMancanti(cliente, req.body?.tipoClienteFiscale ?? 'business_italia');
+      if (rifiuto) return reply.code(409).send(rifiuto);
     }
     try {
       // La numerazione dentro l'adapter non gira in Serializable: con due

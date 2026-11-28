@@ -18,7 +18,8 @@ export interface Cliente {
   sdiCode?: string;
   codiceSdi?: string;
   iban?: string;
-  rischioAml?: 'basso' | 'medio' | 'alto';
+  /** «non_valutato» finché una persona non sceglie la classe (titolare, 28/11/2026). */
+  rischioAml?: 'non_valutato' | 'basso' | 'medio' | 'alto';
   ubo?: string;
   fontePatrimonio?: string;
   dataKyc?: string;

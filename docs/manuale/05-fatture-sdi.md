@@ -13,9 +13,15 @@ tracciato **XML SdI** (FatturaPA).
   riepilogo (emesso/incassato/sospeso/NC).
 
 ## 📐 Calcoli & logica
-- **Importo proposto per ogni voce** nel compositore = prezzo del modulo diviso per il numero delle sue
-  voci, con l'etichetta «ripartito dal modulo»; l'operatore lo può cambiare. Un modulo senza prezzo
-  lascia le voci con «importo mancante», da scrivere a mano prima di emettere.
+- **Importo proposto per ogni voce** nel compositore = **prezzo di listino** del suo articolo
+  (etichetta «da listino»). Se il modulo ha un prezzo a pacchetto diverso dalla somma dei listini,
+  il prezzo del modulo è ripartito **in proporzione al listino** («in proporzione al listino»), al
+  centesimo: la somma delle voci è sempre il prezzo del modulo. Se gli articoli non hanno listino,
+  in parti uguali («parti uguali»). Lo calcola il server; l'operatore lo può cambiare. Un modulo
+  senza prezzo lascia le voci con «importo mancante», da scrivere a mano prima di emettere.
+- **Sconto del progetto** (§01): si toglie da ogni modulo in proporzione al suo prezzo, quindi gli
+  importi proposti sono già al netto; la fattura emessa dal progetto porta la nota «Sconto concordato
+  sul progetto: X su Y», che esce nel PDF.
 - **Numerazione progressiva per serie e per anno**: il progressivo è `max(numeroProgressivoSerie) +
   1` fra le fatture **emesse nell'anno in corso**, quindi riparte da `001` a ogni gennaio (art. 21
   DPR 633/72): la prima fattura del 2027 è `FT-2027/001`, non `FT-2027/043`. Un indice UNIQUE
@@ -46,6 +52,7 @@ tracciato **XML SdI** (FatturaPA).
 - **Impostazioni** (§16): l'anagrafica dello studio — senza i sei dati obbligatori l'XML non si compone.
 
 ## ⚠️ Stati limite & errori
+- **Mancano i dati del cliente** → la fattura **non si emette** (409), dal progetto, dal registro e dal canone Retainer: il messaggio elenca cosa manca e il pulsante porta alla scheda del cliente. Servono **partita IVA o codice fiscale** (ne basta uno; non richiesti al cliente estero) e un **indirizzo** (sede legale o residenza). Non è stato emesso niente e nessun numero è stato usato. La nota di credito non è bloccata: corregge un documento già uscito.
 - Incassare una rata **stornata** → **409**.
 - `PUT /invoices/:id` atomico (niente stati incoerenti).
 - SdI scartata: ritrasmissione (scarto tecnico) **o** NC + riemissione (scarto di contenuto) — la UI guida.
@@ -54,6 +61,8 @@ tracciato **XML SdI** (FatturaPA).
 - Rotte: `src/routes/contabilitaRegistro.ts` (`GET /invoices`, filtri+periodo+riepilogo),
   `contabilitaFatture.ts` (emissione/NC), `contabilitaSdi.ts` (SdI). Motore: `services/fatturaEngine.ts`,
   `mappaturaFatturaSdi.ts`, `sdiXmlGenerator.ts`.
+- Dati del cliente per fatturare: `domain/datiFiscaliCliente.ts` (puro, usato dalle tre rotte che emettono);
+  in pagina `components/contabilita/DatiClienteMancanti.tsx`.
 - Frontend: `pages/InvoicesPage.tsx`.
 - Schema: `Fattura` (`tipoDocumento`, `serie`, `numeroProgressivoSerie`, `data`, `statoSdi`,
   `fatturaOrigineId`), `FatturaRiga`, `ScadenzaIncasso`.

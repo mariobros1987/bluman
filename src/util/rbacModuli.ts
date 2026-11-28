@@ -109,6 +109,8 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   // reference-data condivise (giurisdizioni) restano fuori dalla mappa per non rompere il wizard.
   ['/moduli-template', 'library'],
   ['/articoli', 'library'],
+  // I form che il cliente compila per un articolo (titolare, 28/11/2026): sono Libreria.
+  ['/form-master', 'library'],
   ['/reports', 'reports'],
   ['/audit-logs', 'audit'],
 ];

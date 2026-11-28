@@ -13,6 +13,7 @@ import { registraRotteContabilitaPrimaNota } from './contabilitaPrimaNota.js';
 import { registraRotteContabilitaRegistro } from './contabilitaRegistro.js';
 import { registraRotteContabilitaScadenzario } from './contabilitaScadenzario.js';
 import { registraRotteContabilitaSdi } from './contabilitaSdi.js';
+import { registraRotteContabilitaStornoIncasso } from './contabilitaStornoIncasso.js';
 import { registraRotteContabilitaWebhookSdi } from './contabilitaWebhookSdi.js';
 
 export async function registraRotteContabilita(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -30,6 +31,8 @@ export async function registraRotteContabilita(server: FastifyInstance, app: App
 
   // ─── SCADENZARIO & REGISTRAZIONE INCASSI CON PRIMA NOTA AUTOMATICA ──
   await registraRotteContabilitaScadenzario(server, app);
+  // ─── STORNO DI UN INCASSO (riga contraria, rata riaperta, traccia) ──
+  await registraRotteContabilitaStornoIncasso(server);
 
   // ─── PRIMA NOTA INTEGRATA A DATABASE (ZERO LOCALSTORAGE) ───────────
   await registraRotteContabilitaPrimaNota(server, app);

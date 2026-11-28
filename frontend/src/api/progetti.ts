@@ -476,6 +476,18 @@ export async function ricalcolaProgettoApi(progettoId: string) {
   return await res.json();
 }
 
+/** Scrive lo sconto concordato sul progetto (centesimi); il server ricalcola e salva il valore. */
+export async function salvaScontoProgettoApi(progettoId: string, scontoCentesimi: number) {
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/sconto`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ scontoCentesimi }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel salvataggio dello sconto'));
+  invalidateCache('progett');
+  return await res.json();
+}
+
 /**
  * Salva su database lo stato del progetto modificato dall'operatore.
  *

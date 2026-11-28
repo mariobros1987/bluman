@@ -7,9 +7,10 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
 vi.mock('../components/NewProjectWizard', () => ({ NewProjectWizard: () => null }));
 vi.mock('../api/client', async () => ({
   fetchProgetti: vi.fn(),
-  // Il riquadro «Da fare oggi» legge rate e fatture d'acquisto: qui non interessano.
+  // Il riquadro «Da fare oggi» legge rate, fatture d'acquisto e contratti Retainer: qui non interessano.
   fetchScadenzarioIncassiApi: vi.fn(async () => []),
   fetchFattureRicevuteApi: vi.fn(async () => []),
+  fetchContrattiRicorrentiApi: vi.fn(async () => []),
   isRispostaPaginata: (await import('../api/paginazione')).isRispostaPaginata,
 }));
 

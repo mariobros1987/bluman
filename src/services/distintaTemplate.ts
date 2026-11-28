@@ -12,6 +12,7 @@ import type {
   PassaggioTemplateInput,
   RigaDistintaConArticolo,
 } from './istanziazionePort.js';
+import { passaggioDelForm, type FormDellArticolo } from '../domain/formArticolo.js';
 
 /**
  * La forma minimale di una riga di `riga_distinta` con l'articolo e i suoi passaggi, come la
@@ -29,6 +30,8 @@ export interface RigaDistintaGrezza {
     nome: string;
     oreDefault: number;
     prezzoDefault: number;
+    /** Il form che il cliente compila per questo articolo (titolare, 28/11/2026). */
+    formMasterId?: string | null;
     passaggiTemplate: Array<{
       titolo: string;
       tipo: PassaggioTemplateInput['tipo'];
@@ -43,18 +46,17 @@ export interface RigaDistintaGrezza {
 /**
  * Applica gli override della riga sui default dell'articolo e ordina i passaggi. Gli override
  * sono `??` e non `||`: lo zero è un valore scelto («ore incluse: 0»), non un'assenza.
+ *
+ * `form` sono i form dello studio nominati dagli articoli (`formDegliArticoli`): l'articolo che
+ * ne indica uno porta, in coda ai suoi passaggi, quello in cui il cliente lo compila. Un form
+ * che non c'è più non fa nascere niente.
  */
-export function risolviRigheDistinta(righe: readonly RigaDistintaGrezza[]): RigaDistintaConArticolo[] {
-  return righe.map((r) => ({
-    id: r.id,
-    articoloId: r.articoloId,
-    articoloVersione: r.articoloVersione,
-    articoloNome: r.articolo.nome,
-    quantita: r.quantita,
-    ordine: r.ordine,
-    oreEffettive: r.overrideOre ?? r.articolo.oreDefault,
-    prezzoEffettivo: r.overridePrezzo ?? r.articolo.prezzoDefault,
-    passaggi: [...r.articolo.passaggiTemplate]
+export function risolviRigheDistinta(
+  righe: readonly RigaDistintaGrezza[],
+  form: ReadonlyMap<string, FormDellArticolo> = new Map(),
+): RigaDistintaConArticolo[] {
+  return righe.map((r) => {
+    const passaggi: PassaggioTemplateInput[] = [...r.articolo.passaggiTemplate]
       .sort((a, b) => a.ordine - b.ordine)
       .map((p) => ({
         titolo: p.titolo,
@@ -63,8 +65,24 @@ export function risolviRigheDistinta(righe: readonly RigaDistintaGrezza[]): Riga
         ordine: p.ordine,
         descrizione: p.descrizione,
         campiFormJson: p.campiFormJson,
-      })),
-  }));
+      }));
+    const formArticolo = r.articolo.formMasterId ? form.get(r.articolo.formMasterId) : undefined;
+    if (formArticolo) {
+      const dopoLUltimo = passaggi.reduce((max, p) => Math.max(max, p.ordine), 0) + 1;
+      passaggi.push(passaggioDelForm(formArticolo, dopoLUltimo));
+    }
+    return {
+      id: r.id,
+      articoloId: r.articoloId,
+      articoloVersione: r.articoloVersione,
+      articoloNome: r.articolo.nome,
+      quantita: r.quantita,
+      ordine: r.ordine,
+      oreEffettive: r.overrideOre ?? r.articolo.oreDefault,
+      prezzoEffettivo: r.overridePrezzo ?? r.articolo.prezzoDefault,
+      passaggi,
+    };
+  });
 }
 
 export interface MicrovoceDaCreare {

@@ -18,4 +18,4 @@ export function valoreProgettoModificabile(moduli: ReadonlyArray<unknown> | null
 }
 
 export const SPIEGAZIONE_VALORE_DA_MODULI =
-  'Il valore dell’incarico è la somma dei prezzi dei suoi moduli: cambia quando si aggiunge o si toglie un modulo.';
+  'Il valore dell’incarico è la somma dei prezzi dei suoi moduli, meno lo sconto concordato: clicca per scrivere lo sconto.';

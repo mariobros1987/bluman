@@ -7,7 +7,6 @@ import {
   emettiNotaCreditoApi,
   ripresentaSdiApi,
   deleteInvoiceApi,
-  registraIncassoApi,
   downloadFatturaPdfServerApi,
   downloadFatturaXmlApi,
   inviaFatturaEmailApi,
@@ -20,6 +19,8 @@ import {
 import { fmt } from '../utils';
 import { calcolaTotaliAnteprimaFattura } from '../utils/fatturazione';
 import { EsportaFascicoloCommercialistaModal } from '../components/contabilita/EsportaFascicoloCommercialistaModal';
+import { RegistraIncassoModal } from '../components/contabilita/RegistraIncassoModal';
+import { useDatiClienteMancanti } from '../components/contabilita/DatiClienteMancanti';
 import { Paginatore } from '../components/ui/Paginatore';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import { usePeriodo } from '../context/PeriodoContext';
@@ -39,6 +40,7 @@ const RIEPILOGO_INIZIALE: RiepilogoFatture = { totaleEmessoCentesimi: 0, totaleI
 
 export function InvoicesPage() {
   const toast = useToast();
+  const datiCliente = useDatiClienteMancanti();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
@@ -98,10 +100,6 @@ export function InvoicesPage() {
 
   // Form Incasso Rata State
   const [selectedScadenza, setSelectedScadenza] = useState<any>(null);
-  const [importoIncassoEur, setImportoIncassoEur] = useState('');
-  const [metodoIncasso, setMetodoIncasso] = useState('bonifico');
-  const [croIncasso, setCroIncasso] = useState('');
-  const [noteIncasso, setNoteIncasso] = useState('');
 
   // Form Nota di Credito State
   const [motivoNc, setMotivoNc] = useState('annullo_totale');
@@ -259,6 +257,8 @@ export function InvoicesPage() {
       await loadData();
       toast.successo(emettiSubito ? 'Fattura emessa definitivamente con successo!' : 'Bozza salvata con successo nel registro!');
     } catch (err: any) {
+      // La bozza è stata salvata, l'emissione no: si chiude il modulo e la bozza resta nel registro.
+      if (datiCliente.intercetta(err)) { setShowCreateModal(false); await loadData(); return; }
       toast.errore(`Errore salvataggio fattura: ${err.message}`);
     } finally {
       setSubmitting(false);
@@ -272,6 +272,7 @@ export function InvoicesPage() {
       await loadData();
       toast.successo('Fattura emessa con successo!');
     } catch (err: any) {
+      if (datiCliente.intercetta(err)) return;
       toast.errore(`Errore: ${err.message}`);
     }
   };
@@ -321,29 +322,6 @@ export function InvoicesPage() {
       toast.successo('Nota di credito (TD04) emessa con successo!');
     } catch (err: any) {
       toast.errore(`Errore emissione nota di credito: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRegistraIncasso = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedScadenza || !importoIncassoEur) return;
-    const importoCent = Math.round(parseFloat(importoIncassoEur) * 100);
-
-    setSubmitting(true);
-    try {
-      await registraIncassoApi(selectedScadenza.id, {
-        importoIncassatoCentesimi: importoCent,
-        metodoPagamento: metodoIncasso,
-        riferimentoTransazione: croIncasso || undefined,
-        noteOperatore: noteIncasso || undefined,
-      });
-      setShowIncassoModal(false);
-      await loadData();
-      toast.successo('Incasso registrato con successo e movimento scritto automaticamente in Prima Nota!');
-    } catch (err: any) {
-      toast.errore(`Errore registrazione incasso: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -634,7 +612,6 @@ export function InvoicesPage() {
                                     const scadAperta = inv.scadenzeIncasso.find((s: any) => s.stato !== 'incassato') || inv.scadenzeIncasso[0];
                                     setSelectedInvoice(inv);
                                     setSelectedScadenza(scadAperta);
-                                    setImportoIncassoEur(((scadAperta.importoCentesimi || 0) / 100).toFixed(2));
                                     setShowIncassoModal(true);
                                   }}
                                   className="btn btn-success btn-sm"
@@ -995,89 +972,13 @@ export function InvoicesPage() {
         </Modal>
       )}
 
-      {/* MODAL REGISTRAZIONE INCASSO RATA */}
+      {/* MODAL REGISTRAZIONE INCASSO RATA: lo stesso dello Scadenzario, con data e conto obbligatorio */}
       {showIncassoModal && selectedScadenza && (
-        <Modal onClose={() => setShowIncassoModal(false)} zIndex={1000} overlayBackground="rgba(0,0,0,0.7)" labelledBy="incasso-rata-titolo">
-          {(richiediChiusura) => (
-          <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480, border: '1px solid var(--border)' }}>
-            <h3 id="incasso-rata-titolo" style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1.25rem 0' }}>
-              Fattura: <strong>{selectedInvoice?.numero}</strong> | Cliente: <strong>{selectedInvoice?.cliente?.nome}</strong>
-            </p>
-
-            <form onSubmit={handleRegistraIncasso} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label htmlFor="inv-incasso-importo" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo Incassato (€) *</label>
-                <input
-                  id="inv-incasso-importo"
-                  type="number"
-                  step="0.01"
-                  required
-                  value={importoIncassoEur}
-                  onChange={(e) => setImportoIncassoEur(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 16, fontWeight: 700 }}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="inv-incasso-metodo" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Incasso</label>
-                <select
-                  id="inv-incasso-metodo"
-                  value={metodoIncasso}
-                  onChange={(e) => setMetodoIncasso(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                >
-                  <option value="bonifico">Bonifico Bancario</option>
-                  <option value="carta">Carta di Credito</option>
-                  <option value="contanti">Contanti</option>
-                  <option value="assegno">Assegno</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="inv-incasso-cro" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CRO / Riferimento Transazione Bancaria</label>
-                <input
-                  id="inv-incasso-cro"
-                  type="text"
-                  placeholder="Es. CRO-123456789"
-                  value={croIncasso}
-                  onChange={(e) => setCroIncasso(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="inv-incasso-note" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operatore (Opzionale)</label>
-                <input
-                  id="inv-incasso-note"
-                  type="text"
-                  placeholder="Es. Ricevuta bonifico verificata..."
-                  value={noteIncasso}
-                  onChange={(e) => setNoteIncasso(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  onClick={richiediChiusura}
-                  className="btn btn-secondary"
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="btn btn-success"
-                >
-                  {submitting ? 'Registrazione...' : 'Conferma Incasso & Scrivi in Prima Nota'}
-                </button>
-              </div>
-            </form>
-          </div>
-          )}
-        </Modal>
+        <RegistraIncassoModal
+          rata={{ ...selectedScadenza, fattura: selectedInvoice }}
+          onClose={() => setShowIncassoModal(false)}
+          onRegistrato={loadData}
+        />
       )}
 
       {/* MODAL NOTA DI CREDITO */}
@@ -1183,6 +1084,7 @@ export function InvoicesPage() {
         isOpen={showExportFascicoloZipModal}
         onClose={() => setShowExportFascicoloZipModal(false)}
       />
+      {datiCliente.modale}
     </div>
   );
 }

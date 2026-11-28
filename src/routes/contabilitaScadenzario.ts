@@ -12,6 +12,7 @@ import { creaMovimentoConSaldo } from '../services/primaNotaMovimento.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { RegistraIncassoSchema } from '../schemas/contabilita.schema.js';
 import { leggiIntervalloData, filtroData } from '../util/intervalloData.js';
+import { fatturaSaldata, statoRataDaIncassato, totaleIncassatoCentesimi } from '../domain/stornoIncasso.js';
 
 /** Il giorno di calendario a Roma come `AAAA-MM-GG`: confrontabile come stringa. */
 function giornoARoma(data: Date): string {
@@ -75,6 +76,17 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
     if (giornoARoma(dataIncasso) > giornoARoma(new Date())) {
       return reply.code(400).send({ errore: "La data dell'incasso non può essere futura" });
     }
+    // Il conto è obbligatorio (titolare, 28/11/2026): prima, senza, il server sceglieva quello
+    // della fattura o il predefinito, e senza conti il movimento restava fuori da ogni saldo.
+    if (!contoBancarioId) {
+      const haConti = await prisma.contoBancario.findFirst({ where: { tenantId }, select: { id: true } });
+      return haConti
+        ? reply.code(400).send({ errore: 'Indica il conto su cui è entrato il denaro.', codice: 'CONTO_OBBLIGATORIO' })
+        : reply.code(409).send({
+            errore: 'Lo studio non ha ancora un conto: creane uno in Banche e conti, poi registra l’incasso.',
+            codice: 'NESSUN_CONTO',
+          });
+    }
 
     try {
       // L'incasso è UNA sola operazione contabile: registrazione, stato della
@@ -98,6 +110,13 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
               });
               if (!scadenza) return { nonTrovata: true as const };
 
+              // Il conto deve essere dello studio: un id qualunque non diventa un saldo.
+              const conto = await tx.contoBancario.findFirst({
+                where: { id: contoBancarioId, tenantId },
+                select: { id: true },
+              });
+              if (!conto) return { contoNonTrovato: true as const };
+
               // Guardia (audit 21/09/2026): non si incassa su una fattura ANNULLATA (stornata
               // con Nota di Credito). Senza questo controllo il passo 3 riportava la fattura da
               // 'annullata' a 'emessa'/'incassata', "resuscitandola".
@@ -114,10 +133,7 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
 
               // Tetto all'over-incasso: l'importo non può superare il residuo della rata,
               // altrimenti si gonfia il saldo conto oltre il dovuto senza alcuna segnalazione.
-              const giaIncassatoRata = scadenza.registrazioniRegistrate.reduce(
-                (acc, r) => acc + r.importoIncassatoCentesimi,
-                0,
-              );
+              const giaIncassatoRata = totaleIncassatoCentesimi(scadenza.registrazioniRegistrate);
               const residuoRataCent = scadenza.importoCentesimi - giaIncassatoRata;
               if (importoIncassatoCentesimi > residuoRataCent) {
                 return { eccedeResiduo: true as const, residuoRataCent };
@@ -139,7 +155,7 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
 
               // 2. Aggiorna stato della rata
               const totaleIncassatoRata = giaIncassatoRata + importoIncassatoCentesimi;
-              const nuovoStatoScadenza = totaleIncassatoRata >= scadenza.importoCentesimi ? 'incassato' : 'parziale';
+              const nuovoStatoScadenza = statoRataDaIncassato(scadenza.importoCentesimi, totaleIncassatoRata);
 
               await tx.scadenzaIncasso.update({
                 where: { id },
@@ -154,28 +170,16 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
               // rata stornata perché la fattura non risultasse mai incassata. Saldata = ogni rata
               // incassata o stornata, e almeno una incassata (tutte stornate non è un incasso).
               const statiRate = tutteScadenzeFattura.map((s) => (s.id === id ? nuovoStatoScadenza : s.stato));
-              const tutteSaldate =
-                statiRate.every((st) => st === 'incassato' || st === 'stornata') && statiRate.includes('incassato');
+              const tutteSaldate = fatturaSaldata(statiRate);
 
               await tx.fattura.update({
                 where: { id: scadenza.fatturaId },
                 data: { stato: tutteSaldate ? 'incassata' : 'emessa' },
               });
 
-              // 4. Il conto su cui entra il denaro, deciso **una volta sola** — e poi usato sia dal
-              // movimento sia dal saldo. Prima il movimento prendeva `contoBancarioId` della
-              // fattura (che può essere nullo) e il saldo, quando quello mancava, finiva sul conto
-              // predefinito: il denaro entrava in un conto che nessuna riga nominava.
-              const contoIncasso =
-                contoBancarioId ||
-                scadenza.fattura.contoAccreditoId ||
-                (
-                  await tx.contoBancario.findFirst({
-                    where: { tenantId, isDefault: true },
-                    select: { id: true },
-                  })
-                )?.id ||
-                null;
+              // 4. Il conto su cui entra il denaro è quello indicato dall'operatore, verificato
+              // sopra: movimento e saldo nominano lo stesso conto, e nessuno lo sceglie al suo posto.
+              const contoIncasso = conto.id;
 
               // 5. Movimento in Prima Nota e accredito del saldo: un atto solo
               // (`services/primaNotaMovimento.ts`).
@@ -185,6 +189,8 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
                   contoBancarioId: contoIncasso,
                   fatturaId: scadenza.fatturaId,
                   clienteId: scadenza.fattura.clienteId,
+                  // Il movimento nomina il suo incasso: è ciò che permette lo storno.
+                  registrazioneIncassoId: registrazione.id,
                   data: dataIncasso,
                   tipo: 'entrata',
                   categoria: 'incasso_fattura',
@@ -204,6 +210,9 @@ export async function registraRotteContabilitaScadenzario(server: FastifyInstanc
 
       if ('nonTrovata' in esito) {
         return reply.code(404).send({ errore: 'Scadenza incasso non trovata' });
+      }
+      if ('contoNonTrovato' in esito) {
+        return reply.code(400).send({ errore: 'Il conto indicato non esiste fra i conti dello studio.' });
       }
       if ('fatturaAnnullata' in esito) {
         return reply.code(409).send({

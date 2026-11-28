@@ -60,6 +60,8 @@ export interface ConfigFirmaModalState {
      * Il server lo copia sul documento e lo fa rispettare al momento della firma (409 onesto).
      */
     livelloFirmaRichiesto: 'ses' | 'fea' | 'feq';
+    /** Il livello del modello scelto: è il minimo, si alza e non si abbassa (titolare, 28/11/2026). */
+    livelloFirmaMinimo?: 'ses' | 'fea' | 'feq';
     metodoFirma: 'fea_otp' | 'manuale_scansionata' | 'qualificata_esterna' | 'tutte';
     statoDoc: 'bozza' | 'pubblicato';
     dataScadenzaDoc: string;

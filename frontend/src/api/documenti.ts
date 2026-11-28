@@ -142,6 +142,10 @@ export async function salvaDocumentoApi(input: {
   tipo?: 'template_vuoto' | 'compilato' | 'firmato' | 'allegato' | 'verbale_firma';
   /** Piano firma §3 — livello richiesto (ses|fea|feq); se assente il server usa 'ses'. */
   livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
+  /** Il modello dello studio da cui il documento nasce: il suo livello è il minimo (409 sotto). */
+  modelloId?: string;
+  /** Il minimo di un modello standard della pagina, che il server non ha a database. */
+  livelloFirmaMinimo?: 'ses' | 'fea' | 'feq';
 }): Promise<DocumentoProgetto> {
   const res = await apiFetch(`${API_BASE}/documenti`, {
     method: 'POST',
@@ -173,6 +177,8 @@ export async function generaDocumentoApi(input: {
   dataScadenzaDoc?: string;
   /** Piano firma §3 — se assente, il server eredita il livello del template (default 'ses'). */
   livelloFirmaRichiesto?: 'ses' | 'fea' | 'feq';
+  /** Il livello del modello standard da cui si genera: è il minimo (409 sotto). */
+  livelloFirmaMinimo?: 'ses' | 'fea' | 'feq';
 }): Promise<DocumentoProgetto & { campiMancanti: string[] }> {
   const res = await apiFetch(`${API_BASE}/documenti/genera`, {
     method: 'POST',

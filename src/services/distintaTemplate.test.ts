@@ -48,6 +48,23 @@ describe('risolviRigheDistinta', () => {
     expect(r!.oreEffettive).toBe(4);
     expect(r!.prezzoEffettivo).toBe(50000);
   });
+
+  // Titolare, 28/11/2026 — il form indicato sull'articolo diventa un passaggio per il cliente.
+  it('l\'articolo con un form porta in coda il passaggio in cui il cliente lo compila', () => {
+    const form = new Map([['f-1', { id: 'f-1', nome: 'Dati societari', campi: ['Ragione sociale', 'IBAN'] }]]);
+    const base = riga();
+    const [r] = risolviRigheDistinta([{ ...base, articolo: { ...base.articolo, formMasterId: 'f-1' } }], form);
+    expect(r!.passaggi.map((p) => p.titolo)).toEqual(['Primo', 'Secondo', 'Compila il form «Dati societari»']);
+    expect(r!.passaggi.at(-1)).toMatchObject({ tipo: 'form', chi: 'cliente', ordine: 3, formMasterId: 'f-1', campiFormJson: ['Ragione sociale', 'IBAN'] });
+  });
+
+  it('un form che non c\'è più, o nessun form, non fa nascere niente', () => {
+    const base = riga();
+    const [senzaForm] = risolviRigheDistinta([base], new Map());
+    const [formSparito] = risolviRigheDistinta([{ ...base, articolo: { ...base.articolo, formMasterId: 'f-sparito' } }], new Map());
+    expect(senzaForm!.passaggi).toHaveLength(2);
+    expect(formSparito!.passaggi).toHaveLength(2);
+  });
 });
 
 describe('microvociDaDistinta', () => {

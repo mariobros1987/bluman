@@ -5,10 +5,10 @@
 // non diventa «niente da fare».
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchScadenzarioIncassiApi, fetchFattureRicevuteApi } from '../../api/client';
+import { fetchScadenzarioIncassiApi, fetchFattureRicevuteApi, fetchContrattiRicorrentiApi } from '../../api/client';
 import { getUserPermission } from '../../utils/rbac';
 import { fmt } from '../../utils';
-import { vociDaFare, type FatturaAcquistoPerDaFare, type RataPerDaFare } from '../../utils/daFareOggi';
+import { vociDaFare, type ContrattoPerDaFare, type FatturaAcquistoPerDaFare, type RataPerDaFare } from '../../utils/daFareOggi';
 
 const COLORI: Record<'urgente' | 'presto' | 'info', { bg: string; fg: string; bordo: string; icona: string }> = {
   urgente: { bg: 'var(--pill-red-bg)', fg: 'var(--pill-red-fg)', bordo: 'var(--pill-red-bd)', icona: '⚠' },
@@ -20,11 +20,13 @@ export function DaFareOggi({ user, moduliInRitardo }: { user: unknown; moduliInR
   const navigate = useNavigate();
   const [rate, setRate] = useState<RataPerDaFare[] | null>(null);
   const [fatture, setFatture] = useState<FatturaAcquistoPerDaFare[] | null>(null);
+  const [contratti, setContratti] = useState<ContrattoPerDaFare[] | null>(null);
   const [nonLetti, setNonLetti] = useState<string[]>([]);
   const [caricamento, setCaricamento] = useState(true);
 
   const vedeScadenzario = getUserPermission(user, 'scadenzario') !== 'denied';
   const vedeAcquisti = getUserPermission(user, 'invoices') !== 'denied';
+  const vedeRetainer = getUserPermission(user, 'retainers') !== 'denied';
 
   useEffect(() => {
     let annullato = false;
@@ -44,15 +46,22 @@ export function DaFareOggi({ user, moduliInRitardo }: { user: unknown; moduliInR
           .catch(() => { errori.push('le fatture d’acquisto'); }),
       );
     }
+    if (vedeRetainer) {
+      letture.push(
+        fetchContrattiRicorrentiApi({ rigettaSuErrore: true })
+          .then((r) => { if (!annullato) setContratti(Array.isArray(r) ? r : []); })
+          .catch(() => { errori.push('i contratti Retainer'); }),
+      );
+    }
     void Promise.all(letture).then(() => {
       if (annullato) return;
       setNonLetti(errori);
       setCaricamento(false);
     });
     return () => { annullato = true; };
-  }, [vedeScadenzario, vedeAcquisti]);
+  }, [vedeScadenzario, vedeAcquisti, vedeRetainer]);
 
-  const voci = vociDaFare({ oggi: new Date(), rate, fattureAcquisto: fatture, moduliInRitardo });
+  const voci = vociDaFare({ oggi: new Date(), rate, fattureAcquisto: fatture, contratti, moduliInRitardo });
 
   return (
     <section
@@ -69,7 +78,7 @@ export function DaFareOggi({ user, moduliInRitardo }: { user: unknown; moduliInR
         <>
           {voci.length === 0 && nonLetti.length === 0 && (
             <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-              Niente di urgente: nessuna rata scaduta o in scadenza, nessuna fattura d’acquisto da pagare, nessun modulo in ritardo.
+              Niente di urgente: nessuna rata scaduta o in scadenza, nessuna fattura d’acquisto da pagare, nessun canone Retainer da fatturare, nessun modulo in ritardo.
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

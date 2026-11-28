@@ -174,7 +174,7 @@ const bozza = (serie = 'FT') => ({
   data: new Date(2026, 5, 20),
   nettoAPagareCentesimi: 100000,
   condizionePagamento: 'bonifico_30gg',
-  cliente: { id: 'cli-1', nome: 'Alpha Corp', tipo: 'company', piva: '01234567890', codiceFiscale: '01234567890' },
+  cliente: { id: 'cli-1', nome: 'Alpha Corp', tipo: 'company', piva: '01234567890', codiceFiscale: '01234567890', sedeLegale: 'Via Roma 1, 20121 Milano' },
   righe: [],
   scadenzeIncasso: [],
 });
@@ -285,7 +285,7 @@ describe('la numerazione riparte a ogni gennaio', () => {
       frequenza: 'mensile',
       importoCentesimi: 100000,
       prossimaFatturazione: new Date(2027, 5, 1),
-      cliente: { id: 'cli-1', nome: 'Alpha Corp', tipo: 'company', piva: '01234567890', codiceFiscale: '01234567890' },
+      cliente: { id: 'cli-1', nome: 'Alpha Corp', tipo: 'company', piva: '01234567890', codiceFiscale: '01234567890', sedeLegale: 'Via Roma 1, 20121 Milano' },
       progetto: null,
     });
 
@@ -293,5 +293,38 @@ describe('la numerazione riparte a ogni gennaio', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().fattura.numero).toBe('FT-2027/001');
+  });
+
+  // Titolare, 28/11/2026: senza i dati fiscali del cliente la fattura non si emette. Stanno qui
+  // perché un rifiuto dopo la numerazione consumerebbe un progressivo che non si recupera.
+  it('emissione di una bozza con cliente senza indirizzo → 409 con l’elenco, e nessun numero assegnato', async () => {
+    vi.setSystemTime(new Date(2027, 5, 15, 10, 0, 0));
+    db.perId = bozza('FT');
+    db.perId.cliente = { ...db.perId.cliente, sedeLegale: null };
+
+    const res = await chiama('/invoices/f-bozza/emetti');
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({
+      codice: 'DATI_CLIENTE_MANCANTI', clienteId: 'cli-1', datiMancanti: ['indirizzo (sede legale o residenza)'],
+    });
+    expect(db.perId.stato).toBe('bozza');
+  });
+
+  it('canone da contratto con cliente senza partita IVA né codice fiscale → 409, il contratto non avanza', async () => {
+    vi.setSystemTime(new Date(2027, 5, 15, 10, 0, 0));
+    const prossima = new Date(2027, 5, 1);
+    db.contratti.set('c-1', {
+      id: 'c-1', tenantId: 't-1', clienteId: 'cli-1', progettoId: null, titolo: 'Retainer Advisory',
+      frequenza: 'mensile', importoCentesimi: 100000, prossimaFatturazione: prossima,
+      cliente: { id: 'cli-1', nome: 'Alpha Corp', tipo: 'company', piva: null, codiceFiscale: null, sedeLegale: 'Via Roma 1, 20121 Milano' },
+      progetto: null,
+    });
+
+    const res = await chiama('/contratti-ricorrenti/c-1/genera-fattura');
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json().datiMancanti).toEqual(['partita IVA (o codice fiscale)']);
+    expect(db.contratti.get('c-1').prossimaFatturazione).toBe(prossima);
   });
 });

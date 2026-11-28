@@ -20,6 +20,10 @@ L'anagrafica dei clienti dello studio (persone fisiche o società), pagina **Cli
 ## 📐 Calcoli & logica
 - Qui **non** si calcolano stati: il rischio AML e la due diligence vivono nel modulo **KYC** (§13);
   in anagrafica c'è solo la scheda/badge **Compliance**.
+- **Classe di rischio antiriciclaggio**: un cliente nuovo parte **«Non valutato»** (titolare,
+  28/11/2026). Il programma non propone una classe: la sceglie una persona nella scheda Compliance.
+  Prima il cliente nasceva «medio» e la scheda proponeva «basso»; i clienti che hanno già una classe
+  scritta la tengono, anche quando era quella messa in automatico (non si distingue da una scelta vera).
 - **Elenco paginato lato server**: ricerca testuale (nome, email, P.IVA, codice fiscale), filtro
   **tipo** (`company`/`individual`) e filtro **accesso al portale** (`con`/`senza`). I conteggi del
   riepilogo sono calcolati dal backend **dentro i filtri attivi**, così i quattro riquadri restano

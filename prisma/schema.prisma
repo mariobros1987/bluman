@@ -539,6 +539,9 @@ model Progetto {
   dataInizio              DateTime?      @map("data_inizio")
   dataScadenza            DateTime?      @map("data_scadenza")
   valoreTotale            Int            @map("valore_totale")
+  // Sconto concordato sul progetto, in centesimi (titolare, 28/11/2026): con moduli presenti
+  // `valoreTotale` = somma dei prezzi dei moduli − sconto, e lo scrive `services/valoreProgetto.ts`.
+  scontoCentesimi         Int            @default(0) @map("sconto_centesimi")
   giurisdizionePrimariaId String?        @map("giurisdizione_primaria_id")
   giurisdizionePrimaria   Giurisdizione? @relation(fields: [giurisdizionePrimariaId], references: [id])
   // §2.8 — numero progressivo della lettera d'incarico (EL-<anno>-<seq>), assegnato dal
@@ -818,6 +821,9 @@ model Documento {
   // documento. I generati lo ereditano dal template; per gli upload manuali lo sceglie
   // l'operatore alla pubblicazione. Cambiabile finché la firma non è apposta.
   livelloFirmaRichiesto String             @default("ses") @map("livello_firma_richiesto")
+  // Il livello del modello da cui il documento nasce (titolare, 28/11/2026): è il minimo, il
+  // livello richiesto si può alzare ma non scendere sotto. «ses» = nessun minimo.
+  livelloFirmaMinimo    String             @default("ses") @map("livello_firma_minimo")
   // Versioning: documentoPadreId punta alla riga v1 quando si carica una v2 corretta.
   documentoPadreId      String?            @map("documento_padre_id")
   documentoPadre        Documento?         @relation("VersioniDocumento", fields: [documentoPadreId], references: [id])
@@ -1134,6 +1140,13 @@ model RegistrazioneIncasso {
   metodoPagamento           MetodoPagamento  @default(bonifico) @map("metodo_pagamento")
   riferimentoTransazione    String?          @map("riferimento_transazione")
   noteOperatore             String?          @map("note_operatore")
+  // Storno (titolare, 28/11/2026): un incasso sbagliato non si cancella, si storna con una riga
+  // contraria (importo negativo) che punta all'incasso che annulla. La somma delle registrazioni
+  // di una rata resta così il suo incassato vero, e la riga originale resta leggibile.
+  stornoDiId                String?          @unique @map("storno_di_id")
+  stornoDi                  RegistrazioneIncasso?  @relation("StornoIncasso", fields: [stornoDiId], references: [id])
+  storno                    RegistrazioneIncasso?  @relation("StornoIncasso")
+  movimentiPrimaNota        MovimentoPrimaNota[]
 
   @@map("registrazione_incasso")
 }
@@ -1317,6 +1330,11 @@ model MovimentoPrimaNota {
   cliente           Cliente?         @relation(fields: [clienteId], references: [id], onDelete: SetNull)
   fornitoreId       String?          @map("fornitore_id")
   fornitore         Fornitore?       @relation(fields: [fornitoreId], references: [id], onDelete: SetNull)
+  // L'incasso (o lo storno) da cui il movimento è nato: senza questo legame lo storno non
+  // saprebbe da quale conto far uscire il denaro. Nullo per i movimenti scritti a mano e per
+  // gli incassi registrati prima del 28/11/2026.
+  registrazioneIncassoId String?               @map("registrazione_incasso_id")
+  registrazioneIncasso   RegistrazioneIncasso? @relation(fields: [registrazioneIncassoId], references: [id], onDelete: SetNull)
 
   data                   DateTime               @default(now())
   tipo                   TipoMovimentoPrimaNota @default(entrata)
@@ -1330,6 +1348,7 @@ model MovimentoPrimaNota {
 
   @@index([tenantId, data])
   @@index([tenantId, fatturaId])
+  @@index([registrazioneIncassoId])
   @@map("movimento_prima_nota")
 }
 

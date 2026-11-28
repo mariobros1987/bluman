@@ -73,8 +73,10 @@ export function Library() {
         n: a.nome,
         cat: a.categoria as CategoriaModulo,
         h: a.oreDefault,
-        p: a.prezzoDefault ? a.prezzoDefault / 100 : 500,
+        // Un articolo senza prezzo vale 0, non 500 inventati (regola 6).
+        p: (a.prezzoDefault ?? 0) / 100,
         ver: a.versione || 1,
+        formMasterId: a.formMasterId ?? null,
       }));
       // Solo articoli reali dal database: il vecchio merge con l'elenco mock
       // reiniettava voci di esempio anche quando il catalogo era già completo.
@@ -99,7 +101,7 @@ export function Library() {
             n: r.articolo.nome,
             cat: r.articolo.categoria as CategoriaModulo,
             h: r.articolo.oreDefault,
-            p: r.articolo.prezzoDefault ? r.articolo.prezzoDefault / 100 : 500,
+            p: (r.articolo.prezzoDefault ?? 0) / 100,
             ver: r.articolo.versione || 1,
           } : undefined,
           qty: r.quantita,

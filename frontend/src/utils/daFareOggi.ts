@@ -1,7 +1,8 @@
 // «Da fare oggi» sulla Dashboard: che cosa aspetta l'operatore, ricavato da dati che l'app ha già.
 //
 // Qui non si decide e non si calcola niente di contabile: si contano righe già scritte (rate non
-// incassate, fatture d'acquisto non pagate) e si dice dove andare a guardarle. «Oggi» arriva da
+// incassate, fatture d'acquisto non pagate, canoni Retainer arrivati alla data) e si dice dove
+// andare a guardarle. Il canone non si fattura da solo (titolare, 28/11/2026): qui lo si ricorda. «Oggi» arriva da
 // fuori, così la funzione si prova senza dipendere dall'orologio.
 
 export interface RataPerDaFare {
@@ -16,8 +17,14 @@ export interface FatturaAcquistoPerDaFare {
   totaleCentesimi: number | null;
 }
 
+export interface ContrattoPerDaFare {
+  stato: string;
+  prossimaFatturazione: string | null;
+  importoCentesimi: number | null;
+}
+
 export interface VoceDaFare {
-  chiave: 'rate_scadute' | 'rate_in_scadenza' | 'acquisti_da_pagare' | 'moduli_in_ritardo';
+  chiave: 'rate_scadute' | 'rate_in_scadenza' | 'acquisti_da_pagare' | 'moduli_in_ritardo' | 'canoni_da_fatturare';
   /** `urgente` = è già tardi; `presto` = scade a breve; `info` = da tenere d'occhio. */
   tono: 'urgente' | 'presto' | 'info';
   testo: string;
@@ -49,6 +56,8 @@ export function vociDaFare(dati: {
   /** `null` = non lette (permesso mancante o errore): la voce non si mostra, e non vale «zero». */
   rate: ReadonlyArray<RataPerDaFare> | null;
   fattureAcquisto: ReadonlyArray<FatturaAcquistoPerDaFare> | null;
+  /** I contratti Retainer; `null` o assente = non letti. */
+  contratti?: ReadonlyArray<ContrattoPerDaFare> | null;
   moduliInRitardo: number;
 }): VoceDaFare[] {
   const voci: VoceDaFare[] = [];
@@ -85,6 +94,22 @@ export function vociDaFare(dati: {
         testo: `${plurale(daPagare.length, 'fattura d’acquisto', 'fatture d’acquisto')} da pagare`,
         importoCentesimi: daPagare.reduce((t, f) => t + (f.totaleCentesimi ?? 0), 0),
         vaiA: '/fornitori', etichettaVaiA: 'Apri Fornitori e acquisti',
+      });
+    }
+  }
+
+  if (dati.contratti) {
+    // Un canone è da fatturare quando il contratto è attivo e la sua data è arrivata (oggi compreso).
+    const daFatturare = dati.contratti.filter((c) => {
+      const quando = giornoDaIso(c.prossimaFatturazione ?? '');
+      return c.stato === 'attivo' && !Number.isNaN(quando) && quando <= oggi;
+    });
+    if (daFatturare.length) {
+      voci.push({
+        chiave: 'canoni_da_fatturare', tono: 'presto',
+        testo: `${plurale(daFatturare.length, 'canone Retainer', 'canoni Retainer')} da fatturare`,
+        importoCentesimi: daFatturare.reduce((t, c) => t + (c.importoCentesimi ?? 0), 0),
+        vaiA: '/retainers', etichettaVaiA: 'Apri i Retainer',
       });
     }
   }

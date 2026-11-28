@@ -18,6 +18,7 @@ import { UploadSchema } from '../schemas/upload.schema.js';
 import { condizioneModuliPerGiurisdizione } from '../domain/giurisdizioni.js';
 import { leggiDaCacheOCalcola, invalidaCachePrefisso } from '../services/backendCache.js';
 import { livelloModuloUtente } from '../util/permessiModulo.js';
+import { registraRotteFormArticolo } from './formArticolo.js';
 
 /**
  * Le giurisdizioni si LEGGONO fuori matrice (servono al wizard di chiunque crei un progetto), ma
@@ -32,6 +33,7 @@ const ERRORE_GIURISDIZIONI = { errore: "Permesso insufficiente sul modulo 'libra
 
 // ─── ARTICOLI & PRESTAZIONI API (§Prisma Persistenza Cloud) ───────
 export async function registraRotteCatalogo(server: FastifyInstance, app: AppPort): Promise<void> {
+  await registraRotteFormArticolo(server);
   // ─── GIURISDIZIONI API (§8 Estensione) ───────────────────────────
   server.get('/giurisdizioni', async (req) => {
     const tenantId = req.tenantId;
@@ -255,43 +257,7 @@ export async function registraRotteCatalogo(server: FastifyInstance, app: AppPor
     },
   );
 
-  // Aggiornamento Prezzo & Ore Articolo (§Admin)
-  server.patch<{
-    Params: { id: string };
-    Body: { prezzoDefault?: number; oreDefault?: number; nome?: string };
-  }>('/articoli/:id', async (req, reply) => {
-    const { id } = req.params;
-    const { prezzoDefault, oreDefault, nome } = req.body;
-    const tenantId = req.tenantId;
-    try {
-      const updated = await prisma.articolo.update({
-        where: { id },
-        data: {
-          prezzoDefault: prezzoDefault !== undefined ? prezzoDefault : undefined,
-          oreDefault: oreDefault !== undefined ? oreDefault : undefined,
-          nome: nome !== undefined ? nome : undefined,
-        },
-      });
-      await recordAudit({
-        tenantId,
-        azione: 'ARTICOLO_AGGIORNATO',
-        entita: updated.nome,
-        dettagli: `Aggiornato prezzo (€${(updated.prezzoDefault || 0)/100}) e ore (${updated.oreDefault}h)`,
-        ipAddress: req.ip,
-      });
-      await invalidaCachePrefisso(`articoli:${tenantId}`);
-      await invalidaCachePrefisso(`moduli:${tenantId}`);
-      return reply.send(updated);
-    } catch (err: any) {
-      // §3.3 — il catch rispondeva { ok: true } anche quando l'aggiornamento non
-      // aveva toccato nessuna riga (id sbagliato, articolo di un altro tenant
-      // invisibile per RLS): la UI ringraziava e il dato restava com'era.
-      if (err?.code === 'P2025') {
-        return reply.code(404).send({ errore: 'Articolo non trovato' });
-      }
-      return reply.code(500).send({ errore: err?.message || 'Errore aggiornamento articolo' });
-    }
-  });
+  // La modifica di un articolo (`PATCH /articoli/:id`) sta in `formArticolo.ts`, con il suo form.
 
   server.post<{
     Body: {

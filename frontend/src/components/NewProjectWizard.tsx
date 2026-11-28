@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { CatBadge } from './ui/CatBadge';
+import { AvvisoDipendenzeMancanti } from './wizard/AvvisoDipendenzeMancanti';
 import { fmt, moduloH, moduloP, resolveRighe } from '../utils';
 import type { Cliente, Giurisdizione, ModuloTemplate, CategoriaModulo } from '../types';
 import { fetchClienti, fetchGiurisdizioniApi, fetchModuliLibreria, creaClienteApi, creaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
@@ -459,6 +460,7 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
             {/* STEP 2: Selezione Moduli a Cascata */}
             {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <AvvisoDipendenzeMancanti scelti={selModules} libreria={moduliList} onAggiungi={toggleMod} />
                 {/* 1. Moduli specifici giurisdizione */}
                 {selectedGiurObj && (
                   <div>
@@ -592,6 +594,8 @@ export function NewProjectWizard({ onClose, onProjectCreated }: NewProjectWizard
                     </div>
                   ))}
                 </div>
+
+                <AvvisoDipendenzeMancanti scelti={selModules} libreria={moduliList} onAggiungi={toggleMod} />
 
                 {vociInPiuModuli.length > 0 && (
                   <div style={{ background: 'var(--pill-blue-bg)', color: 'var(--pill-blue-fg)', border: '1px solid var(--indigo)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, fontSize: 11.5, lineHeight: 1.5 }}>

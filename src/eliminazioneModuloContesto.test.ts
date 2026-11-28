@@ -37,6 +37,8 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
       },
     },
     progetto: {
+      // Il riallineamento legge lo sconto del progetto prima di riscrivere il valore (28/11).
+      findUnique: async () => ({ scontoCentesimi: 0 }),
       update: async (args: any) => {
         stato.eventi.push(`progetto.update:valoreTotale=${args.data.valoreTotale}`);
         return {};

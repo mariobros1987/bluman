@@ -15,6 +15,7 @@ import {
 } from '../services/fatturaEngine.js';
 import { recordAudit } from '../util/serverHelpers.js';
 import { CreaContrattoRicorrenteSchema } from '../schemas/contabilita.schema.js';
+import { rifiutoDatiClienteMancanti } from '../domain/datiFiscaliCliente.js';
 
 export async function registraRotteContabilitaContratti(server: FastifyInstance, app: AppPort): Promise<void> {
   // ─── CONTRATTI RICORRENTI & RETAINER ───────────────────────────────
@@ -92,6 +93,10 @@ export async function registraRotteContabilitaContratti(server: FastifyInstance,
       });
 
       if (!contratto) return reply.code(404).send({ errore: 'Contratto non trovato' });
+
+      // Il canone nasce già emesso: senza i dati fiscali del cliente non parte (titolare, 28/11/2026).
+      const rifiuto = rifiutoDatiClienteMancanti(contratto.cliente, 'business_italia');
+      if (rifiuto) return reply.code(409).send(rifiuto);
 
       const opzioni: OpzioniCalcoloFattura = {
         tipoCassa: 'nessuna',

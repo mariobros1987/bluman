@@ -2,7 +2,7 @@
 // valore diventava «€ 8.500,00» (o «€ 0,00»), e senza anagrafica dal server la pagina ripiegava
 // sui dati dello studio dimostrativo (getStudioInfoForTenant). Ora il dato mancante è un
 // segnaposto evidente, come in resolveDocumentTemplateHtml.
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -44,6 +44,16 @@ function apri() {
     </MemoryRouter>,
   );
 }
+
+// Il primo mount del file paga il riscaldamento di React e jsdom (~430 ms contro ~160 ms dei
+// successivi): sotto il carico delle prove in parallelo bastava a portare il primo test oltre i 5 s
+// (run 46016198424). Lo si paga qui, una volta, fuori dai test.
+beforeAll(() => {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  vi.mocked(fetchProgetti).mockResolvedValue([]);
+  vi.mocked(fetchTenantInfoApi).mockResolvedValue(null);
+  apri().unmount();
+});
 
 beforeEach(() => {
   localStorage.clear();
@@ -103,12 +113,33 @@ describe('DocumentEditorPage — il livello di firma segue il modello e il docum
     expect(segnati[0]).toContain('FEA — ');
   });
 
+  // Titolare, 28/11/2026 — il livello del modello è il minimo: si alza, non si abbassa.
+  it('modello FEA → la firma semplice è spenta e la pagina dice perché; FEQ resta scegliibile', async () => {
+    render(
+      <MemoryRouter initialEntries={['/documents?tmplId=tmpl-fea&projId=prg-1']}>
+        <DocumentEditorPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(document.body.textContent).toContain('Mandato di Studio Vero Srl'));
+    expect(livelloSegnato().join(' ')).toContain('FEA — ');
+    // I pulsanti si cercano per testo, non per ruolo e nome: su una pagina così grande ogni ricerca
+    // per ruolo ricalcola l'albero di accessibilità, e ripetuta dentro `waitFor` faceva di questo
+    // test il più caro del file (misurato sotto carico: 3,3 s contro 1,5 s dei vicini).
+    const pulsante = (testo: RegExp) =>
+      Array.from(document.querySelectorAll('button')).find((b) => testo.test(b.textContent || '')) as HTMLButtonElement;
+    expect(pulsante(/SES — Semplice/).disabled).toBe(true);
+    expect(pulsante(/FEQ — Qualificata/).disabled).toBe(false);
+    expect(document.querySelector('[role="note"]')?.textContent).toContain('Il modello richiede almeno la firma FEA');
+  });
+
   it('modello senza livello dichiarato → firma semplice, come prima', async () => {
     apri();
     await waitFor(() => expect(document.body.textContent).toContain('Studio Vero Srl'));
     const segnati = livelloSegnato();
     expect(segnati).toHaveLength(1);
     expect(segnati[0]).toContain('SES — ');
+    // Nessun minimo: nessun livello spento e nessuna nota.
+    expect(screen.queryByRole('note')).toBeNull();
   });
 
   it('documento salvato con FEQ, riaperto → resta FEQ', async () => {

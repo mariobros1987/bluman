@@ -109,7 +109,6 @@ Una scheda per sezione (🚧 = da scrivere, ✅ = pronta). Le facciamo una alla 
 | 22 | Coda KYC / AML | `22-coda-kyc.md` | pratiche aperte, approvazione in blocco | ✅ |
 | 23 | Fornitori & Acquisti | `23-fornitori-acquisti.md` | ciclo passivo, import XML, saldo | ✅ |
 | 24 | Banche & Conti | `24-banche-conti.md` | conti dello studio, liquidità | ✅ |
-| 25 | Pagamenti | `25-pagamenti.md` | vista rate fuori menu | ✅ |
 | 26 | Report & Analytics | `26-report.md` | i cinque report, export | ✅ |
 | 27 | Timesheet Ore | `27-timesheet.md` | ore settimanali, approvazione | ✅ |
 | 28 | Log Audit Studio | `28-log-audit.md` | registro delle azioni | ✅ |

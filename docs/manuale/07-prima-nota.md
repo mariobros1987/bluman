@@ -19,9 +19,9 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
   un numero conservato a parte — è il totale di quello che il conto ha registrato. Un movimento
   **senza conto** non entra nel saldo di nessuna banca, e resta visibile in Prima Nota come non
   attribuito: è la differenza tra «non so dove sia questo denaro» e «l'ho messo io nella banca X».
-- **Il conto di un incasso si decide una volta sola**: quello scelto da chi registra l'incasso, o in
-  mancanza quello di **accredito della fattura**, o in mancanza il conto **predefinito** dello
-  studio. Il movimento in Prima Nota e il saldo nominano **lo stesso** conto, sempre: se il denaro
+- **Il conto di un incasso si decide una volta sola**: lo sceglie chi registra l'incasso, ed è
+  **obbligatorio** (il modulo propone quello di accredito della fattura o il predefinito, §06).
+  Il movimento in Prima Nota e il saldo nominano **lo stesso** conto, sempre: se il denaro
   entra in una banca, la riga che lo registra lo dice.
 - **Il saldo memorizzato è una copia, e viene verificata**: aprendo la pagina dei conti l'app
   ricalcola il saldo dai movimenti e, se la copia non torna, la riporta al valore vero e lo annota
@@ -42,7 +42,7 @@ entrate e uscite, con categoria e collegamento a fattura/fornitore.
 
 ## ⚠️ Stati limite & errori
 - **Conto non indicato**: un movimento senza conto si mostra con «⚠ Conto non indicato» e non entra nel saldo di nessun conto in Banche & Conti. Lo stesso testo compare nel CSV del fascicolo per il commercialista, dove il riferimento alla fattura è il suo numero ufficiale.
-- **Movimenti che non si eliminano**: l'incasso di una fattura e il pagamento di una fattura d'acquisto hanno un lucchetto al posto del cestino, perché eliminandoli la rata resterebbe «incassata» (o la fattura «pagata») senza il suo denaro. Anche il server lo rifiuta. Gli altri movimenti si eliminano, e l'eliminazione resta nel Log Audit.
+- **Movimenti che non si eliminano**: l'incasso di una fattura e il pagamento di una fattura d'acquisto hanno un lucchetto al posto del cestino, perché eliminandoli la rata resterebbe «incassata» (o la fattura «pagata») senza il suo denaro. Anche il server lo rifiuta. Un incasso sbagliato si annulla con **Storna incasso** nello Scadenzario (§06): in Prima Nota compare l'uscita contraria «Storno incasso rata #N fattura X», sullo stesso conto, e anche quella ha il lucchetto perché è la traccia dell'annullamento. Gli altri movimenti si eliminano, e l'eliminazione resta nel Log Audit.
 - Import CSV: una riga con un importo o una data che non si legge **non entra** in Prima Nota e viene
   elencata nel modale (numero di riga, motivo, testo della riga). Non si ripiega su un valore
   plausibile — né un importo né la data di oggi — perché un movimento inventato è indistinguibile da

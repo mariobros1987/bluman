@@ -9,6 +9,8 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
   it('le rotte di scadenzario e solleciti restano sotto scadenzario, non invoices', () => {
     expect(moduloDellaRotta('/invoices/scadenzario')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/scadenze/:id/incassi')).toBe('scadenzario');
+    // Lo storno di un incasso è Scadenzario come l'incasso: storna chi può incassare.
+    expect(moduloDellaRotta('/invoices/scadenze/:id/incassi/:incassoId/storno')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/scadenze/:id/anteprima-sollecito')).toBe('scadenzario');
     expect(moduloDellaRotta('/invoices/solleciti/insoluti')).toBe('scadenzario');
   });
@@ -19,6 +21,10 @@ describe('moduloDellaRotta — mappa pattern → chiave modulo', () => {
     expect(moduloDellaRotta('/progetti')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id')).toBe('projects');
     expect(moduloDellaRotta('/progetti/:id/moduli/:moduloId')).toBe('projects');
+    expect(moduloDellaRotta('/progetti/:id/sconto')).toBe('projects');
+    // I form che il cliente compila per un articolo sono Libreria, come gli articoli.
+    expect(moduloDellaRotta('/form-master')).toBe('library');
+    expect(moduloDellaRotta('/form-master/:id')).toBe('library');
     // Eccezione speculare, dallo stesso criterio: la chat del cliente è materia del modulo
     // Comunicazioni, non del progetto. «Segna come letto» invece resta un'azione di servizio
     // sulla scheda — se stesse su communications, chi ha `read` non riuscirebbe mai a spegnere

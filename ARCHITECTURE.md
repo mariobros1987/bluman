@@ -33,6 +33,9 @@ browser ──► frontend React 19 + Vite (frontend/)
 
 ## Flussi principali
 - **Fattura → SdI**: `src/routes/contabilitaFatture.ts` → `fatturaEngine.ts` (importi in centesimi) → `sdiXmlGenerator.ts` → `sdiService.ts`; stato e numerazione per anno dal DB.
+- **Incasso → storno**: `src/routes/contabilitaScadenzario.ts` (incasso, conto obbligatorio) e `contabilitaStornoIncasso.ts` → `domain/stornoIncasso.ts`; ogni incasso e ogni storno scrive il suo movimento con `services/primaNotaMovimento.ts` (movimento e saldo del conto insieme).
+- **Importi proposti in fattura**: `GET /progetti/:id` → `domain/importiFatturabili.ts` (listino dell'articolo, sconto del progetto pro-quota); il compositore li mostra, non li calcola.
+- **Form del cliente**: `routes/formArticolo.ts` (form dello studio, form sull'articolo) → all'istanziazione `services/distintaTemplate.ts` + `services/formArticolo.ts` creano il passaggio e riprendono le risposte già date dallo stesso cliente.
 - **Firma**: `src/routes/firma.ts` → `livelloFirmaService.ts` → OTP (`otpService.ts`) → `verbaleFirma.ts`, `copiaFirmata.ts`, sigillo HMAC-SHA256, marca temporale (`marcaTemporaleService.ts`).
 - **KYC/AML**: `src/routes/kyc.ts` → `kycCaseService.ts`, `kycGate.ts` (blocca la fatturazione da progetto senza KYC) → `src/domain/kycStateMachine.ts`, `calcoloRischio.ts`, `segnalazioneFiau*`.
 - **Posta dei clienti**: timer in `src/index.ts` (o `npm run cron:posta`) → `raccogliPosta.ts` (uno studio alla volta, nel suo contesto RLS) → `postaRaccolta.ts` → `postaImap.ts` (IMAP in sola lettura) → `postaAttribuzione.ts` → `messaggio_posta`; l'operatore smista da `/posta` (`src/routes/posta.ts`).
