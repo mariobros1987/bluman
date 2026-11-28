@@ -69,3 +69,4 @@ README.md e `docs/storico/`.
 
 ## 2026-11-28
 - Allineamento allo Standard 8dfbc5c (Projects di Claude Code e standard#10): regole comuni, script delle barriere e parte comune delle istruzioni del Project. Il punto 6 di `10-produzione-e-dati.md` vieta `prisma migrate` da una sessione, ma qui lo schema si fa con `migrate dev` (regola 2 del titolare): la deroga di `90-progetto.md` copre ora anche il punto 6, solo per `migrate dev`; `migrate deploy` e `migrate reset`, negati in `.claude/settings.json`, sono scritti nella regola 2 di CLAUDE.md. Gli altri divieti di `settings.json` (push verso upstream o `main`, `railway`, `vercel`, `distribuisci.sh`, `ssh`) erano già in CLAUDE.md (Claude).
+- Allineamento allo Standard 6614298 (standard#11): `automerge.sh` finisce col merge quando il progetto non ha `deploy.yml` (qui c'è: comportamento uguale), e una riga vuota prima dell'elenco nella parte comune delle istruzioni del Project (Claude).
