@@ -55,3 +55,18 @@
    quando serve lui; la sessione che vede una PR ferma la sistema senza aspettarlo.
    Le prove non dipendono dal tempo reale (attese, soglie in secondi, orologio):
    solo il test che controlla apposta quel tempo può farlo.
+10. **Thread dei Projects di Claude Code** (Fabio, 27/11). Un giro di Fabio è un
+   thread, con le regole del punto 9: il coordinatore lo divide in più thread solo
+   per un'altra area o una parte urgente. Il ramo del thread è quello che gli dà
+   Claude Code (`claude/project-thread-…`) o `thread/<cosa>`: è il segno con cui gli
+   script sanno che il correttore è il thread e non `fix.yml` (due correttori sullo
+   stesso ramo si scrivono addosso); non si rinomina. Il thread apre la PR con gli
+   strumenti GitHub che ha, la segue e corregge lui prove rosse e richieste del
+   revisore; i giri li conta lo Standard (2 per motivo, poi `serve-fabio`), e se il
+   thread non manda un commit entro un'ora la sentinella mette `serve-fabio`. I
+   conflitti li allinea `fix.yml`: prima di ogni push il thread aggiorna il ramo.
+   Mai merge (nemmeno «Merge it»), force-push o etichette diverse da `ok-fabio`
+   (punto 5): il merge resta di `automerge.sh`. Decisioni e «ricorda che…» vanno nel
+   repo (punto 8: DIARIO, o `90-progetto.md` se è metodo del progetto), non nella
+   memoria del progetto, che può essere spenta. Fuori da un progetto (PC, issue) i
+   rami restano `feat/…` e `fix/…`, e il correttore `fix.yml`.

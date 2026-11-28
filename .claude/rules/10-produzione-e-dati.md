@@ -18,3 +18,10 @@
    compatibile all'indietro (prima si aggiunge, si toglie in una PR successiva),
    perché il rollback riporta il codice e non lo schema.
 5. **Script sui dati:** prima a vuoto, poi `--apply`; sempre ripetibili senza danni.
+6. **I divieti valgono anche senza hook.** Le sessioni cloud e i thread dei
+   Projects non leggono `.claude/settings.json` (permessi e hook): quello che lì è
+   negato resta vietato a mano. Non si leggono `.env` né `dist/`/`node_modules/`,
+   niente `ssh`/`scp`, force-push, `prisma migrate` né `--accept-data-loss`, e la
+   suite intera non si lancia in locale (la fa la CI). Un divieto che un progetto
+   aggiunge in `settings.json` (un file di config vero, una cartella di dati) si
+   scrive anche nei «Vincoli assoluti» del suo `CLAUDE.md`.

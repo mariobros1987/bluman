@@ -16,6 +16,11 @@
 #   serve-fabio          → avviso Telegram (ci-notify.sh)
 #   review-da-correggere → lancia il correttore (fix.yml), al massimo MAX_GIRI volte
 #                          per PR; oltre, serve-fabio e avviso
+#   ramo di un thread    → (Projects di Claude Code, dal 27/11; ramo_thread) il correttore è il
+#                          thread che ha scritto la PR e la segue: fix.yml non parte,
+#                          due correttori sullo stesso ramo si scriverebbero addosso.
+#                          Il tetto resta qui: oltre MAX_GIRI richieste del revisore,
+#                          serve-fabio e avviso.
 #
 # Il commento valido è l'ultimo di un bot, scritto dopo l'inizio di QUESTA
 # revisione, che comincia con «**Revisione automatica — <esito>**».
@@ -29,6 +34,9 @@ MAX_GIRI=2
 # shellcheck disable=SC1091
 [[ -f scripts/progetto.env ]] && source scripts/progetto.env
 NOME="${NOME_PROGETTO:-${GH_REPO##*/}}"
+# Rami dei thread dei Projects di Claude Code (00-metodo, punto 10): quello che dà
+# Claude Code (claude/project-thread-…) o thread/…. Lì il correttore è il thread.
+ramo_thread() { [[ "$1" == thread/* || "$1" == claude/project-thread-* ]]; }
 log() { printf '[review-label #%s] %s\n' "$PR" "$*"; }
 
 if [[ "$LIVELLO" == leggero ]]; then
@@ -61,25 +69,40 @@ gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=$esito" >/dev/nul
 pr="$(gh api "repos/$GH_REPO/pulls/$PR")"
 titolo="$(jq -r .title <<<"$pr")"; url="$(jq -r .html_url <<<"$pr")"
 prod="$(jq -r .base.ref <<<"$pr")"
+ramo="$(jq -r .head.ref <<<"$pr")"
 avvisa() { bash scripts/ci-notify.sh "$1
 #$PR $titolo
 $url"; }
+conta() { gh api --paginate "repos/$GH_REPO/issues/$PR/comments" --jq \
+  "[.[] | select(.user.type == \"Bot\" and (.body | startswith(\"$1\")))] | length" \
+  | awk '{s+=$1} END {print s+0}'; }
+ferma() {  # ferma <giri>: correzioni esaurite
+  log "già $1 correzioni: serve-fabio"
+  gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=serve-fabio" >/dev/null
+  gh pr comment "$PR" --body "**Ferma: dopo $1 correzioni automatiche il revisore trova ancora problemi.** Leggi l'ultimo commento del revisore e decidi tu: una correzione (anche chiesta a Claude Code su questa PR) fa ripartire la revisione con un commit nuovo." >/dev/null
+  avvisa "🔴 $NOME: correzioni automatiche esaurite"
+}
 
 case "$esito" in
   serve-fabio)
     avvisa "🟠 $NOME: una PR aspetta te" ;;
   review-da-correggere)
-    giri="$(gh api --paginate "repos/$GH_REPO/issues/$PR/comments" --jq \
-      '[.[] | select(.user.type == "Bot" and (.body | startswith("**Correzione automatica")))] | length' \
-      | awk '{s+=$1} END {print s+0}')"
-    if (( giri < MAX_GIRI )); then
-      log "correzione automatica, giro $((giri + 1)) di $MAX_GIRI"
-      gh workflow run fix.yml --ref "$prod" -f pr="$PR"
+    if ramo_thread "$ramo"; then
+      # Le richieste del revisore su questa PR, compresa questa: la prima è il giro 1.
+      richieste="$(conta "**Revisione automatica — review-da-correggere**")"
+      if (( richieste <= MAX_GIRI )); then
+        log "ramo di un thread: corregge il thread, giro $richieste di $MAX_GIRI"
+      else
+        ferma "$((richieste - 1))"
+      fi
     else
-      log "già $giri correzioni automatiche: serve-fabio"
-      gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=serve-fabio" >/dev/null
-      gh pr comment "$PR" --body "**Ferma: dopo $giri correzioni automatiche il revisore trova ancora problemi.** Leggi l'ultimo commento del revisore e decidi tu: una correzione (anche chiesta a Claude Code su questa PR) fa ripartire la revisione con un commit nuovo." >/dev/null
-      avvisa "🔴 $NOME: correzioni automatiche esaurite"
+      giri="$(conta "**Correzione automatica")"
+      if (( giri < MAX_GIRI )); then
+        log "correzione automatica, giro $((giri + 1)) di $MAX_GIRI"
+        gh workflow run fix.yml --ref "$prod" -f pr="$PR"
+      else
+        ferma "$giri"
+      fi
     fi ;;
 esac
 

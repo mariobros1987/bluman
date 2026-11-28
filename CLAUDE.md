@@ -22,7 +22,8 @@ motore in `src/domain/`) · React 19 + Vite (`frontend/`) · PostgreSQL + Prisma
    script, seed, bootstrap, backup e ricerca utente al login. Ogni `$transaction` interattiva
    va avvolta in `conContestoInTransazione(tx, …)` (esempio: `src/routes/progetti.ts:243`).
 2. **Schema** solo con migrazioni (`prisma migrate dev`). Mai `db push`, mai il flag che accetta
-   la perdita di dati. Ogni migrazione che crea una tabella con `tenant_id` porta la sua policy RLS.
+   la perdita di dati; da una sessione mai `migrate deploy` né `migrate reset`, anche dove l'hook
+   di `.claude/settings.json` non c'è (10-produzione, punto 6). Ogni migrazione che crea una tabella con `tenant_id` porta la sua policy RLS.
 3. **Persistenza vera.** Tutto ciò che l'utente modifica si salva via API nel DB.
    `localStorage` solo come copia; un salvataggio fallito si dichiara, non si chiude il modale.
 4. **Niente credenziali** nel codice o nei .md, neanche come ripiego. Presidio: `src/credenziali.test.ts`.

@@ -60,3 +60,6 @@ README.md e `docs/storico/`.
 - La pagina Pagamenti (`/payments`) resta fuori dal menu ma il suo «Sollecita» ora apre l'invio vero dello Scadenzario: se tenerla o toglierla è una decisione di prodotto ancora aperta.
 - Dodici schede nuove nel manuale (20–31) per le pagine che non ne avevano una; la 31 (Multi-Tenant Admin) è riservata al super admin come la 19. Scritte leggendo il codice, non provando l'app: da rileggere con chi la usa.
 - Non corretto, solo dichiarato nella scheda 28: nel Log Audit i filtri per ruolo e categoria agiscono sulla pagina visualizzata (le etichette lo dicono già); portarli sul server chiede di decidere come si classificano le azioni.
+
+## 2026-11-28
+- Allineamento allo Standard 8dfbc5c (Projects di Claude Code e standard#10): regole comuni, script delle barriere e parte comune delle istruzioni del Project. Il punto 6 di `10-produzione-e-dati.md` vieta `prisma migrate` da una sessione, ma qui lo schema si fa con `migrate dev` (regola 2 del titolare): la deroga di `90-progetto.md` copre ora anche il punto 6, solo per `migrate dev`; `migrate deploy` e `migrate reset`, negati in `.claude/settings.json`, sono scritti nella regola 2 di CLAUDE.md. Gli altri divieti di `settings.json` (push verso upstream o `main`, `railway`, `vercel`, `distribuisci.sh`, `ssh`) erano già in CLAUDE.md (Claude).
