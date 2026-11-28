@@ -8,7 +8,7 @@ Gestionale multi-studio per studi di consulenza: progetti con motore di stato, c
 prima nota, LIPE, scadenzario, firma elettronica, KYC/AML, portale cliente. Il prodotto è del titolare
 (Mario, `mariobros1987/bluman`); il pilota dello Standard gira nel fork.
 
-Dove gira: la produzione usata dallo studio è blusmart.eu (server Register.it), aggiornata solo dal titolare; Railway (backend) e Vercel (bluman.vercel.app, copia di riserva) pubblicano da `main` di `mariobros1987/bluman`. Repo: wolftradesystem-tech/bluman (fork, `origin`), ramo di produzione `main`; `upstream` = `mariobros1987/bluman` con push disattivato. Dal fork non si deploya: si pubblica con `scripts/pubblica.sh` (PR verso upstream), unita solo su «pubblica» di Fabio, e con migrazioni solo dopo un backup del DB (DEPLOY.md).
+Dove gira: la produzione usata dallo studio è blusmart.eu (server Register.it); Railway (backend) e Vercel (bluman.vercel.app, copia di riserva) pubblicano da `main` di `mariobros1987/bluman`. Repo: wolftradesystem-tech/bluman (fork, `origin`), ramo di produzione `main`; `upstream` = `mariobros1987/bluman` con push disattivato. Dal fork non si deploya: dopo ogni merge `deploy.yml` pubblica da solo con `scripts/pubblica.sh --automatico` (PR verso upstream, unita se non porta migrazioni; con migrazioni aspetta il backup del DB e il «pubblica» di Fabio), e blusmart.eu si aggiorna dal suo cron entro 10 minuti, con la copia del database prima (DEPLOY.md).
 Intoccabile: il remote `upstream` (mai push), `main` del fork (solo merge automatico), i dati veri degli studi, `scripts/distribuisci.sh`, `backup-vps.sh`, `monitor-vps.sh` e tutto ciò che è del titolare (Railway, Vercel, server), `LAVORO_RIMANENTE.md`.
 Referente: Fabio, italiano, risponde dal telefono.
 

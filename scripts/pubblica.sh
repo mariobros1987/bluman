@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pubblica.sh [--merge [--backup-fatto]]
+# pubblica.sh [--merge [--backup-fatto] | --automatico]
 # Script PROPRIO di BluMan (non dello Standard). La pubblicazione è una PR da
 # wolftradesystem-tech:main (il fork, dove gira il pilota) a mariobros1987/bluman main
 # (il repo del titolare, `upstream`, con push disattivato). All'unione Railway (backend,
@@ -9,25 +9,34 @@
 #
 #   senza argomenti  apre o aggiorna la PR su upstream: elenco dei commit, dove arriva,
 #                    e in TESTA l'avviso se cambiano le migrazioni (la PR lo segnala da sola).
-#   --merge          unisce con `gh pr merge --merge`, SOLO quando Fabio scrive «pubblica»;
+#   --automatico     lo lancia deploy.yml dopo ogni merge nel fork (Fabio, 28/11: «tutto
+#                    automatico», d'accordo il titolare): unisce da solo se la pubblicazione
+#                    NON porta migrazioni; se le porta apre o aggiorna la PR, esce con 3 e
+#                    aspetta il «pubblica» di Fabio dopo il backup del DB di Railway.
+#   --merge          unisce con `gh pr merge --merge`, a mano, quando Fabio scrive «pubblica»;
 #                    con migrazioni rifiuta senza --backup-fatto, perché Railway applica le
 #                    migrazioni senza fare un backup (regola di 90-progetto.md).
 #                    Dopo l'unione riallinea main del fork a upstream (gh repo sync): il
 #                    merge commit sta solo su upstream, e senza il sync la pubblicazione
 #                    successiva vedrebbe i due rami divergere.
-# Serve `gh` autenticato come wolftradesystem-tech, e il remote `upstream` nel clone.
+# Serve `gh` autenticato come wolftradesystem-tech (in deploy.yml: GH_TOKEN = secret
+# PUBBLICA_TOKEN), e il remote `upstream` nel clone.
 set -Eeuo pipefail
 UP=mariobros1987/bluman
 FORK=wolftradesystem-tech/bluman
 TESTA_PR="wolftradesystem-tech:main"
-MERGE=no; BACKUP=no
+MERGE=no; BACKUP=no; AUTO=no
 for a in "$@"; do
   case "$a" in
     --merge) MERGE=si ;;
     --backup-fatto) BACKUP=si ;;
-    *) echo "argomento sconosciuto: $a (ammessi: --merge, --backup-fatto)"; exit 2 ;;
+    --automatico) AUTO=si ;;
+    *) echo "argomento sconosciuto: $a (ammessi: --merge, --backup-fatto, --automatico)"; exit 2 ;;
   esac
 done
+if [[ "$AUTO" == si && ( "$MERGE" == si || "$BACKUP" == si ) ]]; then
+  echo "--automatico va da solo: con migrazioni la pubblicazione si unisce a mano (--merge --backup-fatto)"; exit 2
+fi
 log() { printf '[pubblica] %s\n' "$*"; }
 
 git fetch --quiet origin main
@@ -66,11 +75,15 @@ corpo="$(mktemp)"
   echo
   echo "- Railway: backend (\`prisma migrate deploy\` all'avvio, poi il server)."
   echo "- Vercel: frontend su bluman.vercel.app (copia di riserva)."
-  echo "- blusmart.eu (server Register.it, produzione dello studio): **no**, si aggiorna dopo l'unione con \`scripts/aggiorna-blusmart.sh\` (Fabio, via ssh) o \`scripts/distribuisci.sh --solo-vps\` (titolare)."
+  echo "- blusmart.eu (server Register.it, produzione dello studio): entro 10 minuti dall'unione, da solo (\`scripts/aggiorna-blusmart-auto.sh\` dal cron del server, con la copia del database prima)."
   echo
   echo "## Come si unisce"
   echo
-  echo "Solo quando Fabio scrive «pubblica»: \`bash scripts/pubblica.sh --merge\`${migr:+ \`--backup-fatto\`}."
+  if [[ -n "$migr" ]]; then
+    echo "**Non si unisce da sola**: dopo il backup del DB di Railway, quando Fabio scrive «pubblica»: \`bash scripts/pubblica.sh --merge --backup-fatto\`."
+  else
+    echo "Da sola, dopo ogni merge nel fork (\`deploy.yml\` → \`bash scripts/pubblica.sh --automatico\`)."
+  fi
   echo "Ogni commit è arrivato su main del fork da una PR con CI verde e revisione (pilota dello Standard)."
 } > "$corpo"
 
@@ -85,6 +98,11 @@ fi
 rm -f "$corpo"
 [[ -n "$migr" ]] && log "⚠️ migrazioni dentro: $(tr '\n' ' ' <<<"$migr")"
 
+if [[ "$AUTO" == si && -n "$migr" ]]; then
+  log "NON unita: porta migrazioni. Prima il backup del DB di Railway, poi «pubblica» (--merge --backup-fatto)"
+  exit 3
+fi
+[[ "$AUTO" == si ]] && MERGE=si
 [[ "$MERGE" == si ]] || { log "non unita: --merge solo quando Fabio scrive «pubblica»"; exit 0; }
 if [[ -n "$migr" && "$BACKUP" != si ]]; then
   log "RIFIUTATO: la pubblicazione porta migrazioni e manca --backup-fatto (prima il backup del DB di produzione)"
@@ -94,6 +112,6 @@ fi
 # pubblicazione dopo si vede cosa c'è di nuovo. --match-head-commit: si unisce quello
 # che è stato letto e scritto nella PR, non un main avanzato nel frattempo.
 gh pr merge "$pr" -R "$UP" --merge --match-head-commit "$testa"
-log "unita: Railway e Vercel pubblicano da soli; blusmart.eu: ssh blusmart \"cd /opt/bluman && git pull --ff-only && bash scripts/aggiorna-blusmart.sh\""
+log "unita: Railway e Vercel pubblicano da soli; blusmart.eu si aggiorna da solo entro 10 minuti (aggiorna-blusmart-auto.sh)"
 gh repo sync "$FORK" --source "$UP" --branch main
 log "main del fork riallineato a upstream (merge commit compreso)"

@@ -74,13 +74,14 @@ motore in `src/domain/`) · React 19 + Vite (`frontend/`) · PostgreSQL + Prisma
 ## Repo, pubblicazione e produzione (il resto in DEPLOY.md)
 - `origin` = il fork; `upstream` = `mariobros1987/bluman` con push disattivato (`NO_PUSH`):
   non si cambia mai. Mai `git push` su `main`, mai verso upstream.
-- Dal fork non si deploya niente. Pubblicare = `bash scripts/pubblica.sh` (PR da
-  `wolftradesystem-tech:main` a `mariobros1987/bluman` `main`); `--merge` solo quando Fabio
-  scrive «pubblica». All'unione Railway e Vercel (bluman.vercel.app, copia di riserva)
-  pubblicano da soli. blusmart.eu: dopo la pubblicazione lo aggiorna Fabio dal suo PC con
-  `scripts/aggiorna-blusmart.sh` (gira sul server, prima controlla, poi `--applica`), oppure il titolare.
+- Dal fork non si deploya su un server: si pubblica. Dopo ogni merge `deploy.yml` lancia
+  `scripts/pubblica.sh --automatico` (PR da `wolftradesystem-tech:main` a `mariobros1987/bluman`
+  `main`, unita da sola se non porta migrazioni); `--merge` a mano solo quando Fabio scrive
+  «pubblica». All'unione Railway e Vercel (bluman.vercel.app, copia di riserva) pubblicano da
+  soli; blusmart.eu si aggiorna dal cron del server (`scripts/aggiorna-blusmart-auto.sh`, che
+  lancia `aggiorna-blusmart.sh --applica` con la copia del database prima) (Fabio, 28/11).
 - Una pubblicazione che cambia `prisma/migrations` si unisce solo dopo un backup del DB di
   produzione (Railway applica le migrazioni senza backup): `pubblica.sh` lo scrive in testa
-  alla PR e con `--merge` rifiuta senza `--backup-fatto`.
+  alla PR, con `--automatico` non la unisce e con `--merge` rifiuta senza `--backup-fatto`.
 - `railway`, `vercel`, `scripts/distribuisci.sh`: del titolare. `ssh` sul server: Fabio, con la sua chiave
-  (dal 27/11); una sessione mai, scrive i comandi esatti. `backup-vps.sh`, `monitor-vps.sh` girano da soli sul server.
+  (dal 27/11); una sessione mai, scrive i comandi esatti. `backup-vps.sh`, `monitor-vps.sh`, `aggiorna-blusmart-auto.sh` girano da soli sul server.
