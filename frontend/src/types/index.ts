@@ -18,7 +18,8 @@ export interface Cliente {
   sdiCode?: string;
   codiceSdi?: string;
   iban?: string;
-  rischioAml?: 'basso' | 'medio' | 'alto';
+  /** «non_valutato» finché una persona non sceglie la classe (titolare, 28/11/2026). */
+  rischioAml?: 'non_valutato' | 'basso' | 'medio' | 'alto';
   ubo?: string;
   fontePatrimonio?: string;
   dataKyc?: string;
@@ -145,9 +146,15 @@ export interface Passaggio {
    * È il gemello di `fields` sul lato delle risposte, e sta a database in
    * `passaggio_progetto.risposte_form_json`. L'operatore le registra da
    * «Compila / Visualizza Form» quando il cliente gliele passa a voce, per email o
-   * di persona: il portale non ha ancora una scheda che le raccolga da solo.
+   * di persona. Quelle che il cliente scrive da sé nel portale stanno in `risposteCliente`.
    */
   risposte?: Record<string, string>;
+  /**
+   * Ciò che il cliente ha scritto dal portale (scheda «Da fare»), e quando. Resta distinto da
+   * `risposte`, che è ciò che lo studio ha registrato: l'operatore lo controlla e lo fa suo.
+   */
+  risposteCliente?: Record<string, string>;
+  rispostaClienteAt?: string | null;
   documentoAllegatoUrl?: string;
   formMasterId?: string;
   linkIstruzioni?: string;

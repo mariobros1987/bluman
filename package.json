@@ -51,6 +51,7 @@
     "passwords:assign": "tsx src/scripts/assignPasswords.ts",
     "cleanup:test-data": "tsx src/scripts/cleanupTestData.ts",
     "cron:notifiche": "tsx src/scripts/runDailyNotificationCron.ts",
+    "cron:posta": "tsx src/scripts/raccogliPosta.ts",
     "backup:db": "tsx src/scripts/backupDb.ts",
     "backup:scheduled": "tsx src/scripts/runScheduledBackup.ts",
     "audit:progetti": "tsx src/scripts/auditIntegritaProgetti.ts",

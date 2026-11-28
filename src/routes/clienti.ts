@@ -27,6 +27,7 @@ import { CreaClienteSchema, AggiornaClienteSchema } from '../schemas/clienti.sch
 import { chatIdTelegram } from '../services/telegramService.js';
 import { clienteIdDalJwt, richiediRuolo } from '../util/authorization.js';
 import { campoOrdinamento, creaMetaPaginazione, leggiPaginazione } from '../util/paginazione.js';
+import { rischioAmlDichiarato } from '../domain/rischioAml.js';
 
 // ─── DETTAGLIO CLIENTE & MAGIC LINK (coda dell'ex blocco ARTICOLI) ──
 export async function registraRotteClienti(server: FastifyInstance, app: AppPort): Promise<void> {
@@ -55,7 +56,8 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       piva: cliente.piva || referenti.piva,
       sedeLegale: cliente.sedeLegale || referenti.sedeLegale,
       giurisdizione: cliente.giurisdizione || referenti.giurisdizione,
-      rischioAml: cliente.rischioAml || referenti.rischioAml || 'medio',
+      // Senza una classe scritta il cliente è «non valutato» (titolare, 28/11/2026), non «medio».
+      rischioAml: rischioAmlDichiarato(cliente.rischioAml, referenti.rischioAml),
       ubo: cliente.ubo || referenti.ubo,
       fontePatrimonio: cliente.fontePatrimonio || referenti.fontePatrimonio,
       dataKyc: cliente.dataKyc || referenti.dataKyc,
@@ -279,7 +281,8 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
           aliquotaIvaDefault: b.aliquotaIvaDefault ?? null,
           naturaEsenzioneDefault: b.naturaEsenzioneDefault || null,
           iban: b.iban || null,
-          rischioAml: b.rischioAml || 'medio',
+          // Un cliente nuovo parte «non valutato»: la classe la sceglie una persona.
+          rischioAml: rischioAmlDichiarato(b.rischioAml),
           ubo: b.ubo || null,
           fontePatrimonio: b.fontePatrimonio || null,
           dataKyc: b.dataKyc || null,
@@ -294,6 +297,8 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       });
       await recordAudit({
         tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'CLIENTE_CREATO',
         entita: cliente.nome,
         dettagli: `Creata anagrafica cliente ERP ${cliente.nome} (P.IVA: ${cliente.piva || 'N/D'})`,
@@ -407,6 +412,8 @@ export async function registraRotteClienti(server: FastifyInstance, app: AppPort
       });
       await recordAudit({
         tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'CLIENTE_AGGIORNATO',
         entita: updated.nome,
         dettagli: `Aggiornati dati legali/fiscali cliente ${updated.nome} (P.IVA: ${updated.piva})`,

@@ -19,6 +19,8 @@ export interface PassaggioTemplateInput {
   ordine: number;
   descrizione: string | null;
   campiFormJson: unknown | null;
+  /** Il form dell'articolo da cui il passaggio nasce (titolare, 28/11/2026); assente per gli altri. */
+  formMasterId?: string | null;
 }
 
 export interface RigaDistintaConArticolo {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { MessaggioDiMicrovoce } from '../../api/progetti';
-import { urlDocumentoAssoluto } from '../../api/client';
 import { etichettaOrigine } from '../../utils/origineAbbinamento';
+import { AllegatiMessaggio } from '../AllegatiMessaggio';
 import { SpunteStato } from '../SpunteStato';
 import { LinkTelegramProgetto } from '../projectDetail/LinkTelegramProgetto';
 
@@ -93,7 +93,6 @@ export function TabMessaggi({
 
       {messaggi.map((m) => {
         const origine = etichettaOrigine(m.origine);
-        const allegati = leggiAllegati(m.allegatiJson);
         return (
           <div key={m.id} style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -142,24 +141,9 @@ export function TabMessaggi({
 
             {/* Gli allegati arrivavano fino al browser e non si vedevano mai: `allegatiJson` era
                 scaricato e buttato. Per una voce che esiste per raccogliere documenti era il pezzo
-                più utile a restare invisibile. */}
-            {allegati.length > 0 && (
-              <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {allegati.map((att, idx) => (
-                  <a
-                    key={idx}
-                    href={urlDocumentoAssoluto(att.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit' }}
-                  >
-                    <span style={{ fontSize: 14 }}>📎</span>
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)' }}>{att.nome}</span>
-                    {att.dimensione && <span style={{ fontSize: 10, color: 'var(--muted)' }}>· {att.dimensione}</span>}
-                  </a>
-                ))}
-              </div>
-            )}
+                più utile a restare invisibile. Quelli del portale si scaricano con l'accesso
+                dell'operatore: non hanno un indirizzo da aprire. */}
+            <AllegatiMessaggio messaggio={m} />
 
             {onApriInChat && (
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'flex-end' }}>
@@ -180,22 +164,4 @@ export function TabMessaggi({
       {composer}
     </div>
   );
-}
-
-/**
- * Gli allegati di un messaggio, letti dalla colonna JSON.
- *
- * Non lancia mai: un `allegatiJson` illeggibile è un messaggio senza allegati, non un errore da far
- * esplodere in faccia a chi sta leggendo un fascicolo — la stessa regola di `baseDaEsterno` lato
- * server, e per la stessa ragione.
- */
-function leggiAllegati(grezzo: string | null): { nome: string; url: string; dimensione?: string }[] {
-  if (!grezzo) return [];
-  try {
-    const letto = JSON.parse(grezzo);
-    if (!Array.isArray(letto)) return [];
-    return letto.filter((a) => a && typeof a.nome === 'string' && typeof a.url === 'string');
-  } catch {
-    return [];
-  }
 }

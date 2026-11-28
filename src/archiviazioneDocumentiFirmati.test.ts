@@ -79,7 +79,8 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       // E10 — il delete del modulo riallinea il valore del progetto ai moduli rimasti.
       aggregate: async () => ({ _sum: { prezzo: null }, _count: { _all: 0 } }),
     },
-    progetto: { update: async () => ({}) },
+    // Il riallineamento legge lo sconto del progetto prima di riscrivere il valore (28/11).
+    progetto: { findUnique: async () => ({ scontoCentesimi: 0 }), update: async () => ({}) },
     fatturaRiga: { count: async () => stato.righeFattura },
     accessoRisorsa: { deleteMany: async () => ({ count: 0 }) },
     microvoceProgetto: {

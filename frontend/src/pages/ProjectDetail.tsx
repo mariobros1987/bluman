@@ -6,6 +6,7 @@ import { ComunicazioniTab } from '../components/ComunicazioniTab';
 import { AssignOperatorModal } from '../components/AssignOperatorModal';
 import { CalendarPreviewModal, etichettaTipoAttivita, type PianificazioneScadenza } from '../components/CalendarPreviewModal';
 import { ConfirmDeleteModal } from '../components/ConfirmDeleteModal';
+import { passaggioDaDb } from '../utils/passaggioDaDb';
 import { ModuliTab } from '../components/projectDetail/ModuliTab';
 import { FatturazioneTab } from '../components/projectDetail/FatturazioneTab';
 import { GateKycProgetto } from '../components/kyc/GateKycProgetto';
@@ -15,6 +16,7 @@ import { StoricoContrattiTab } from '../components/projectDetail/StoricoContratt
 import { DocumentiTab } from '../components/projectDetail/DocumentiTab';
 import { CalendarioProgettoTab } from '../components/projectDetail/CalendarioProgettoTab';
 import { HeaderProgetto } from '../components/projectDetail/HeaderProgetto';
+import { ScontoProgettoModal } from '../components/projectDetail/ScontoProgettoModal';
 import { ModalAccessiProgetto } from '../components/projectDetail/ModalAccessiProgetto';
 import { fetchProgettoDettaglio, assegnaAccessoProgettoApi, salvaProgettoDettaglioApi, archiviaProgettoApi, eliminaProgettoApi, eliminaModuloApi, ricalcolaProgettoApi, creaPreventivoEAccettaApi } from '../api/client';
 import { useTeamMembers } from '../hooks/useTeamMembers';
@@ -29,6 +31,7 @@ import type { Progetto, ModuloProgetto, MicroVoce, CategoriaModulo, StatoProgett
 import styles from './ProjectDetail.module.css';
 import { useToast } from '../components/ui/ToastProvider';
 import { confirm } from '../components/ui/ConfirmProvider';
+import { confermaCompletamentoSenzaOre } from '../utils/completamentoSenzaOre';
 
 type Tab = 'moduli' | 'grafo' | 'fatturazione' | 'redditivita' | 'storico' | 'comunicazioni' | 'documenti' | 'calendario';
 
@@ -333,6 +336,7 @@ export function ProjectDetail() {
   };
 
   const [rawDbProject, setRawDbProject] = useState<any>(null);
+  const [scontoAperto, setScontoAperto] = useState(false);
 
   const loadDetail = async () => {
     setLoading(true);
@@ -395,22 +399,7 @@ export function ProjectDetail() {
               risorsaId,
               d: mv.passaggi?.length || 0,
               vn: mv.causaNota || undefined,
-              proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map((p: any) => ({
-                id: p.id,
-                title: p.titolo,
-                // Il database enumera il tipo con i valori Prisma («documento», «verifica»);
-                // la UI parla «doc»/«check». La traduzione avviene qui al confine, così il
-                // rendering (bottone allegato, etichette, colori) riconosce la riga.
-                type: p.tipo === 'documento' ? 'doc' : p.tipo === 'verifica' ? 'check' : p.tipo,
-                who: p.chi,
-                stato: p.stato,
-                desc: p.descrizione,
-                file: p.documentoAllegatoUrl,
-                fields: p.campiFormJson,
-                // Le risposte raccolte: senza questa riga la scheda «Compila / Visualizza
-                // Form» riaprirebbe vuota su dati che a database ci sono già.
-                risposte: p.risposteFormJson ?? undefined,
-              })) : undefined),
+              proc: mv.proc || (mv.passaggi?.length ? mv.passaggi.map(passaggioDaDb) : undefined),
               note: savedNotes,
             };
           });
@@ -615,8 +604,11 @@ export function ProjectDetail() {
     });
   };
 
-  const handleToggleMicrovoce = (modId: number, mvIdx: number) => {
+  const handleToggleMicrovoce = async (modId: number, mvIdx: number) => {
     if (!project) return;
+    // Completare senza ore segnate: si chiede conferma, non si blocca (titolare, 28/11/2026).
+    const voce = project.mods.find(m => m.id === modId)?.v[mvIdx];
+    if (voce && voce.s !== 'done' && !(await confermaCompletamentoSenzaOre(voce.hA))) return;
     const newMods = project.mods.map(m => {
       if (m.id === modId) {
         const newV = m.v.map((mv, idx) => {
@@ -757,7 +749,9 @@ export function ProjectDetail() {
     // Con moduli il valore è la loro somma e lo scrive il server: un importo scritto a mano
     // veniva sovrascritto al primo salvataggio, e a schermo spariva già alla riapertura.
     if (!valoreProgettoModificabile(project.mods)) {
-      toast.attenzione(SPIEGAZIONE_VALORE_DA_MODULI);
+      // Con moduli si scrive lo sconto (titolare, 28/11/2026), non il valore: serve il progetto a database.
+      if (rawDbProject?.id) setScontoAperto(true);
+      else toast.attenzione(SPIEGAZIONE_VALORE_DA_MODULI);
       return;
     }
     const nuovoVal = prompt('Inserisci il nuovo valore totale dell\'incarico (€):', String(project.val));
@@ -896,11 +890,22 @@ export function ProjectDetail() {
         onApriCliente={() => navigate(`/clients?client=${encodeURIComponent(project.cl)}`)}
         onModificaValore={handleModificaValore}
         valoreModificabile={valoreProgettoModificabile(project.mods)}
+        scontoEuro={(rawDbProject?.scontoApplicatoCentesimi ?? 0) / 100}
         onApriAccessi={() => setAccessiModalOpen(true)}
         onRicalcola={handleRicalcolaAvanzamento}
         onArchivia={handleArchiviaRipristina}
         onElimina={() => setDeleteModalOpen(true)}
       />
+
+      {scontoAperto && rawDbProject?.id && (
+        <ScontoProgettoModal
+          progettoId={rawDbProject.id}
+          sommaModuliCentesimi={rawDbProject.sommaModuliCentesimi ?? 0}
+          scontoCentesimi={rawDbProject.scontoCentesimi ?? 0}
+          onClose={() => setScontoAperto(false)}
+          onSalvato={loadDetail}
+        />
+      )}
 
       {/* Tabs */}
       <div className={styles.tabs}>

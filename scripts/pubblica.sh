@@ -39,6 +39,23 @@ if [[ "$AUTO" == si && ( "$MERGE" == si || "$BACKUP" == si ) ]]; then
 fi
 log() { printf '[pubblica] %s\n' "$*"; }
 
+# Le chiamate a GitHub si ritentano: il 28/11 una risposta vuota («unexpected end of JSON
+# input») ha chiuso la pubblicazione al primo colpo, senza una riga che dicesse dove. Un
+# rifiuto (HTTP 4xx, tranne 429) non cambia riprovando e non si ritenta. Se non basta, la
+# riga [pubblica] dice quale chiamata e con che errore: è quella che arriva nell'avviso.
+TENTATIVI="${PUBBLICA_TENTATIVI:-3}"; ATTESA="${PUBBLICA_ATTESA:-5}"
+gh_api() { # gh_api «cosa sta facendo» <argomenti di gh api…>
+  local cosa="$1" t=1 risposta errore; shift
+  errore="$(mktemp)"
+  while :; do
+    if risposta="$(gh api "$@" 2>"$errore")"; then rm -f "$errore"; printf '%s' "$risposta"; return 0; fi
+    if (( t >= TENTATIVI )) || grep -qE 'HTTP 4(0[0-9]|1[0-9]|2[0-8])\)' "$errore"; then break; fi
+    sleep "$(( ATTESA * t ))"; t=$(( t + 1 ))
+  done
+  log "GitHub non ha risposto a «$cosa» (tentativi: $t): $(head -n 1 "$errore" | cut -c1-200)" >&2
+  rm -f "$errore"; return 1
+}
+
 git fetch --quiet origin main
 git fetch --quiet upstream main
 base="$(git rev-parse upstream/main)"; testa="$(git rev-parse origin/main)"
@@ -87,12 +104,12 @@ corpo="$(mktemp)"
   echo "Ogni commit è arrivato su main del fork da una PR con CI verde e revisione (pilota dello Standard)."
 } > "$corpo"
 
-pr="$(gh api "repos/$UP/pulls?head=$TESTA_PR&base=main&state=open" --jq '.[0].number // empty')"
+pr="$(gh_api "cerca la PR aperta" "repos/$UP/pulls?head=$TESTA_PR&base=main&state=open" --jq '.[0].number // empty')"
 if [[ -z "$pr" ]]; then
-  pr="$(gh api -X POST "repos/$UP/pulls" -f title="$titolo" -f head="$TESTA_PR" -f base=main -F body=@"$corpo" --jq .number)"
+  pr="$(gh_api "apri la PR" -X POST "repos/$UP/pulls" -f title="$titolo" -f head="$TESTA_PR" -f base=main -F body=@"$corpo" --jq .number)"
   log "PR aperta: https://github.com/$UP/pull/$pr"
 else
-  gh api -X PATCH "repos/$UP/pulls/$pr" -f title="$titolo" -F body=@"$corpo" >/dev/null
+  gh_api "aggiorna la PR #$pr" -X PATCH "repos/$UP/pulls/$pr" -f title="$titolo" -F body=@"$corpo" >/dev/null
   log "PR aggiornata: https://github.com/$UP/pull/$pr"
 fi
 rm -f "$corpo"

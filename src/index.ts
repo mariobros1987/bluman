@@ -4,6 +4,7 @@ import { buildServer } from './server.js';
 // §14 — il client condiviso, non `new PrismaClient()`: si connette col ruolo applicativo
 // soggetto alle policy RLS e impone a ogni query il tenant della richiesta in corso.
 import { prisma } from './util/prismaClient.js';
+import { avviaRaccoltaAutomatica } from './scripts/raccogliPosta.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -40,6 +41,9 @@ async function start() {
       process.exit(1);
     }
     console.log(`🚀 BluMan API in ascolto su ${address} (porta ${porta})`);
+    // Accentratore delle mail: la raccolta gira solo con il database vero. Parte dopo l'ascolto e
+    // non apre connessioni di posta all'avvio: non può ritardare né impedire la partenza dell'API.
+    if (app instanceof PrismaApp) avviaRaccoltaAutomatica();
   });
 }
 

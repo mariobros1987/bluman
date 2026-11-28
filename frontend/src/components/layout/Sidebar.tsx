@@ -24,6 +24,8 @@ const NAV: VoceMenu[] = [
   { path: '/clients',    moduleKey: 'clients',     label: 'Clienti',                icon: '👥', area: 'lavoro' },
   // Coda KYC — stessa chiave RBAC di Clienti: sono le pratiche dei clienti viste tutte insieme.
   { path: '/compliance', moduleKey: 'clients',     label: 'Coda KYC / AML',          icon: '🛡️', area: 'lavoro' },
+  // L'accentratore delle mail: chiave RBAC propria, negata ai collaboratori finché lo studio non la concede.
+  { path: '/posta',      moduleKey: 'posta',       label: 'Posta dei clienti',      icon: '📬', area: 'lavoro' },
   { path: '/calendar',   moduleKey: 'calendar',    label: 'Calendario',             icon: '📅', area: 'lavoro' },
   { path: '/timesheet',  moduleKey: 'timesheet',   label: 'Timesheet ore',          icon: '⏱️', area: 'lavoro' },
   { path: '/invoices',   moduleKey: 'invoices',    label: 'Fatture & SDI',          icon: '💶', area: 'contabilita' },

@@ -153,9 +153,6 @@ export async function uploadDocumento(
   contentBase64: string,
   tenantId?: string,
 ): Promise<UploadResult> {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-
   const buffer = decodificaBase64Documento(contentBase64);
   const scansione = scanFileBuffer(buffer, filename);
   if (!scansione.safe) throw new Error(scansione.reason ?? 'File non ammesso');
@@ -170,6 +167,19 @@ export async function uploadDocumento(
   const safeFilename = accorciaNomeFile(`${prefissoTenant}${Date.now()}_${nomeFileSicuro(filename)}`);
   const sizeKb = `${Math.round(buffer.length / 1024)} KB`;
 
+  const url = await salvaBufferInArchivio(safeFilename, buffer, mimeDaEstensione(filename));
+  return { ok: true, url, name: filename, size: sizeKb };
+}
+
+/**
+ * Scrive un contenuto nell'archivio (Supabase Storage se configurato, altrimenti la cartella
+ * locale) e ne restituisce l'URL firmato. Non controlla il contenuto: chi chiama lo ha già fatto
+ * (`uploadDocumento` con lo scanner; il canale protetto prima di cifrare, perché dopo non si può).
+ */
+export async function salvaBufferInArchivio(safeFilename: string, buffer: Buffer, contentType: string): Promise<string> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+
   // 1. Supabase Storage API Integration (Se le chiavi sono configurate)
   if (supabaseUrl && supabaseKey) {
     try {
@@ -178,7 +188,7 @@ export async function uploadDocumento(
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
           'apikey': supabaseKey,
-          'Content-Type': mimeDaEstensione(filename),
+          'Content-Type': contentType,
         },
         body: new Uint8Array(buffer),
       });
@@ -189,8 +199,7 @@ export async function uploadDocumento(
         // perché il bucket era raggiungibile senza titolo. Il token firmato scade
         // (TTL sotto), quindi l'URL che resta nelle tabelle non è permanente: chi deve
         // rileggere il file passa da `urlSupabaseFirmato()`, che lo rifirma al volo.
-        const url = await urlSupabaseFirmato(safeFilename);
-        return { ok: true, url, name: filename, size: sizeKb };
+        return await urlSupabaseFirmato(safeFilename);
       }
       // Regola 5: una risposta non-ok non solleva eccezione, quindi prima di questa
       // riga finiva nel fallback locale in totale silenzio — per tutto agosto
@@ -211,12 +220,17 @@ export async function uploadDocumento(
   const filePath = path.join(CARTELLA_UPLOADS, safeFilename);
   fs.writeFileSync(filePath, buffer);
 
-  return {
-    ok: true,
-    url: urlUploadFirmato(safeFilename),
-    name: filename,
-    size: sizeKb,
-  };
+  return urlUploadFirmato(safeFilename);
+}
+
+/**
+ * Il riferimento stabile di un oggetto appena scritto da `salvaBufferInArchivio`, senza firma né
+ * scadenza: è ciò che si conserva quando il file non verrà mai servito con un link (gli allegati
+ * del canale protetto), e che `leggiFileArchivio` sa rileggere.
+ */
+export function riferimentoArchivio(safeFilename: string, urlFirmato: string): string {
+  if (urlFirmato.startsWith('/uploads/')) return `/uploads/${safeFilename}`;
+  return `${process.env.SUPABASE_URL}/storage/v1/object/bluman-documents/${safeFilename}`;
 }
 
 /**

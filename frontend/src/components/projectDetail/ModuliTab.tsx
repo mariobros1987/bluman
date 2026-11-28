@@ -1,4 +1,5 @@
 import { ModuloBlock } from './ModuloBlock';
+import { RichiesteAlCliente } from './RichiesteAlCliente';
 import { ordinaPerLivello } from '../../utils/dipendenzeModuli';
 import type { Progetto, ModuloProgetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
@@ -33,6 +34,7 @@ export function ModuliTab({
 }) {
   return (
     <div>
+      <RichiesteAlCliente progettoId={rawDbProject?.id} moduli={rawDbProject?.moduli} />
       {/* Stato vuoto sincero. Prima qui c'era "Inizializzazione Moduli Operativi in
           Corso..." con un pulsante "Istanzia Subito" che scriveva tre moduli cablati
           (Analisi/Societario/Trust, 23.500 € complessivi) con ore GIÀ consuntivate e una

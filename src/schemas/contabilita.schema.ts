@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LUNGHEZZA_MASSIMA_MOTIVO_STORNO, LUNGHEZZA_MINIMA_MOTIVO_STORNO } from '../domain/stornoIncasso.js';
 
 export const RigaFatturaInputSchema = z.object({
   tipo: z.enum(['modulo_completo', 'modulo_parziale', 'milestone_libera']).default('milestone_libera'),
@@ -48,6 +49,15 @@ export const RegistraIncassoSchema = z.object({
   riferimentoTransazione: z.string().max(100).optional().nullable(),
   noteOperatore: z.string().max(1000).optional().nullable(),
 }).passthrough();
+
+/** Lo storno di un incasso: il motivo è obbligatorio, è ciò che resta nel registro. */
+export const StornaIncassoSchema = z.object({
+  motivo: z
+    .string('Scrivi il motivo dello storno.')
+    .trim()
+    .min(LUNGHEZZA_MINIMA_MOTIVO_STORNO, `Scrivi il motivo dello storno (almeno ${LUNGHEZZA_MINIMA_MOTIVO_STORNO} caratteri).`)
+    .max(LUNGHEZZA_MASSIMA_MOTIVO_STORNO, `Il motivo dello storno è troppo lungo (massimo ${LUNGHEZZA_MASSIMA_MOTIVO_STORNO} caratteri).`),
+});
 
 export const CreaMovimentoPrimaNotaSchema = z.object({
   data: z.string().or(z.date()).default(() => new Date()).transform((val) => new Date(val)).optional(),

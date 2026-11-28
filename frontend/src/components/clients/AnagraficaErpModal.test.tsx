@@ -92,6 +92,32 @@ describe('AnagraficaErpModal — niente dati inventati, niente campi obbligatori
     expect(inviato.sedeLegale).toBe('');
   });
 
+  // Titolare, 28/11/2026 — il rischio antiriciclaggio parte «non valutato»: prima la scheda
+  // proponeva «basso» e il primo salvataggio lo scriveva.
+  it('cliente senza classe di rischio: il salvataggio scrive «non valutato», non «basso»', async () => {
+    vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
+    const onSaved = vi.fn();
+    render(<AnagraficaErpModal client={{ ...CLIENTE }} onClose={vi.fn()} onSaved={onSaved} />);
+
+    salva();
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    const inviato = vi.mocked(aggiornaClienteApi).mock.calls[0][1] as any;
+    expect(inviato.rischioAml).toBe('non_valutato');
+    expect(inviato.referentiJson.rischioAml).toBe('non_valutato');
+  });
+
+  it('una classe già scelta resta quella', async () => {
+    vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
+    const onSaved = vi.fn();
+    render(<AnagraficaErpModal client={{ ...CLIENTE, rischioAml: 'alto' }} onClose={vi.fn()} onSaved={onSaved} />);
+
+    salva();
+
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect((vi.mocked(aggiornaClienteApi).mock.calls[0][1] as any).rischioAml).toBe('alto');
+  });
+
   it('i dati che il cliente ha davvero restano quelli', async () => {
     vi.mocked(aggiornaClienteApi).mockResolvedValue({ id: CLIENTE.id });
     const onSaved = vi.fn();

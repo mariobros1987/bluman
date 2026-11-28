@@ -16,7 +16,6 @@ import { AuditLogPage } from './pages/AuditLogPage';
 import { InvoicesPage } from './pages/InvoicesPage';
 import { FornitoriPage } from './pages/FornitoriPage';
 import { LiquidazioneIvaPage } from './pages/LiquidazioneIvaPage';
-import { PaymentsPage } from './pages/PaymentsPage';
 import { ScadenzarioPage } from './pages/ScadenzarioPage';
 import { PrimaNotaPage } from './pages/PrimaNotaPage';
 import { BanksPage } from './pages/BanksPage';
@@ -29,6 +28,7 @@ import { TimesheetPage } from './pages/TimesheetPage';
 // Il manuale in-app: legge le schede di `docs/manuale/` dal backend.
 import { AiutoPage } from './pages/AiutoPage';
 import { NoteBetaPage } from './pages/NoteBetaPage';
+import { PostaPage } from './pages/PostaPage';
 import { getUserPermission } from './utils/rbac';
 import { fetchMeApi } from './api/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -183,7 +183,6 @@ function AppContent() {
           <Route path="/scadenzario"   element={<ProtectedModule user={currentUser} moduleKey="scadenzario" element={<ScadenzarioPage />} />} />
           <Route path="/primanota"     element={<ProtectedModule user={currentUser} moduleKey="primanota" element={<PrimaNotaPage />} />} />
           <Route path="/banks"         element={<ProtectedModule user={currentUser} moduleKey="banks" element={<BanksPage />} />} />
-          <Route path="/payments"      element={<ProtectedModule user={currentUser} moduleKey="banks" element={<PaymentsPage />} />} />
           <Route path="/retainers"     element={<ProtectedModule user={currentUser} moduleKey="retainers" element={<RetainersPage />} />} />
           <Route path="/documents"     element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
           <Route path="/editor"        element={<ProtectedModule user={currentUser} moduleKey="documents" element={<DocumentEditorPage />} />} />
@@ -196,6 +195,9 @@ function AppContent() {
           <Route path="/audit"         element={<ProtectedModule user={currentUser} moduleKey="audit" element={<AuditLogPage />} />} />
           <Route path="/reports"       element={<ProtectedModule user={currentUser} moduleKey="reports" element={<ReportsPage />} />} />
           <Route path="/timesheet"     element={<ProtectedModule user={currentUser} moduleKey="timesheet" element={<TimesheetPage />} />} />
+          {/* La posta dei clienti ha una chiave RBAC sua (`posta`), negata ai collaboratori finché
+              lo studio non la concede: è posta privata dei clienti, non la casella dello studio. */}
+          <Route path="/posta"         element={<ProtectedModule user={currentUser} moduleKey="posta" element={<PostaPage />} />} />
           <Route path="/admin/tenants" element={<SuperAdminPage />} />
           <Route path="/library"       element={<ProtectedModule user={currentUser} moduleKey="library" element={<Library />} />} />
           <Route path="/settings"      element={<ProtectedModule user={currentUser} moduleKey="settings" element={<SettingsPage />} />} />

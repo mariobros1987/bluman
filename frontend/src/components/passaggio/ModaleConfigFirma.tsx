@@ -2,6 +2,7 @@ import React from 'react';
 import type { ConfigFirmaModalState } from './types';
 import { closeBtnStyle } from './passaggioStyles';
 import { Modal } from '../ui/Modal';
+import { sottoIlMinimo, spiegaMinimoFirma } from '../../utils/livelloFirmaMinimo';
 
 // ─── Modale Configurazione Documento (Upload / Genera da Template) ─────
 export function ModaleConfigFirma({
@@ -119,15 +120,22 @@ export function ModaleConfigFirma({
                           desc: 'Firma elettronica qualificata (eIDAS art. 25): solo tramite provider esterno del cliente (file .p7m).',
                           tagColor: 'var(--indigo-l)',
                         },
-                      ]).map((l) => (
+                      ]).map((l) => {
+                        // Il livello del modello è il minimo: quelli più bassi sono spenti.
+                        const spento = sottoIlMinimo(l.id, configFirmaModal.livelloFirmaMinimo);
+                        return (
                         <button
                           key={l.id}
                           type="button"
+                          aria-pressed={configFirmaModal.livelloFirmaRichiesto === l.id}
+                          disabled={spento}
+                          title={spento ? spiegaMinimoFirma(configFirmaModal.livelloFirmaMinimo) ?? undefined : undefined}
                           onClick={() => setConfigFirmaModal({ ...configFirmaModal, livelloFirmaRichiesto: l.id })}
                           style={{
                             background: configFirmaModal.livelloFirmaRichiesto === l.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
                             border: `1.5px solid ${configFirmaModal.livelloFirmaRichiesto === l.id ? 'var(--indigo)' : 'var(--border)'}`,
-                            borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
+                            borderRadius: 10, padding: '9px 10px', textAlign: 'left',
+                            cursor: spento ? 'not-allowed' : 'pointer', opacity: spento ? 0.5 : 1,
                             display: 'flex', flexDirection: 'column', gap: 3
                           }}
                         >
@@ -138,8 +146,14 @@ export function ModaleConfigFirma({
                             {l.desc}
                           </div>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
+                    {spiegaMinimoFirma(configFirmaModal.livelloFirmaMinimo) && (
+                      <div role="note" style={{ marginTop: 8, fontSize: 10.5, color: 'var(--muted)', lineHeight: 1.4 }}>
+                        🔒 {spiegaMinimoFirma(configFirmaModal.livelloFirmaMinimo)}
+                      </div>
+                    )}
                     {configFirmaModal.livelloFirmaRichiesto === 'fea' && (
                       <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#6366f118', border: '1px solid #6366f150', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
                         ℹ️ Con livello <strong>FEA (Avanzata)</strong> il cliente firmerà dal Portale con il flusso certificato completo: verifica OTP, firma grafica obbligatoria, firmatario verificato in anagrafica e documento d'identità (eIDAS art. 26 · art. 25 CAD).

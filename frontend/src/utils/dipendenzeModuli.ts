@@ -50,3 +50,25 @@ export function fraseAttesa(dipendeDa: ReadonlyArray<{ nome: string; fatto: bool
   const mancanti = (dipendeDa ?? []).filter((d) => !d.fatto).map((d) => `«${d.nome}»`);
   return mancanti.length ? `In attesa di: ${mancanti.join(', ')}` : '';
 }
+
+/**
+ * Nel nuovo progetto: i moduli scelti che di solito vengono dopo un modulo NON scelto (titolare,
+ * 28/11/2026: avvisare, non bloccare). Una dipendenza che non è più in libreria non si propone:
+ * non la si potrebbe aggiungere.
+ */
+export function dipendenzeMancanti<M extends { id: string; n: string; deps?: ReadonlyArray<string> | null }>(
+  scelti: ReadonlyArray<M>,
+  libreria: ReadonlyArray<M>,
+): Array<{ modulo: M; mancanti: M[] }> {
+  const idScelti = new Set(scelti.map((m) => m.id));
+  const perId = new Map(libreria.map((m) => [m.id, m]));
+  return scelti
+    .map((modulo) => ({
+      modulo,
+      mancanti: (modulo.deps ?? [])
+        .filter((id) => !idScelti.has(id))
+        .map((id) => perId.get(id))
+        .filter((m): m is M => Boolean(m)),
+    }))
+    .filter((x) => x.mancanti.length > 0);
+}

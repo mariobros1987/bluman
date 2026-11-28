@@ -10,6 +10,7 @@ import { updateArticoloPrezzoApi } from '../../api/client';
 // browser (`tmpl-custom-<timestamp>`) che il server scartava: l'articolo restava allacciato a
 // un identificativo che a database non esisteva, e da un altro computer non si vedeva niente.
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
+import { useFormMaster } from '../../hooks/useFormMaster';
 import type { Articolo } from '../../types';
 import { useToast } from '../ui/ToastProvider';
 import { Modal } from '../ui/Modal';
@@ -21,6 +22,9 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
   const navigate = useNavigate();
   const editArtFileImportRef = useRef<HTMLInputElement>(null);
   const cartella = useCartellaTemplate();
+  // I form dello studio, dal server: l'articolo ne indica uno per il cliente (titolare, 28/11/2026).
+  const formStudio = useFormMaster();
+  const nomeDelForm = (id: string) => formStudio.form?.find((f) => f.id === id)?.nome;
   // Gli archiviati non si allacciano: sono carte che lo studio ha messo da parte.
   const allMasterTemplates = React.useMemo(
     () => cartella.modelli.filter(t => !t.archiviato),
@@ -129,6 +133,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
     // §41 — si rilegge la cartella dello studio, non la copia di questo browser: se un collega
     // ha aggiunto o archiviato un modello, l'elenco allacciabile lo mostra già aggiornato.
     void cartella.sincronizza();
+    void formStudio.ricarica();
     setEditingArt(art);
     setEditPrice(art.p);
     setEditHours(art.h);
@@ -148,6 +153,8 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
         prezzoDefault: editPrice * 100,
         oreDefault: editHours,
         nome: editName,
+        // Il form che il cliente compila: si salva sull'articolo. Vuoto = nessun form.
+        formMasterId: editFormMasterId || null,
       });
       // §3.3 — aggiorna locale SOLO dopo la conferma del server. Prima anche il ramo
       // catch applicava le modifiche in locale e chiudeva il modal in silenzio: prezzo
@@ -156,7 +163,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
       editingArt.h = editHours;
       editingArt.n = editName;
       editingArt.documentiRichiesti = editDocModels;
-      editingArt.formMasterId = editFormMasterId;
+      editingArt.formMasterId = editFormMasterId || null;
       setEditingArt(null);
     } catch (err: any) {
       toast.errore(`Salvataggio articolo non riuscito: ${err?.message || 'errore di rete'}. Le modifiche NON sono state applicate, riprova.`);
@@ -318,7 +325,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                   <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>📋 Form Cliente:</span>
                   {a.formMasterId ? (
                     <span style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', padding: '2px 6px', borderRadius: 6, fontSize: 9.5, fontWeight: 700, border: '1px solid var(--pill-purple-bg)' }}>
-                      {a.formMasterId === 'f1' ? 'Form Dati Societari' : a.formMasterId === 'f2' ? 'Form UBO & Controllo' : 'Form Dati Bancari & KYC'}
+                      {nomeDelForm(a.formMasterId) ?? (formStudio.form === null ? 'lettura…' : formStudio.errore ? 'form non letto' : 'form non più disponibile')}
                     </span>
                   ) : (
                     <span style={{ color: 'var(--muted)', fontSize: 10, fontStyle: 'italic' }}>Nessun form richiesto</span>
@@ -373,7 +380,7 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
                   <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>📄 Documenti & Modelli Allacciati ({editDocModels.length})</div>
                   <div style={{ fontSize: 10, color: 'var(--muted)' }}>Seleziona dalla memoria, crea un nuovo modello Word o importalo dal PC</div>
                   <div role="note" style={{ fontSize: 10, color: 'var(--pill-amber-fg)', marginTop: 3 }}>
-                    ⚠ I documenti allacciati e il form scelti qui non vengono ancora salvati: valgono finché la pagina resta aperta. Si salvano nome, prezzo e ore.
+                    ⚠ I documenti allacciati qui non vengono ancora salvati: valgono finché la pagina resta aperta. Si salvano nome, prezzo, ore e il form del cliente.
                   </div>
                 </div>
 
@@ -472,19 +479,38 @@ export function ArticoliCatalogView({ articoliList, onOpenNew, onDisattiva }: { 
               </div>
             </div>
 
-            {/* Form Master Dinamico */}
+            {/* Il form che il cliente compila per questo articolo: si salva (titolare, 28/11/2026). */}
             <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📋 Form Master Dati da far Compilare al Cliente</label>
+              <label htmlFor="art-form-cliente" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>📋 Form da far compilare al cliente</label>
               <select
+                id="art-form-cliente"
                 value={editFormMasterId}
                 onChange={e => setEditFormMasterId(e.target.value)}
+                disabled={formStudio.form === null || !!formStudio.errore}
                 style={{ padding: 8, fontSize: 12 }}
               >
-                <option value="">-- Nessun Form Richiesto --</option>
-                <option value="f1">Form Dati Societari & Legale Rappresentante</option>
-                <option value="f2">Form Titolarità Effettiva & UBO</option>
-                <option value="f3">Form Dati Bancari & KYC Compliance</option>
+                <option value="">{formStudio.form === null ? 'Lettura dei form…' : '-- Nessun form richiesto --'}</option>
+                {(formStudio.form ?? []).map((f) => (
+                  <option key={f.id} value={f.id}>{f.nome} ({f.campi.length} {f.campi.length === 1 ? 'domanda' : 'domande'})</option>
+                ))}
+                {editFormMasterId && formStudio.form && !formStudio.form.some((f) => f.id === editFormMasterId) && (
+                  <option value={editFormMasterId}>Form non più disponibile</option>
+                )}
               </select>
+              {formStudio.errore ? (
+                <div role="alert" style={{ fontSize: 10.5, color: 'var(--pill-red-fg)', marginTop: 4 }}>
+                  Form non letti ({formStudio.errore}): il form dell'articolo resta com'è.{' '}
+                  <button type="button" className="btn btn-sm btn-secondary" onClick={() => void formStudio.ricarica()}>Riprova</button>
+                </div>
+              ) : formStudio.form && formStudio.form.length === 0 ? (
+                <div style={{ fontSize: 10.5, color: 'var(--hint)', marginTop: 4 }}>
+                  Lo studio non ha ancora un form: si crea in Libreria, nella scheda «Modelli Documenti in Bianco & Form Master».
+                </div>
+              ) : (
+                <div style={{ fontSize: 10.5, color: 'var(--hint)', marginTop: 4 }}>
+                  Nei progetti nuovi diventa un passaggio del cliente. Se il cliente l'ha già compilato in un altro progetto, le risposte vengono riprese e restano da controllare.
+                </div>
+              )}
             </div>
 
             <div>

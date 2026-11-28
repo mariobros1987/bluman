@@ -8,6 +8,8 @@ import { getTenantStorageKey, getStudioInfoForTenant, getCurrentTenantId, BLUECO
 import type { Progetto } from '../../types';
 import styles from '../../pages/ProjectDetail.module.css';
 import { useToast } from '../ui/ToastProvider';
+import { useDatiClienteMancanti } from '../contabilita/DatiClienteMancanti';
+import { leggiImportiProposti, spiegaCriterio, type CriterioImporto } from '../../utils/importiProposti';
 import { Modal } from '../ui/Modal';
 
 export interface VoceFatturabile {
@@ -19,8 +21,8 @@ export interface VoceFatturabile {
   oreConsuntivate: number;
   /** Imponibile in euro; `null` = importo mancante, da inserire prima di emettere (N3). */
   importo: number | null;
-  /** L'importo è la quota del modulo (valore / numero di voci), non un dato della voce. */
-  ripartitoDaModulo?: boolean;
+  /** Da dove viene l'importo proposto (lo calcola il server); assente se l'ha scritto l'operatore. */
+  criterio?: CriterioImporto | null;
   selezionato: boolean;
   giaFatturata?: boolean;
   dettaglioFattura?: {
@@ -30,22 +32,10 @@ export interface VoceFatturabile {
   };
 }
 
-/**
- * La quota del valore del modulo per ciascuna delle sue voci, oppure `null` se il modulo non ha un
- * valore: un modulo a 0 o senza valore non dà un importo da fatturare, e non se ne inventa uno.
- */
-function quotaModulo(m: unknown, numVoci: number): number | null {
-  // Il prezzo del modulo, in euro, è `p` (`ModuloProgetto`, riempito da `modulo_progetto.prezzo`).
-  // Qui si leggeva `val`, un campo che il modulo non ha: ogni voce risultava «importo mancante»
-  // anche su un modulo con il suo prezzo.
-  const prezzo = (m as { p?: unknown })?.p;
-  if (typeof prezzo !== 'number' || !(prezzo > 0)) return null;
-  return Math.round(prezzo / (numVoci || 1));
-}
-
 // ─── Fatturazione Tab ─────────────────────────────────────────────
 export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project: Progetto; rawDbProject?: any; onRefresh: () => void }) {
   const toast = useToast();
+  const datiCliente = useDatiClienteMancanti();
   const navigate = useNavigate();
   const totFatturato = project.fatture.reduce((a, f) => a + f.importo, 0);
   const residuo = project.val - totFatturato;
@@ -58,6 +48,8 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   const [previewFattura, setPreviewFattura] = useState<any | null>(null);
 
   const [vociFatturabili, setVociFatturabili] = useState<VoceFatturabile[]>([]);
+  // Gli importi proposti arrivano dal server (listino, proporzione, sconto): qui non si fanno conti.
+  const proposti = leggiImportiProposti(rawDbProject);
 
   // Le voci dai moduli e microvoci del progetto, identificando quelle già fatturate.
   // N3 — niente importi di ripiego (400, 120 €/h, 1000): una voce senza valore resta «importo
@@ -86,7 +78,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
     (project.mods || []).forEach((m, mIdx) => {
       const numV = (m.v || []).length;
-      const imp = quotaModulo(m, numV);
+      const criterio = proposti.criterio(m.dbId);
       const modNome = m.n || 'Modulo';
 
       (m.v || []).forEach((mv, vIdx) => {
@@ -94,6 +86,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
         const st = anyMv.s || anyMv.st || (anyMv.done ? 'done' : 'pending');
         const ore = anyMv.hA || anyMv.a || 0;
         const tit = mv.n || 'Micro-voce operativa';
+        const imp = proposti.voce(m.dbId, mv.dbId);
 
         // Match su descrizione fattura: `[NomeModulo] TitoloMicrovoce` o `TitoloMicrovoce`
         const descKey1 = `[${modNome.trim().toLowerCase()}] ${tit.trim().toLowerCase()}`;
@@ -109,7 +102,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           stato: st,
           oreConsuntivate: ore,
           importo: imp,
-          ripartitoDaModulo: imp !== null,
+          criterio: imp !== null ? criterio : null,
           giaFatturata,
           dettaglioFattura,
           // PREVENZIONE DOPPIA FATTURAZIONE: Se è già fatturata, parte SEMPRE deselezionata!
@@ -119,6 +112,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       });
 
       if (numV === 0) {
+        const imp = proposti.modulo(m.dbId);
         const descKey1 = `[${modNome.trim().toLowerCase()}] ${modNome.trim().toLowerCase()}`;
         const descKey2 = modNome.trim().toLowerCase();
         const modKeyId = String(m.id || mIdx);
@@ -185,7 +179,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
 
   const updateVoceImporto = (key: string, importo: number | null) => {
     // Modificato a mano, l'importo non è più la quota ripartita: l'etichetta sparisce.
-    setVociFatturabili(prev => prev.map(v => v.key === key ? { ...v, importo, ripartitoDaModulo: false } : v));
+    setVociFatturabili(prev => prev.map(v => v.key === key ? { ...v, importo, criterio: null } : v));
   };
 
   const toggleVoce = (key: string) => {
@@ -209,7 +203,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       const righe = vociSelezionate.map(v => ({
         tipo: 'modulo_completo' as const,
         moduloProgettoId: v.moduloId.startsWith('mod-') ? v.moduloId.replace('mod-', '') : v.moduloId,
-        importo: Math.abs(v.importo ?? 0) * 100, // centesimi, imponibile di riga (mai null: controllato sopra)
+        importo: Math.round(Math.abs(v.importo ?? 0) * 100), // centesimi interi, imponibile di riga (mai null: controllato sopra)
         descrizione: `[${v.moduloNome}] ${v.titolo}`,
       }));
 
@@ -225,6 +219,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       onRefresh();
       toast.successo(`Documento ${resFattura?.numero || 'fiscale'} emesso con successo a database (${righe.length} voci fatturate per ${fmt(totaleImponibile)})!`);
     } catch (err: any) {
+      if (datiCliente.intercetta(err)) return;
       console.error(err);
       toast.errore(`Errore emissione fattura: ${err?.message || 'Impossibile completare la richiesta'}`);
     } finally {
@@ -278,7 +273,6 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
   };
   (project.mods || []).forEach((m, mIdx) => {
     const numV = (m.v || []).length;
-    const imp = quotaModulo(m, numV);
     const modNome = m.n || 'Modulo';
     (m.v || []).forEach((mv) => {
       const anyMv = mv as any;
@@ -287,12 +281,12 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
       const k1 = `[${modNome.trim().toLowerCase()}] ${tit.trim().toLowerCase()}`;
       const k2 = tit.trim().toLowerCase();
       const isFatturata = fatturateDescSet.has(k1) || fatturateDescSet.has(k2);
-      if ((st === 'done' || anyMv.done === true) && !isFatturata) contaDaFatturare(imp);
+      if ((st === 'done' || anyMv.done === true) && !isFatturata) contaDaFatturare(proposti.voce(m.dbId, mv.dbId));
     });
     if (numV === 0 && m.st === 'done') {
       const k1 = `[${modNome.trim().toLowerCase()}] ${modNome.trim().toLowerCase()}`;
       const isFatturata = fatturateDescSet.has(`mod-${m.id || mIdx}`) || fatturateDescSet.has(k1);
-      if (!isFatturata) contaDaFatturare(imp);
+      if (!isFatturata) contaDaFatturare(proposti.modulo(m.dbId));
     }
   });
 
@@ -705,12 +699,12 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
                                   {v.importo === null && (
                                     <span style={{ fontSize: 10, color: 'var(--pill-amber-fg)', fontWeight: 600 }}>importo mancante</span>
                                   )}
-                                  {v.ripartitoDaModulo && (
+                                  {v.criterio && (
                                     <span
                                       style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}
-                                      title={`Valore del modulo «${v.moduloNome}» diviso per il numero delle sue voci: modificalo se la voce vale un importo diverso.`}
+                                      title={spiegaCriterio(v.criterio, v.moduloNome, proposti.scontoEuro).spiegazione}
                                     >
-                                      ripartito dal modulo
+                                      {spiegaCriterio(v.criterio, v.moduloNome).etichetta}
                                     </span>
                                   )}
                                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>€</span>
@@ -774,6 +768,11 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
               <div>
                 <div style={{ fontSize: 11, color: 'var(--muted)' }}>Voci selezionate: <strong>{vociSelezionate.length}</strong> su {vociFatturabili.length}</div>
                 <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Imponibile: {fmt(totaleImponibile)} · IVA ({aliquotaPct}%): {fmt(totaleIva)}</div>
+                {proposti.scontoEuro > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    Sconto di progetto {fmt(proposti.scontoEuro)}: già tolto dagli importi proposti, e dichiarato in fattura.
+                  </div>
+                )}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, color: 'var(--indigo-l)', fontWeight: 600 }}>TOTALE DOCUMENTO</div>
@@ -814,6 +813,7 @@ export function FatturazioneTab({ project, rawDbProject, onRefresh }: { project:
           )}
         </Modal>
       )}
+      {datiCliente.modale}
     </div>
   );
 }

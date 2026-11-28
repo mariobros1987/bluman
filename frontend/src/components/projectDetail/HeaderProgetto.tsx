@@ -17,6 +17,7 @@ export function HeaderProgetto({
   onApriCliente,
   onModificaValore,
   valoreModificabile = true,
+  scontoEuro = 0,
   onApriAccessi,
   onRicalcola,
   onArchivia,
@@ -30,8 +31,10 @@ export function HeaderProgetto({
   onRinomina: () => void;
   onApriCliente: () => void;
   onModificaValore: () => void;
-  /** Falso quando il valore è la somma dei moduli: niente matita, e il title lo spiega. */
+  /** Falso quando il valore è la somma dei moduli: il clic apre lo sconto, e il title lo spiega. */
   valoreModificabile?: boolean;
+  /** Sconto concordato sul progetto, in euro (0 o assente = nessuno). */
+  scontoEuro?: number;
   onApriAccessi: () => void;
   onRicalcola: () => void;
   onArchivia: () => void;
@@ -61,11 +64,11 @@ export function HeaderProgetto({
           </span>
           <span title={project.due ? 'Data di avvio → scadenza del progetto' : 'Data di avvio (nessuna scadenza indicata)'}>📅 {project.start}{project.due ? ` → ${project.due}` : ''}</span>
           <span
-            style={{ cursor: valoreModificabile ? 'pointer' : 'help' }}
+            style={{ cursor: 'pointer' }}
             title={valoreModificabile ? 'Valore dell’incarico: clicca per scriverlo' : SPIEGAZIONE_VALORE_DA_MODULI}
             onClick={onModificaValore}
           >
-            💶 {fmt(project.val)}{valoreModificabile ? ' ✏️' : ''}
+            💶 {fmt(project.val)}{scontoEuro > 0 ? ` (sconto ${fmt(scontoEuro)})` : ''} ✏️
           </span>
           <Badge stato={project.st} />
           <button

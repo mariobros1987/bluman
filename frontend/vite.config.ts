@@ -16,5 +16,11 @@ export default defineConfig({
     // jsdom non ha fetch nativa affidabile nelle versioni vecchie di Node su Windows:
     // i test che toccano la rete la mockano sempre, qui si evita solo il warning.
     css: false,
+    // Come il backend (`vitest.config.ts`): i 5 s di default non bastano quando le tre parti delle
+    // prove, la build e il revisore girano insieme sullo stesso PC. Il 28/11 due test da 180-230 ms
+    // sono scaduti a 5 s in due giri di fila (run 46151502939 e 46152024074), ogni volta uno
+    // diverso: non era un test lento, era il tetto troppo vicino. Un test che si blocca davvero
+    // fallisce comunque, a 30 s.
+    testTimeout: 30_000,
   },
 })

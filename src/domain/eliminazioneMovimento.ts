@@ -6,10 +6,13 @@
 // il denaro spariva dalla Prima Nota e dal saldo, ma la rata restava incassata: lo Scadenzario
 // diceva «pagato» di un importo che nessuna riga registrava più.
 //
-// Qui si impedisce il danno. Come si annulla davvero un incasso sbagliato (storno) è una regola
-// che decide il titolare: finché non c'è, il messaggio lo dice.
+// Qui si impedisce il danno. Un incasso sbagliato si annulla con lo storno (titolare, 28/11/2026):
+// Scadenzario → «Storna incasso» scrive la riga contraria e riapre la rata. Anche lo storno è metà
+// di un'operazione, e non si elimina.
 
 export interface MovimentoPerEliminazione {
+  tipo?: string | null;
+  categoria?: string | null;
   fatturaId?: string | null;
   fatturaRicevutaId?: string | null;
   fattura?: { numero?: string | null } | null;
@@ -20,9 +23,16 @@ export interface MovimentoPerEliminazione {
 export function motivoMovimentoNonEliminabile(m: MovimentoPerEliminazione): string | null {
   if (m.fatturaId) {
     const numero = m.fattura?.numero ? ` ${m.fattura.numero}` : '';
+    if (m.tipo === 'uscita') {
+      // Un'uscita legata a una fattura emessa è uno storno d'incasso o il rimborso di una Nota di Credito.
+      return (
+        `Questo movimento è lo storno o il rimborso di un incasso della fattura${numero}: è la traccia ` +
+        'dell’annullamento, e non si elimina.'
+      );
+    }
     return (
       `Questo movimento è l'incasso della fattura${numero}: eliminandolo la rata resterebbe «incassata» ` +
-      'senza il suo denaro in Prima Nota. Non si elimina da qui.'
+      'senza il suo denaro in Prima Nota. Per annullarlo usa «Storna incasso» nello Scadenzario.'
     );
   }
   if (m.fatturaRicevutaId) {

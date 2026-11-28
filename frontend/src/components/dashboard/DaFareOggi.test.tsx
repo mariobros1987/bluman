@@ -4,11 +4,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { DaFareOggi } from './DaFareOggi';
-import { fetchScadenzarioIncassiApi, fetchFattureRicevuteApi } from '../../api/client';
+import { fetchScadenzarioIncassiApi, fetchFattureRicevuteApi, fetchContrattiRicorrentiApi } from '../../api/client';
 
-vi.mock('../../api/client', () => ({ fetchScadenzarioIncassiApi: vi.fn(), fetchFattureRicevuteApi: vi.fn() }));
+vi.mock('../../api/client', () => ({ fetchScadenzarioIncassiApi: vi.fn(), fetchFattureRicevuteApi: vi.fn(), fetchContrattiRicorrentiApi: vi.fn() }));
 const mockRate = fetchScadenzarioIncassiApi as ReturnType<typeof vi.fn>;
 const mockAcquisti = fetchFattureRicevuteApi as ReturnType<typeof vi.fn>;
+const mockContratti = fetchContrattiRicorrentiApi as ReturnType<typeof vi.fn>;
 
 const ADMIN = { id: 'u-1', ruolo: 'super_admin' };
 const apri = (user: unknown = ADMIN, moduliInRitardo = 0) =>
@@ -18,6 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockRate.mockResolvedValue([]);
   mockAcquisti.mockResolvedValue([]);
+  mockContratti.mockResolvedValue([]);
 });
 
 describe('DaFareOggi', () => {
@@ -52,5 +54,21 @@ describe('DaFareOggi', () => {
     expect(await screen.findByText(/Niente di urgente/)).toBeTruthy();
     expect(mockRate).not.toHaveBeenCalled();
     expect(mockAcquisti).not.toHaveBeenCalled();
+    expect(mockContratti).not.toHaveBeenCalled();
+  });
+
+  it('un canone Retainer arrivato alla data → riga con l’importo e il pulsante per i Retainer', async () => {
+    mockContratti.mockResolvedValue([{ stato: 'attivo', prossimaFatturazione: '2020-01-10T00:00:00.000Z', importoCentesimi: 50000 }]);
+    apri();
+    expect(await screen.findByText('1 canone Retainer da fatturare')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Apri i Retainer/ })).toBeTruthy();
+    expect(mockContratti).toHaveBeenCalledWith({ rigettaSuErrore: true });
+  });
+
+  it('contratti non letti → avviso, e non «niente di urgente»', async () => {
+    mockContratti.mockRejectedValue(new Error('rete'));
+    apri();
+    expect((await screen.findByRole('alert')).textContent).toContain('i contratti Retainer');
+    expect(screen.queryByText(/Niente di urgente/)).toBeNull();
   });
 });

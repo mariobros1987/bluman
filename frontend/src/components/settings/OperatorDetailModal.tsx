@@ -110,6 +110,8 @@ export function OperatorDetailModal({
     retainers: 'write',
     reports: 'write',
     communications: 'write',
+    // La posta dei clienti parte negata: è posta privata, la concede chi risponde dello studio.
+    posta: 'denied',
     documents: 'read',
     library: 'read',
     audit: 'denied',
@@ -218,6 +220,7 @@ export function OperatorDetailModal({
     // in arrivo e il fascicolo del cliente (voce 4). Il livello «read» significa qui «consulta la
     // conversazione senza poter scrivere», e vale identico per la posta e per l'invio.
     { key: 'communications', label: '💬 Comunicazioni & Canali Cliente', desc: 'Lettura e invio email/WhatsApp/Telegram/Signal, casella in arrivo e fascicolo del cliente' },
+    { key: 'posta', label: '📬 Posta dei clienti', desc: 'Le caselle dei clienti raccolte in BluMan: lettura, smistamento a cliente e progetto, archivio. Caselle e inoltri li configura solo il responsabile' },
     { key: 'audit', label: '🔍 Log Audit & Attività Operatori', desc: 'Tracciamento completo azioni operatori' },
     { key: 'settings', label: '⚙️ Impostazioni Studio & Canali', desc: 'Anagrafica studio, SMTP, IMAP e configurazioni' },
   ];

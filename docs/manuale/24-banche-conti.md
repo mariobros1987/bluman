@@ -10,7 +10,7 @@
 ## 📐 Calcoli & logica
 - Il saldo di un conto è **saldo iniziale + entrate − uscite** dei suoi movimenti (§07).
 - All'apertura della pagina il saldo viene ricontrollato sui movimenti e riallineato se necessario.
-- Un incasso senza conto indicato usa quello di accredito della fattura e, in mancanza, il **conto predefinito** (§06).
+- Un incasso si registra sempre su un conto, scelto da chi registra: senza conti dello studio non si registra, e il modulo dell'incasso porta qui a crearne uno (§06).
 
 ## 🔗 Collegamenti
 - **Prima Nota** (§07), **Scadenzario** (§06), **Fornitori** (§23).

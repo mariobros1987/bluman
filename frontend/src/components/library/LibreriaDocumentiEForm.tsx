@@ -11,6 +11,7 @@ import { uploadFileApi, fetchClienti, fetchProgetti } from '../../api/client';
 import { useCartellaTemplate } from '../../hooks/useCartellaTemplate';
 import { useToast } from '../ui/ToastProvider';
 import { confirm } from '../ui/ConfirmProvider';
+import { FormMasterSection } from './FormMasterSection';
 
 // ─── Componente Libreria Documenti in Bianco & Form Master ────────
 export function LibreriaDocumentiEForm() {
@@ -47,21 +48,11 @@ export function LibreriaDocumentiEForm() {
     [cartella.modelli],
   );
 
-  const [formMasters, setFormMasters] = useState([
-    { id: 'f1', nome: 'Form Dati Societari & Legale Rappresentante', campi: ['Ragione Sociale', 'P.IVA / VAT', 'Codice Fiscale', 'Indirizzo Sede Legale', 'Legale Rappresentante'] },
-    { id: 'f2', nome: 'Form Titolarità Effettiva & Struttura di Controllo', campi: ['Nome Titolare Effettivo', 'Percentuale Quote', 'Dati Passaporto', 'Residenza Fiscale'] },
-    { id: 'f3', nome: 'Form Dati Bancari & KYC Compliance', campi: ['Banca di Riferimento', 'IBAN', 'Origine dei Fondi', 'Volume Affari Annuo'] },
-  ]);
-
   const [newDocOpen, setNewDocOpen] = useState(false);
   const [docName, setDocName] = useState('');
   const [docCat, setDocCat] = useState('Societario');
   const [docDesc, setDocDesc] = useState('');
   const [docSign, setDocSign] = useState(true);
-
-  const [newFormOpen, setNewFormOpen] = useState(false);
-  const [formName, setFormName] = useState('');
-  const [formFieldsText, setFormFieldsText] = useState('');
 
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -185,22 +176,6 @@ export function LibreriaDocumentiEForm() {
     URL.revokeObjectURL(url);
   };
 
-  const handleAddForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formName.trim()) return;
-    const campiArr = formFieldsText.split(',').map(s => s.trim()).filter(Boolean);
-    setFormMasters([
-      ...formMasters,
-      {
-        id: `f-${Date.now()}`,
-        nome: formName,
-        campi: campiArr.length > 0 ? campiArr : ['Campo 1', 'Campo 2'],
-      },
-    ]);
-    setFormName('');
-    setFormFieldsText('');
-    setNewFormOpen(false);
-  };
 
   const [linkingDocModel, setLinkingDocModel] = useState<any | null>(null);
   const [clientiList, setClientiList] = useState<any[]>([]);
@@ -519,54 +494,8 @@ export function LibreriaDocumentiEForm() {
         </div>
       </div>
 
-      {/* Sezione 2: Form Master Dinamici */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>📋 Form Master Dinamici ({formMasters.length})</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>Definisci la struttura dei moduli di raccolta dati da guidare al cliente nel suo portale</div>
-          </div>
-          <button
-            onClick={() => setNewFormOpen(true)}
-            style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-          >
-            + Crea Nuovo Form Master
-          </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-          {formMasters.map(f => (
-            <div key={f.id} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--indigo-l)' }}>📋 {f.nome}</div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      if (await confirm({ messaggio: `Eliminare il Form Master "${f.nome}"?`, confermaLabel: 'Elimina', pericolo: true })) {
-                        setFormMasters(formMasters.filter(x => x.id !== f.id));
-                      }
-                    }}
-                    style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid var(--red)', color: 'var(--pill-red-fg)', padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}
-                    title="Elimina Form Master"
-                  >
-                    <span>🗑️</span>
-                    <span>Elimina</span>
-                  </button>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Campi di raccolta dati incorporati ({f.campi.length}):</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {f.campi.map((c, i) => (
-                    <span key={i} style={{ background: 'var(--pill-indigo-bg)', color: 'var(--purple)', padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600 }}>
-                      {c}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Sezione 2: i form per il cliente, letti e salvati sul server */}
+      <FormMasterSection />
 
       {/* Modal Nuovo Modello Documento */}
       {newDocOpen && (
@@ -619,34 +548,6 @@ export function LibreriaDocumentiEForm() {
         </div>
       )}
 
-      {/* Modal Nuovo Form Master */}
-      {newFormOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <form onSubmit={handleAddForm} style={{ background: 'var(--sidebar)', border: '1px solid var(--border)', borderRadius: 16, padding: 20, width: '100%', maxWidth: 460, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Crea Nuovo Form Master Dinamico</div>
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Titolo Form Master *</label>
-              <input aria-label="Titolo form master" value={formName} onChange={e => setFormName(e.target.value)} placeholder="es. Form Adeguata Verifica & Profilo KYC" required />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Campi del Form (separati da virgola) *</label>
-              <textarea
-                aria-label="Campi del form (separati da virgola)"
-                value={formFieldsText}
-                onChange={e => setFormFieldsText(e.target.value)}
-                placeholder="es. Nome Completo, Codice Fiscale, Indirizzo Residenza, Origine Patrimoniale, IBAN"
-                rows={4}
-                required
-                style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', padding: 10, fontSize: 12 }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
-              <button type="button" onClick={() => setNewFormOpen(false)} style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted)', padding: '7px 14px', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>Annulla</button>
-              <button type="submit" style={{ background: 'var(--indigo)', color: '#fff', border: 'none', padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>+ Crea Form Master</button>
-            </div>
-          </form>
-        </div>
-      )}
       {/* Modal Collega Modello Documento a Cliente */}
       {linkingDocModel && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: 16 }}>

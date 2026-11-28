@@ -48,6 +48,10 @@ export async function eliminaTenantCompleto(tenantId: string): Promise<Record<st
       ['checklistVoce', () => tx.checklistVoce.deleteMany(w)],
       ['collegamentoChatProgetto', () => tx.collegamentoChatProgetto.deleteMany(w)],
       ['comunicazioneProgetto', () => tx.comunicazioneProgetto.deleteMany(w)],
+      // Accentratore delle mail: allegati → messaggi → caselle (i messaggi puntano alla casella).
+      ['allegatoPosta', () => tx.allegatoPosta.deleteMany(w)],
+      ['messaggioPosta', () => tx.messaggioPosta.deleteMany(w)],
+      ['casellaPosta', () => tx.casellaPosta.deleteMany(w)],
       ['notifica', () => tx.notifica.deleteMany(w)],
       ['oraTimesheet', () => tx.oraTimesheet.deleteMany(w)],
       ['eventoCalendario', () => tx.eventoCalendario.deleteMany(w)],

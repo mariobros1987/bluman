@@ -38,7 +38,7 @@ Riferimento: diagnosi del 02/11/2026 (codici A, F, D, M, N).
 - [ ] 3.2 AnagraficaErpModal: salvataggio fallito dichiarato (F3) — modello: Sonnet
 - [ ] 3.3 PassaggioModal: autore dall'utente collegato, nessuna nota fabbricata (F4) — modello: Sonnet
 - [ ] 3.4 Dati demo mai mostrati su errore API; Dashboard con stato d'errore (F5) — modello: Sonnet
-- [ ] 3.5 Pagine Banks, Scadenzario, Retainers, Payments: errore distinto da "vuoto" (F6) — modello: Sonnet
+- [ ] 3.5 Pagine Banks, Scadenzario, Retainers: errore distinto da "vuoto" (F6; Payments eliminata il 28/11, R.8) — modello: Sonnet
 - [ ] 3.6 Testi di ripiego negli atti → campo mancante segnalato — modello: Sonnet
 
 ## Fase 4 — Sicurezza
@@ -57,5 +57,29 @@ Riferimento: diagnosi del 02/11/2026 (codici A, F, D, M, N).
 - [ ] 5.4 Node 20 in engines e .nvmrc (D6); ramo master eliminato — modello: Sonnet
 - [ ] 5.5 Split di firma.ts, progetti.ts, tenant.ts, uno per sessione — modello: Sonnet
 
+## Risposte del titolare — 28/11/2026
+Dal documento «Domande per Mario» compilato in call (19 domande). I numeri sono quelli del documento.
+- [x] R.2 Fattura senza i dati fiscali del cliente: bloccata (409) nelle tre rotte che emettono, con il rimando alla scheda cliente
+- [x] R.3 Importi in fattura dal listino dell'articolo; in proporzione al listino se il modulo ha un prezzo a pacchetto
+- [x] R.5 «Storna incasso»: riga contraria, rata riaperta, uscita in Prima Nota dallo stesso conto, motivo nel registro
+- [x] R.6 Conto dell'incasso obbligatorio
+- [x] R.7 Sconto concordato sul progetto, dichiarato in fattura
+- [x] R.8 Pagina Pagamenti eliminata (la 3.5 non la riguarda più)
+- [x] R.9 Retainer: nessuna fattura automatica, «Da fare oggi» ricorda i canoni da fatturare
+- [x] R.12 Nuovo progetto: avviso se manca il modulo da cui un altro dipende (nessun blocco)
+- [x] R.13 Attività chiusa a zero ore: domanda di conferma (nessun blocco)
+- [x] R.14 Il livello di firma del modello è il minimo del documento
+- [x] R.15 Rischio antiriciclaggio di un cliente nuovo: «non valutato»
+- [x] R.16 Il form dell'articolo si salva, diventa un passaggio del cliente nei progetti nuovi e riprende le risposte già date
+- [ ] R.1 Multi-Paese, emittente per progetto — fermo sulle domande al titolare: (a) l'elenco dei Paesi (Malta e Gibilterra erano esempi); (b) un'azienda che fattura = uno studio a sé (un tenant per azienda, come oggi: nessun codice nuovo) oppure più emittenti nello stesso studio, scelte sul progetto (anagrafiche emittente, numerazione e registro per emittente, isolamento da ripensare); (c) per ogni Paese: tipi di cliente, canale d'invio, formato del documento
+- [ ] R.4 IVA per Paese nelle impostazioni dello studio — dipende da R.1; aliquote, periodicità e prospetto di versamento per Paese vanno scritti con un commercialista (oggi: 22% Italia e 0% estero sono ripieghi del codice, il prospetto F24 trimestrale resta una bozza)
+- [ ] R.10 Vincolo UNIQUE sulle fatture d'acquisto doppie — «dati di esempio, vincolo da confermare»: prima i conteggi sui dati veri (R.19), poi la migrazione; fino ad allora resta il controllo applicativo (409)
+- [ ] R.11 Bloccare le attività in attesa di un altro modulo — da rivedere con Francesco o Giuseppe: nessun blocco aggiunto
+- [ ] R.17–R.19 Chi pubblica, quando, e i controlli sui dati veri — non annotate nel documento; nel frattempo vale DEPLOY.md
+- [ ] R.20 Documenti allacciati all'articolo — non deciso: i campi restano, con l'avviso che non si salvano
+- [ ] R.21 Passaggi interni scritti sull'articolo della Libreria (DIARIO 27/11) e domande 21–24 sul portale — non sono nel documento compilato: restano aperte
+- [ ] R.22 Seguiti nati da queste risposte, da fare se servono: sconto come riga propria nell'XML SdI; storno degli incassi vecchi il cui movimento di Prima Nota non si riconosce (oggi lo storno si ferma e lo dice); form sui progetti già creati e modifica di un form; i clienti nati col «medio» automatico restano «medio»; il compositore della fattura dichiara lo sconto ma le fatture già emesse non cambiano
+
 ## Varianti al piano
 - 02/11 piano creato dalla diagnosi; il backlog di LAVORO_RIMANENTE.md resta al titolare
+- 28/11 aggiunta la sezione «Risposte del titolare» (12 applicate, le altre ferme su una sua decisione). Le spunte delle fasi 0–5 non sono state riverificate in questo giro: lo stato vero di quei punti sta nel DIARIO e nelle PR

@@ -28,7 +28,14 @@ import { scanFileBuffer } from '../services/securityScanner.js';
 import { contestoTagDocumento, risolviTagDocumento, blocchiDaHtml, generaPdfDocumento, generaDocxDocumento, campiMancantiNelTesto } from '../services/generazioneDocumenti.js';
 import { notificaCliente, avvisaClienteViaCanali } from '../services/notificheService.js';
 import { recordAudit, ipReale, nomeFileDaUrl, clienteDellaRichiesta, normalizzaGrafometrica } from '../util/serverHelpers.js';
-import { livelloFirmaValido, normalizzaLivelloFirma, type LivelloFirma } from '../services/livelloFirmaService.js';
+import {
+  CODICE_LIVELLO_SOTTO_MINIMO,
+  livelloFirmaValido,
+  livelloPiuAlto,
+  motivoLivelloSottoMinimo,
+  normalizzaLivelloFirma,
+  type LivelloFirma,
+} from '../services/livelloFirmaService.js';
 // §40 — la micro-voce indicata deve appartenere al progetto indicato: la decisione sta in un
 // service a parte, presidiato, e la usano sia questo upload sia PATCH /documenti/:id/collegamento.
 import { decidiCollocazione } from '../services/collocazioneDocumento.js';
@@ -250,11 +257,15 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       dataScadenzaDoc?: string;
       statoDoc?: 'bozza' | 'pubblicato';
       livelloFirmaRichiesto?: string;
+      /** Il modello dello studio da cui il documento nasce: il suo livello è il minimo. */
+      modelloId?: string;
+      /** Il minimo dei modelli standard della pagina, che il server non ha a database. */
+      livelloFirmaMinimo?: string;
     };
   }>('/documenti', async (req, reply) => {
     const tenantId = req.tenantId;
     const userId = req.userId as string | undefined;
-    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc, livelloFirmaRichiesto } = req.body;
+    const { progettoId, microvoceProgettoId, filename, contentBase64, tipo, categoriaDoc, dataScadenzaDoc, statoDoc, livelloFirmaRichiesto, modelloId, livelloFirmaMinimo } = req.body;
 
     if (!progettoId || !filename || !contentBase64) {
       return reply.code(400).send({ errore: 'progettoId, filename e contentBase64 sono obbligatori.' });
@@ -269,10 +280,25 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     if (livelloFirmaRichiesto !== undefined && !livelloFirmaValido(livelloFirmaRichiesto)) {
       return reply.code(400).send({ errore: 'livelloFirmaRichiesto non valido: i valori ammessi sono ses, fea, feq.' });
     }
+    if (livelloFirmaMinimo !== undefined && !livelloFirmaValido(livelloFirmaMinimo)) {
+      return reply.code(400).send({ errore: 'livelloFirmaMinimo non valido: i valori ammessi sono ses, fea, feq.' });
+    }
 
     try {
       const progetto = await prisma.progetto.findFirst({ where: { id: progettoId, tenantId }, select: { id: true, clienteId: true, nome: true } });
       if (!progetto) return reply.code(404).send({ errore: 'Progetto non trovato.' });
+
+      // Il livello del modello è il minimo (titolare, 28/11/2026). Per un modello dello studio
+      // lo legge il server; per i modelli standard della pagina lo dichiara la richiesta. Vale
+      // il più alto dei due, e sotto quello il documento non si salva.
+      const modelloStudio = modelloId
+        ? await prisma.modelloDocumentoCustom.findFirst({ where: { id: modelloId, tenantId }, select: { livelloFirmaRichiesto: true } })
+        : null;
+      const minimoFirma = livelloPiuAlto([modelloStudio?.livelloFirmaRichiesto, livelloFirmaMinimo]);
+      // Senza un livello indicato il documento eredita quello del modello.
+      const livelloDocumento = normalizzaLivelloFirma(livelloFirmaRichiesto ?? minimoFirma);
+      const sottoMinimo = motivoLivelloSottoMinimo(livelloDocumento, minimoFirma);
+      if (sottoMinimo) return reply.code(409).send({ errore: sottoMinimo, codice: CODICE_LIVELLO_SOTTO_MINIMO, livelloFirmaMinimo: minimoFirma });
       if (req.ruolo === 'cliente') {
         const clienteId = clienteDellaRichiesta(req);
         if (!clienteId || progetto.clienteId !== clienteId) {
@@ -329,8 +355,9 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           categoriaDoc: categoriaDoc || 'generico',
           dataScadenzaDoc: scadenza,
           // Piano §3.1 — per gli upload manuali il livello lo sceglie l'operatore alla
-          // pubblicazione; 'ses' se non indicato (comportamento invariato).
-          livelloFirmaRichiesto: livelloFirmaRichiesto ?? 'ses',
+          // pubblicazione; se non indicato vale quello del modello ('ses' senza modello).
+          livelloFirmaRichiesto: livelloDocumento,
+          livelloFirmaMinimo: minimoFirma,
           statoDoc: defaultStatoDoc,
           pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
           statoScansione: 'pulito',
@@ -414,6 +441,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       statoDoc,
       dataScadenzaDoc,
       livelloFirmaRichiesto,
+      livelloFirmaMinimo: minimoDichiarato,
     } = parseResult.data;
     const modelloId = rawModelloId || templateId || undefined;
 
@@ -486,14 +514,21 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
       // salvo override esplicita dell'operatore nella richiesta (il template impone,
       // l'operatore può alzare o precisare alla generazione).
       let livelloFinale: LivelloFirma = livelloFirmaRichiesto ?? 'ses';
+      // Il livello del modello è anche il minimo (titolare, 28/11/2026): si alza, non si abbassa.
+      // Per un modello dello studio lo legge il server; per i modelli standard della pagina,
+      // che arrivano come HTML, lo dichiara la richiesta. Vale il più alto dei due.
+      let livelloMinimo: LivelloFirma = normalizzaLivelloFirma(minimoDichiarato);
       if (modelloId) {
         const modello = await prisma.modelloDocumentoCustom.findFirst({ where: { id: modelloId, tenantId } });
         if (!modello) return reply.code(404).send({ errore: 'Modello documento non trovato.' });
         htmlTemplate = modello.contenutoHtml || '';
         titoloDocumento = titoloDocumento || modello.titolo;
         categoria = categoria || modello.categoria;
-        if (!livelloFirmaRichiesto) livelloFinale = normalizzaLivelloFirma(modello.livelloFirmaRichiesto);
+        livelloMinimo = livelloPiuAlto([modello.livelloFirmaRichiesto, livelloMinimo]);
       }
+      if (!livelloFirmaRichiesto) livelloFinale = livelloMinimo;
+      const sottoMinimo = motivoLivelloSottoMinimo(livelloFinale, livelloMinimo);
+      if (sottoMinimo) return reply.code(409).send({ errore: sottoMinimo, codice: CODICE_LIVELLO_SOTTO_MINIMO, livelloFirmaMinimo: livelloMinimo });
       if (!htmlTemplate.trim()) {
         return reply.code(400).send({ errore: 'Il template indicato non ha contenuto.' });
       }
@@ -574,6 +609,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
           categoriaDoc: categoria || 'generico',
           dataScadenzaDoc: scadenza,
           livelloFirmaRichiesto: livelloFinale,
+          livelloFirmaMinimo: livelloMinimo,
           statoDoc: defaultStatoDoc,
           pubblicatoAt: defaultStatoDoc === 'pubblicato' ? new Date() : null,
           statoScansione: 'pulito',
@@ -724,7 +760,7 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
     try {
       const doc = await prisma.documento.findFirst({
         where: { id, tenantId },
-        select: { id: true, statoDoc: true, livelloFirmaRichiesto: true },
+        select: { id: true, statoDoc: true, livelloFirmaRichiesto: true, livelloFirmaMinimo: true },
       });
       if (!doc) return reply.code(404).send({ errore: 'Documento non trovato.' });
 
@@ -734,6 +770,12 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
         });
       }
 
+      // Il livello del modello da cui il documento è nato è il minimo (titolare, 28/11/2026).
+      const sottoMinimo = motivoLivelloSottoMinimo(livelloFirmaRichiesto, doc.livelloFirmaMinimo);
+      if (sottoMinimo) {
+        return reply.code(409).send({ errore: sottoMinimo, codice: CODICE_LIVELLO_SOTTO_MINIMO, livelloFirmaMinimo: doc.livelloFirmaMinimo });
+      }
+
       const aggiornato = await prisma.documento.update({
         where: { id },
         data: { livelloFirmaRichiesto },
@@ -741,6 +783,8 @@ export async function registraRotteDocumenti(server: FastifyInstance): Promise<v
 
       await recordAudit({
         tenantId,
+        userId: req.userId,
+        ruolo: req.ruolo,
         azione: 'DOCUMENTO_LIVELLO_FIRMA_AGGIORNATO',
         entita: id,
         dettagli: `Livello di firma richiesto del documento ${id} aggiornato da «${doc.livelloFirmaRichiesto}» a «${livelloFirmaRichiesto}»`,

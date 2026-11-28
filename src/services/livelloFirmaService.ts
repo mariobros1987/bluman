@@ -64,6 +64,23 @@ export function livelloPiuAlto(livelli: Iterable<string | null | undefined>): Li
   return massimo;
 }
 
+/**
+ * Il livello del modello è il minimo (deciso dal titolare il 28/11/2026): chi prepara il
+ * documento può alzarlo, non abbassarlo. `null` se il livello chiesto va bene; altrimenti la
+ * frase per l'operatore.
+ */
+export function motivoLivelloSottoMinimo(livelloChiesto: unknown, livelloMinimo: unknown): string | null {
+  const chiesto = normalizzaLivelloFirma(livelloChiesto);
+  const minimo = normalizzaLivelloFirma(livelloMinimo);
+  if (PESO_LIVELLO[chiesto] >= PESO_LIVELLO[minimo]) return null;
+  return (
+    `Il modello richiede almeno la firma ${minimo.toUpperCase()}: il livello si può alzare, non abbassare ` +
+    `(chiesto ${chiesto.toUpperCase()}).`
+  );
+}
+
+export const CODICE_LIVELLO_SOTTO_MINIMO = 'LIVELLO_FIRMA_SOTTO_MINIMO';
+
 /** Quale rotta di firma sta chiedendo di firmare. */
 export type CanaleFirma = 'otp' | 'file';
 

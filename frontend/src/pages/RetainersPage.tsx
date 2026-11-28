@@ -8,11 +8,13 @@ import {
 } from '../api/client';
 import { fmt } from '../utils';
 import { useToast } from '../components/ui/ToastProvider';
+import { useDatiClienteMancanti } from '../components/contabilita/DatiClienteMancanti';
 import { confirm } from '../components/ui/ConfirmProvider';
 import { Modal } from '../components/ui/Modal';
 
 export function RetainersPage() {
   const toast = useToast();
+  const datiCliente = useDatiClienteMancanti();
   const [contratti, setContratti] = useState<any[]>([]);
   const [clienti, setClienti] = useState<any[]>([]);
   const [progetti, setProgetti] = useState<any[]>([]);
@@ -95,6 +97,7 @@ export function RetainersPage() {
       toast.successo(res.messaggio || 'Fattura retainer emessa e inserita nello Scadenzario Incassi!');
       await loadData();
     } catch (err: any) {
+      if (datiCliente.intercetta(err)) return;
       toast.errore(`Errore generazione fattura: ${err.message}`);
     } finally {
       setGeneratingId(null);
@@ -384,6 +387,7 @@ export function RetainersPage() {
           )}
         </Modal>
       )}
+      {datiCliente.modale}
     </div>
   );
 }

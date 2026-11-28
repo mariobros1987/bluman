@@ -3,7 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import { riallineaValoreProgetto, type ClientValoreProgetto } from './services/valoreProgetto.js';
 
-function clientFinto(prezzi: number[]) {
+function clientFinto(prezzi: number[], scontoCentesimi = 0) {
   const scritture: Array<{ id: string; valoreTotale: number }> = [];
   const client: ClientValoreProgetto = {
     moduloProgetto: {
@@ -13,6 +13,7 @@ function clientFinto(prezzi: number[]) {
       }),
     },
     progetto: {
+      findUnique: async () => ({ scontoCentesimi }),
       update: async ({ where, data }) => {
         scritture.push({ id: where.id, valoreTotale: data.valoreTotale });
       },
@@ -44,5 +45,17 @@ describe('riallineaValoreProgetto', () => {
     const { client, scritture } = clientFinto([]);
     await expect(riallineaValoreProgetto(client, 'P1', { azzeraSeSenzaModuli: true })).resolves.toBe(0);
     expect(scritture).toEqual([{ id: 'P1', valoreTotale: 0 }]);
+  });
+
+  // Titolare, 28/11/2026 (risposta 7): lo sconto concordato sul progetto.
+  it('con uno sconto il valore è la somma dei moduli meno lo sconto', async () => {
+    const { client, scritture } = clientFinto([1150000, 500000, 210000], 100000);
+    await expect(riallineaValoreProgetto(client, 'P1')).resolves.toBe(1760000);
+    expect(scritture).toEqual([{ id: 'P1', valoreTotale: 1760000 }]);
+  });
+
+  it('uno sconto più alto della somma non porta il valore sotto zero', async () => {
+    const { client } = clientFinto([10000], 50000);
+    await expect(riallineaValoreProgetto(client, 'P1')).resolves.toBe(0);
   });
 });

@@ -57,6 +57,41 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
     abbinato) resta l'unica parte non cablata: dipende dal payload del provider e va verificata per
     canale.
 - I canali si configurano in **Impostazioni** (§16).
+- **Canale protetto (Portale).** I messaggi scambiati sul canale **Portale** e i loro allegati sono
+  il canale riservato fra studio e cliente: il cliente scrive dalla scheda **Messaggi** del portale
+  (§12), lo studio risponde da qui scegliendo il canale Portale. Testo e file sono **conservati
+  cifrati**, e accanto al messaggio compare «🔒 cifrato». Un allegato del canale protetto non ha un
+  link: si scarica col tasto, solo da chi è entrato (il cliente della pratica, gli operatori con il
+  permesso Comunicazioni). Gli avvisi (campanella, email) dicono che c'è un messaggio, non cosa dice.
+
+### Posta dei clienti (l'accentratore delle mail)
+La voce di menu **📬 Posta dei clienti** raccoglie in un elenco solo la posta che arriva nelle
+**caselle dei clienti**: non solo quello che il cliente scrive allo studio, ma tutta la posta che lo
+studio deve tenere d'occhio per lui (banca, fornitori, enti). Un cliente entra nella raccolta in uno
+di due modi, e si sceglie **cliente per cliente**:
+- **Inoltro.** Lo studio collega una sua **casella di raccolta**; per ogni cliente si attiva
+  l'inoltro e BluMan gli assegna un **indirizzo personale** (la casella di raccolta con un codice dopo
+  il «+», per esempio `posta+k7m2p9qa@studio.it`). Il cliente imposta nella sua casella l'inoltro
+  automatico verso quell'indirizzo. Lo studio non conosce la password del cliente.
+- **Casella collegata.** Il cliente dà allo studio le credenziali della sua casella (meglio una
+  «password per le app») e BluMan la legge direttamente. Chi la collega deve **dichiarare che il
+  cliente ha autorizzato per iscritto** lo studio a leggerla: la dichiarazione resta nel Log Audit
+  con nome e data. La password si salva cifrata e non torna più a schermo.
+
+BluMan le caselle **le legge e basta**: non segna i messaggi come letti, non li sposta, non li
+cancella. Per il cliente la sua posta resta com'era.
+
+- **Messaggi**: l'elenco si filtra (tutti, da smistare, attribuiti; per cliente; solo da leggere;
+  archiviati) e si cerca per oggetto, testo e mittente. Aprendo un messaggio si vedono testo, allegati
+  e **perché è sotto quel cliente**; da lì lo si **smista** a un cliente e a un suo progetto, lo si
+  segna letto, lo si archivia. «Letto» e «archiviato» valgono dentro BluMan, non nella casella.
+- **Raccolta**: parte da sola ogni pochi minuti e a mano con **↻ Raccogli ora**. Una casella che non
+  risponde compare in cima alla pagina con il motivo.
+- **Configurazione** (solo il responsabile dello studio): caselle collegate (prova, pausa, cambio
+  password, scollega) e inoltro dei clienti (attiva, copia l'indirizzo, disattiva).
+- **Chi la vede**: di default solo il responsabile dello studio. Ai collaboratori interni la apre la
+  Matrice Permessi (voce «Posta dei clienti»: lettura, o lettura e smistamento). Ai collaboratori
+  esterni non si apre in nessun caso.
 
 ## 📐 Calcoli & logica
 - **Tutto il modulo è governato dalla Matrice Permessi** (`communications`, §17): l'admin decide chi
@@ -75,6 +110,21 @@ Le comunicazioni con il cliente sono **omnichannel** e finiscono nel **fascicolo
   `RAILWAY_PUBLIC_DOMAIN` → `APP_BASE_URL` → dominio di produzione. Un errore qui **non produce un
   errore**: produce un webhook che punta a un altro backend, con un altro database — e ce ne si accorge
   solo quando un cliente scrive e non riceve risposta.
+- **Cifratura del canale protetto.** È cifratura **a riposo**: nel database e nell'archivio dei file
+  il messaggio e l'allegato sono testo cifrato (AES-256-GCM), con una chiave derivata per ogni studio
+  da un segreto del server. Chi mette le mani su una copia del database o su un backup non legge la
+  corrispondenza; un messaggio spostato a mano su un altro studio o su un'altra pratica non si apre.
+  **Non è cifratura «da capo a capo»**: il server decifra per chi ha titolo a leggere, perché lo
+  studio deve poter consultare e conservare la corrispondenza della pratica e il cliente entra con
+  un link, senza una chiave sua.
+- **La chiave** si ricava da `JWT_SECRET`, che in produzione c'è sempre: il canale è cifrato senza
+  niente da impostare. `CANALE_PROTETTO_CHIAVE`, se presente, la sostituisce; se è presente ma non
+  valida (meno di 32 caratteri) il canale **rifiuta di scrivere** invece di ripiegare. Solo senza
+  nessuna delle due (sviluppo) il canale funziona in chiaro, e il portale lo dice: «Canale
+  riservato, non ancora cifrato», senza lucchetto.
+- **Sul portale il cliente scrive solo nel canale protetto**: il canale non lo sceglie lui, e gli
+  allegati che dichiara a mano si ignorano. I messaggi scritti prima dell'attivazione restano
+  leggibili e non vengono cifrati a posteriori.
 - **Regola 7**: un invio fallito **non** lascia la riga «inviato»; il collegamento chat è unico per
   pratica (un secondo `/start` **sposta** il collegamento).
 
@@ -95,13 +145,37 @@ tengono onesto, e sono tutte necessarie:
 - Ri-armare (il cliente che ritocca il link, l'operatore che risceglie la voce) è una decisione nuova:
   riporta l'armamento a ora e fa ripartire il tetto.
 
+### Posta dei clienti: a chi si attribuisce un messaggio
+Un messaggio raccolto si attribuisce da solo **solo quando c'è un solo cliente possibile**, e dice
+sempre con quale criterio:
+- **casella collegata** → il cliente a cui la casella appartiene;
+- **inoltro** → il cliente il cui codice compare nell'indirizzo di consegna (dopo il «+»);
+- se manca il codice: il cliente il cui indirizzo in anagrafica è **fra i destinatari**, poi quello
+  che è il **mittente**. Se lo stesso indirizzo è di due clienti, non si sceglie.
+
+Tutto il resto finisce in **Da smistare** e lo attribuisce un operatore. Il progetto non si deduce
+mai: lo sceglie l'operatore, e scegliendo un progetto il messaggio va sotto il cliente di quel
+progetto. Un'attribuzione fatta a mano si può cambiare o togliere, e resta marcata «a mano».
+
+Alla **prima raccolta** di una casella BluMan prende i messaggi degli ultimi 30 giorni, o dal giorno
+indicato collegandola. Poi prende solo i nuovi, al massimo 50 per casella a ogni giro: il resto
+arriva al giro successivo. Di ogni messaggio salva fino a 20 allegati, ciascuno fino a 15 MB.
+
 ## 🔗 Collegamenti
 - **Progetti** (§01): le comunicazioni stanno nel fascicolo del progetto.
 - **Scadenzario** (§06): i solleciti escono da qui.
 - **Impostazioni** (§16): credenziali SMTP/IMAP e configurazione canali.
+- **Clienti** (§02): la posta raccolta si attribuisce ai clienti dell'anagrafica; l'indirizzo email del cliente serve a riconoscerlo.
+- **Team & Permessi** (§17): la voce «Posta dei clienti» della matrice.
 
 ## ⚠️ Stati limite & errori
 - Relay non configurato → invio email non parte (fail-closed).
+- Chiave del canale protetto non valida → il messaggio non parte (**503**) e lo dice. Segreto
+  cambiato senza tenere il vecchio in `CANALE_PROTETTO_CHIAVI_PRECEDENTI` → i messaggi scritti prima
+  compaiono come «non leggibile su questo server» (non spariscono: tornano quando il vecchio
+  segreto è di nuovo in elenco) e l'allegato risponde **409**.
+- Allegato del canale protetto oltre 15 MB, più di 5 per messaggio, o di un tipo non ammesso →
+  rifiutato con il motivo (**400**), e il testo scritto resta nel compositore del portale.
 - Bot Telegram con username errato / id numerico → messaggi guidati diversi per rimedi diversi.
 - Chi non ha il permesso `communications=write` → invio bloccato; chi non ha nemmeno `read` non vede
   né la scheda del fascicolo né la linguetta «Messaggi» della micro-voce, e le rotte rispondono **403**
@@ -123,7 +197,32 @@ tengono onesto, e sono tutte necessarie:
   al rinvio si troverebbe la riga già scritta e uscirebbe in silenzio, cioè lo stesso guasto per
   una porta più stretta.
 
+- **Posta dei clienti — una casella che non risponde non è «nessun messaggio»**: password
+  cambiata, server irraggiungibile, casella di un cliente tolto dall'anagrafica. Il motivo compare in
+  cima alla pagina e nella Configurazione, con la data dell'ultima raccolta riuscita. Le altre caselle
+  continuano a essere raccolte.
+- **Posta dei clienti — un allegato non salvato si dichiara** (troppo grande, tipo rifiutato dal
+  controllo dei file, archivio non raggiungibile): resta il nome con il motivo, senza un link vuoto.
+  Il messaggio si salva comunque.
+- **Posta dei clienti — la casella viene rinumerata dal fornitore** (migrazione, ripristino): BluMan
+  rilegge gli ultimi 30 giorni e riconosce ciò che aveva già raccolto, dall'identificativo del
+  messaggio o, se manca, da mittente, data e oggetto. Niente doppioni.
+- **Posta dei clienti — il database cade mentre si salvano gli allegati**: il messaggio resta con gli
+  allegati scritti fin lì e la casella mostra l'errore. La raccolta non lo supera: dopo un quarto
+  d'ora lo riprende e aggiunge gli allegati che mancavano, poi prosegue con i messaggi successivi.
+- **Posta dei clienti — il fornitore non consegna gli indirizzi con il «+»**: i messaggi arrivano lo
+  stesso nella casella di raccolta e si attribuiscono dall'indirizzo del cliente in anagrafica; quelli
+  che non si riconoscono restano in «Da smistare».
+- **Posta dei clienti — scollegare una casella** ferma la raccolta e cancella la password salvata; i
+  messaggi già raccolti restano. Disattivare l'inoltro di un cliente annulla il suo indirizzo
+  personale: riattivandolo ne riceve uno nuovo e deve aggiornare l'inoltro nella sua casella.
+- **Posta dei clienti — la raccolta gira dove la porta IMAP (993) è raggiungibile**: sul server dello
+  studio sì; su un servizio che blocca le porte della posta la casella risulterà «non risponde».
+
 ## 🔧 Nota tecnica
+- Canale protetto: `src/services/cifraturaCanale.ts` (chiavi, AES-256-GCM), `canaleProtetto.ts`
+  (allegati, lettura), `avvisiCanaleProtetto.ts` (avvisi senza contenuto), rotta di scarico in
+  `src/routes/canaleProtetto.ts`; frontend `api/canaleProtetto.ts`, `components/AllegatiMessaggio.tsx`.
 - Servizi: `src/services/emailRelay.ts`, `imapInbound.ts`, `collegamentoChat.ts`,
   `comunicazioniMicrovoci.ts`; funzione Vercel `api/send-email.ts` (relay). Rotte: comunicazioni
   (`/comunicazioni/invia-*`), webhooks, `collegamentoChat.ts`, `progetti.ts`.
@@ -188,3 +287,14 @@ tengono onesto, e sono tutte necessarie:
   `ContestoMicrovoceChat` (con `progetto_id` denormalizzato: rende il controllo «la voce armata è di
   *questa* pratica?» un confronto fra due campi).
 - Fonti: `.agents/AGENTS.md`, `docs/storico/AUDIT_2026-09-27/06-comunicazioni-canali.md`, `GUIDA_CONFIGURAZIONE_CANALI.md`.
+- **Posta dei clienti (accentratore).** Tabelle `casella_posta`, `messaggio_posta`,
+  `allegato_posta` e `cliente.alias_posta` (migrazione `20261128130000_accentratore_posta`, con RLS).
+  Lettura IMAP in `src/services/postaImap.ts` (`imapflow`, casella aperta `readOnly`, nessun flag
+  scritto; il segnalibro è `uidValidity` + `ultimoUid` sulla riga della casella), giro in
+  `postaRaccolta.ts`, attribuzione pura in `postaAttribuzione.ts`. Password cifrate con
+  `src/util/cifraturaSegreti.ts` (AES-256-GCM, chiave derivata da `JWT_SECRET`, riapribile con
+  `JWT_PREVIOUS_SECRETS` e ricifrata alla prima lettura dopo una rotazione). Rotte `/posta/*` in
+  `src/routes/posta.ts` (chiave RBAC `posta`) e `postaConfigurazione.ts` (in più: solo
+  advisor/super_admin). Raccolta automatica dal processo dell'API (`POSTA_RACCOLTA_MINUTI`, 5 se
+  assente, 0 la spegne) o da `npm run cron:posta`. Frontend: `pages/PostaPage.tsx`,
+  `components/posta/`. Presidi: `src/posta*.test.ts`, `src/cifraturaSegreti.test.ts`.

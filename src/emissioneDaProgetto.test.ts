@@ -1,5 +1,5 @@
 /**
- * N1, N2 — `POST /progetti/:id/fatture`.
+ * N1, N2 — `POST /progetti/:id/fatture`; dal 28/11/2026 anche il blocco «mancano i dati del cliente».
  * - N1: `tipoDocumento: 'nota_credito'` saltava il gate KYC, ma l'adapter emetteva comunque una FT.
  * - N2: un id inesistente saltava il gate (nessun cliente trovato) e l'adapter ripiegava su una
  *   ricerca per `nome contains`, intestando la fattura a un progetto diverso.
@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
-const db: { progetti: any[]; statoFascicolo: string | null } = { progetti: [], statoFascicolo: null };
+const db: { progetti: any[]; clienti: any[]; statoFascicolo: string | null } = { progetti: [], clienti: [], statoFascicolo: null };
 
 vi.mock('./util/prismaClient.js', async (importOriginal) => {
   const reale = await importOriginal<typeof import('./util/prismaClient.js')>();
@@ -18,6 +18,10 @@ vi.mock('./util/prismaClient.js', async (importOriginal) => {
     progetto: {
       findFirst: async ({ where }: any) =>
         db.progetti.find((p) => p.id === where.id && p.tenantId === where.tenantId) ?? null,
+    },
+    cliente: {
+      findFirst: async ({ where }: any) =>
+        db.clienti.find((c) => c.id === where.id && c.tenantId === where.tenantId) ?? null,
     },
     // Nessuna riga tenant: il modulo KYC si considera attivo (guardiaModuli).
     tenant: { findUnique: async () => null },
@@ -62,6 +66,10 @@ async function emetti(id: string, corpo: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   db.progetti = [{ id: 'prg-1', nome: 'Bilancio Rossi 2026', tenantId: TENANT, clienteId: 'cli-1' }];
+  db.clienti = [{
+    id: 'cli-1', tenantId: TENANT, nome: 'Rossi Srl', piva: '01234567890', codiceFiscale: null,
+    sedeLegale: 'Via Roma 1, 20121 Milano', indirizzoResidenza: null,
+  }];
   db.statoFascicolo = null;
   emettiFattura.mockClear();
 });
@@ -98,5 +106,42 @@ describe('N2 — il progetto si cerca solo per id esatto, prima del gate', () =>
     const res = await emetti('prg-1');
     expect(res.statusCode).toBe(201);
     expect(emettiFattura).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('dati del cliente — senza, la fattura non parte (titolare, 28/11/2026)', () => {
+  it('cliente senza partita IVA, codice fiscale e indirizzo → 409 che elenca cosa manca e nomina il cliente', async () => {
+    db.clienti[0] = { ...db.clienti[0], piva: null, codiceFiscale: '  ', sedeLegale: null };
+    const res = await emetti('prg-1');
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({
+      codice: 'DATI_CLIENTE_MANCANTI',
+      clienteId: 'cli-1',
+      clienteNome: 'Rossi Srl',
+      datiMancanti: ['partita IVA (o codice fiscale)', 'indirizzo (sede legale o residenza)'],
+    });
+    expect(res.json().errore).toContain('Rossi Srl');
+    expect(emettiFattura).not.toHaveBeenCalled();
+  });
+
+  it('basta un identificativo fiscale: codice fiscale senza partita IVA passa', async () => {
+    db.clienti[0] = { ...db.clienti[0], piva: null, codiceFiscale: 'RSSMRA80A01H501U' };
+    const res = await emetti('prg-1', { tipoClienteFiscale: 'privato_italia' });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('la residenza vale come indirizzo per la persona fisica', async () => {
+    db.clienti[0] = { ...db.clienti[0], sedeLegale: null, indirizzoResidenza: 'Via Verdi 3, Torino' };
+    const res = await emetti('prg-1', { tipoClienteFiscale: 'privato_italia' });
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('cliente estero: non si chiede un identificativo fiscale, l’indirizzo sì', async () => {
+    db.clienti[0] = { ...db.clienti[0], piva: null, codiceFiscale: null };
+    expect((await emetti('prg-1', { tipoClienteFiscale: 'estero' })).statusCode).toBe(201);
+    db.clienti[0] = { ...db.clienti[0], sedeLegale: null };
+    const res = await emetti('prg-1', { tipoClienteFiscale: 'estero' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().datiMancanti).toEqual(['indirizzo (sede legale o residenza)']);
   });
 });

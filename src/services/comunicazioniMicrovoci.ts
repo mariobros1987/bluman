@@ -50,6 +50,7 @@
  */
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../util/prismaClient.js';
+import { messaggioLeggibile } from './canaleProtetto.js';
 import { proiettaRecapito, type RecapitoComunicazione } from '../util/statoComunicazione.js';
 
 /**
@@ -305,6 +306,9 @@ export interface MessaggioAbbinato {
   testo: string;
   createdAt: Date;
   allegatiJson: string | null;
+  /** Vero se il messaggio è cifrato a riposo (canale protetto del portale). */
+  cifrato: boolean;
+  illeggibile?: true;
   origine: string;
   /**
    * Il recapito, proiettato da `proiettaRecapito` esattamente come nel fascicolo.
@@ -339,6 +343,7 @@ export async function elencaComunicazioniMicrovoce(
       comunicazione: {
         select: {
           id: true,
+          progettoId: true,
           canale: true,
           mittente: true,
           destinatario: true,
@@ -355,8 +360,8 @@ export async function elencaComunicazioniMicrovoce(
   return righe.map((r) => {
     // `externalId` non esce da qui: è la colonna da cui si legge lo stato e porta anche le chiavi
     // del provider (`whatsapp:<wamid>`). Il browser riceve il recapito proiettato, non la materia
-    // prima.
-    const { externalId, ...messaggio } = r.comunicazione;
+    // prima. I messaggi del portale sono cifrati a riposo: si aprono qui, come nel fascicolo.
+    const { externalId, tenantId: _studio, ...messaggio } = messaggioLeggibile({ ...r.comunicazione, tenantId });
     return {
       ...messaggio,
       ...proiettaRecapito(messaggio.direzione, externalId, messaggio.createdAt),

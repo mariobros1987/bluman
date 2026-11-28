@@ -25,6 +25,13 @@ La firma trasforma un documento (o la **conclusione di un modulo**) in un atto c
   legale, impronta del sigillo). Sotto il nome di ciascuna parte compare **il sigillo di quella
   firma**, riletto dalla sua riga: per le firme anteriori al 03/10/2026 l'impronta non è
   ricostruibile e la riga dice `Sigillo SHA-256 non registrato`, che è la verità.
+- **Il livello del modello è il minimo** (titolare, 28/11/2026): un documento nato da un modello che
+  esige la FEA può salire a FEQ, non scendere a SES. Nel Document Studio e nella finestra
+  «Configurazione Documento» i livelli più bassi sono spenti, con la riga «Il modello richiede almeno
+  la firma FEA: il livello si può alzare, non abbassare». Il server fa lo stesso controllo quando il
+  documento si salva, si genera o cambia livello (409 `LIVELLO_FIRMA_SOTTO_MINIMO`), e ricorda il
+  minimo sul documento (`livello_firma_minimo`). I documenti di prima del 28/11 hanno minimo SES:
+  per loro non cambia niente. Un file caricato a mano, senza modello, non ha minimo.
 
 ## 📐 Calcoli & logica
 - **L'impronta la calcola il server**, **mai** il browser. Per i documenti del fascicolo e per i

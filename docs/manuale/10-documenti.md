@@ -8,6 +8,8 @@ Word (WYSIWYG, foglio A4, export PDF) con i **Smart Tags** ERP.
 - **Document Studio** (`/documents`): compone un documento da un modello, inserisce i Smart Tags
   (`{{cliente.codice_fiscale}}`, `{{cliente.sdi}}`, …), lo lega a una **micro-voce reale** del progetto
   (nessun id inventato) ed esporta PDF/Word.
+- **Livello di firma**: il documento nasce col livello del suo modello, che è anche il minimo: si può
+  alzare, non abbassare (scheda 11).
 - **Ciclo di vita**: `bozza → pubblicato → in_revisione → parzialmente_firmato → firmato`; versioni
   concatenate (`documentoPadreId`) con cronologia a ritroso.
 - **Nome file leggibile**: a video il nome è ripulito (niente prefisso tenant/timestamp né token).

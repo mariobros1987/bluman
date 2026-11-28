@@ -92,7 +92,11 @@ export async function fetchArticoli(options?: { forceRefresh?: boolean }) {
   );
 }
 
-export async function updateArticoloPrezzoApi(id: string, input: { prezzoDefault?: number; oreDefault?: number; nome?: string }) {
+export async function updateArticoloPrezzoApi(
+  id: string,
+  /** `formMasterId: null` toglie il form che il cliente compila; assente lo lascia com'è. */
+  input: { prezzoDefault?: number; oreDefault?: number; nome?: string; formMasterId?: string | null },
+) {
   // §3.3 — prima il `catch` restituiva `{ ok: true, ...input }`: un prezzo/ore aggiornato
   // solo a schermo ma mai scritto a database. Il listino tornava al valore vecchio al reload.
   const res = await apiFetch(`${API_BASE}/articoli/${id}`, {

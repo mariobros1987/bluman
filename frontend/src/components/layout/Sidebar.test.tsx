@@ -27,7 +27,8 @@ describe('Sidebar — la voce Coda KYC segue il modulo dello studio (F6)', () =>
     mockModuli.mockResolvedValue({ concessi: [], disattivati: [], attivi: [] });
     apri();
     await waitFor(() => expect(voceKyc()).toBeNull());
-    expect(screen.getByRole('link', { name: /Clienti/i })).toBeTruthy();
+    // Con la maiuscola e a fine nome: «Posta dei clienti» è un'altra voce.
+    expect(screen.getByRole('link', { name: /Clienti$/ })).toBeTruthy();
   });
 
   it('modulo acceso → la voce c’è', async () => {
@@ -113,7 +114,7 @@ describe('Sidebar — aree a tendina', () => {
     for (const nome of [/Contabilità/, /Documenti/, /Studio/]) fireEvent.click(area(nome));
     const voci = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(voci).toEqual([
-      '/', '/projects', '/clients', '/compliance', '/calendar', '/timesheet',
+      '/', '/projects', '/clients', '/compliance', '/posta', '/calendar', '/timesheet',
       '/invoices', '/fornitori', '/liquidazione-iva', '/scadenzario', '/primanota', '/banks', '/retainers',
       '/documents', '/modelli', '/archivio',
       '/reports', '/library', '/audit', '/note-beta', '/settings', '/admin/tenants',

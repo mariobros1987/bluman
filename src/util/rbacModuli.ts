@@ -31,6 +31,7 @@ export const MODULI_RBAC = [
   'retainers',
   'reports',
   'communications',
+  'posta',
   'documents',
   'library',
   'audit',
@@ -94,6 +95,11 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   // Stanno tutte dietro l'autenticazione (non sono in ROTTE_PUBBLICHE): le chiama il frontend
   // col JWT dell'operatore, non un relay esterno.
   ['/comunicazioni', 'communications'],
+  // Accentratore delle mail: la posta dei clienti raccolta dalle loro caselle. Chiave propria e non
+  // `communications`, perché lì il default dei collaboratori è «write»: qui dentro c'è tutta la
+  // posta di un cliente, non la sua conversazione con lo studio, e di default la vede solo chi
+  // risponde dello studio. Ai collaboratori interni la apre l'admin dalla matrice.
+  ['/posta', 'posta'],
   // Vault documentale e Document Studio (§01): la matrice vale anche via API, non solo nell'UI. Un
   // collaboratore con documents=read consulta ma non carica/firma/elimina; denied blocca; write pieno.
   // NB: il portale cliente (/portal/documenti) NON è qui (ruolo cliente, gestito a parte).
@@ -103,6 +109,8 @@ const ROTTE_MODULO: ReadonlyArray<readonly [prefisso: string, modulo: ModuloChia
   // reference-data condivise (giurisdizioni) restano fuori dalla mappa per non rompere il wizard.
   ['/moduli-template', 'library'],
   ['/articoli', 'library'],
+  // I form che il cliente compila per un articolo (titolare, 28/11/2026): sono Libreria.
+  ['/form-master', 'library'],
   ['/reports', 'reports'],
   ['/audit-logs', 'audit'],
 ];
@@ -123,11 +131,13 @@ export function moduloDellaRotta(patternRotta: string | undefined): ModuloChiave
 
 /**
  * Rotte fuori dalla matrice che il collaboratore_esterno non deve raggiungere: dati AML,
- * fornitori, ciclo passivo, IVA, fascicolo del commercialista, firme. Non sono chiavi
+ * posta dei clienti, fornitori, ciclo passivo, IVA, fascicolo del commercialista, firme. Non sono chiavi
  * configurabili: è un divieto per ruolo, valutato nell'hook di server.ts prima della matrice.
  */
 export const PREFISSI_VIETATI_ESTERNO = [
   '/kyc',
+  // La posta dei clienti non si apre a chi è fuori dallo studio, nemmeno dalla matrice.
+  '/posta',
   '/fornitori',
   '/fatture-ricevute',
   '/liquidazione-iva',

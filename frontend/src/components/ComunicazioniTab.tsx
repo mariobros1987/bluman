@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, urlDocumentoAssoluto, apriStreamNotifiche } from '../api/client';
+import { fetchComunicazioniApi, inviaComunicazioneApi, segnaComunicazioniLetteApi, fetchClienti, sendWhatsAppDirectApi, fetchInboundImapEmailsApi, fetchInboundImapAllegatiApi, apriStreamNotifiche } from '../api/client';
 import {
   abbinaComunicazioneMicrovoceApi,
   fetchMicrovociProgettoApi,
@@ -9,6 +9,7 @@ import {
 } from '../api/progetti';
 import { downloadGuidePdf } from '../utils/pdfGenerator';
 import { useInvioComunicazione, type CanaleInvio } from '../hooks/useInvioComunicazione';
+import { AllegatiMessaggio } from './AllegatiMessaggio';
 import { useCanaliStudio } from '../hooks/useCanaliStudio';
 import { ComposerComunicazione } from './ComposerComunicazione';
 import { SpunteStato } from './SpunteStato';
@@ -26,7 +27,9 @@ export interface MessaggioComunicazione {
   direzione: 'entrata' | 'uscita';
   testo: string;
   dataOra: string;
-  allegati?: { nome: string; url: string; dimensione: string }[];
+  allegati?: { nome: string; url: string; dimensione: string; protetto?: boolean }[];
+  /** Dal server: la riga è conservata cifrata (canale protetto del portale). */
+  cifrato?: boolean;
   /**
    * Le micro-voci a cui questo messaggio è abbinato, e **perché**.
    *
@@ -217,6 +220,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
     // La riga compare subito, prima che il server risponda: la si è appena scritta, e aspettare il
     // giro di rete per vederla farebbe sembrare l'invio non partito.
     onInviato: (m) => setMessaggi(prev => [...prev, m]),
+    onAllegati: (idLocale, allegati) => setMessaggi(prev => prev.map(x => (x.id === idLocale ? { ...x, allegati } : x))),
     // E l'esito del dispatch si scrive sulla riga che si sta guardando: senza, l'operatore vedrebbe
     // «in attesa» finché non ricarica il fascicolo, anche quando l'invio è già fallito.
     onEsito: (idLocale, esito) => setMessaggi(prev =>
@@ -227,6 +231,14 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
       ),
     ),
   });
+
+  const archiviaInVault = (att: { nome: string; url: string }) => {
+    const vaultKey = `bluman_vault_docs_${progettoId}`;
+    const existing = JSON.parse(localStorage.getItem(vaultKey) || '[]');
+    existing.push({ id: `doc-${Date.now()}`, nome: att.nome, url: att.url, data: new Date().toLocaleDateString('it-IT'), categoria: 'Da Comunicazione Cliente' });
+    localStorage.setItem(vaultKey, JSON.stringify(existing));
+    toast.successo(`Documento "${att.nome}" archiviato ed indicizzato con successo nel Vault Legale del Fascicolo!`);
+  };
 
   // Smart Chat Scroll & Unread Marker
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -785,6 +797,7 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
               <div style={{ fontSize: 10.5, color: 'var(--muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span>A:</span>
                 <span style={{ color: 'var(--text)', fontWeight: 600 }}>{m.destinatario}</span>
+                {m.cifrato && <span title="Messaggio del canale protetto: nel database e nell'archivio è conservato cifrato.">🔒 cifrato</span>}
               </div>
 
               {/* Testo Messaggio */}
@@ -837,49 +850,15 @@ export function ComunicazioniTab({ progettoId, nomeCliente, emailCliente, client
                 </div>
               )}
 
-              {/* Allegati Messaggio */}
-              {m.allegati && m.allegati.length > 0 && (
-                <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📎 File & Documenti Ricevuti ({m.allegati.length}):</span>
-                  </div>
-                  {m.allegati.map((att, idx) => (
-                    <div key={idx} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 16 }}>📄</span>
-                        <div>
-                          <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 11.5 }}>{att.nome}</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>{att.dimensione || '1.2 MB'} • File Sicuro Verificato</div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <a
-                          href={urlDocumentoAssoluto(att.url || '#')}
-                          download={att.nome}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                        >
-                          📥 Scarica
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const vaultKey = `bluman_vault_docs_${progettoId}`;
-                            const existing = JSON.parse(localStorage.getItem(vaultKey) || '[]');
-                            existing.push({ id: `doc-${Date.now()}`, nome: att.nome, url: att.url, data: new Date().toLocaleDateString('it-IT'), categoria: 'Da Comunicazione Cliente' });
-                            localStorage.setItem(vaultKey, JSON.stringify(existing));
-                            toast.successo(`Documento "${att.nome}" archiviato ed indicizzato con successo nel Vault Legale del Fascicolo!`);
-                          }}
-                          style={{ background: 'var(--pill-green-bg)', border: '1px solid var(--pill-green-bg)', color: 'var(--green)', padding: '4px 10px', borderRadius: 6, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                        >
-                          📁 Archivia in Vault Progetto
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Allegati: quelli del portale si scaricano con l'accesso, gli altri restano un link. */}
+              <AllegatiMessaggio
+                messaggio={m}
+                azione={(att) => (
+                  <button type="button" className="btn btn-sm" onClick={() => archiviaInVault(att)}>
+                    📁 Archivia in Vault Progetto
+                  </button>
+                )}
+              />
             </div>
               </React.Fragment>
             );

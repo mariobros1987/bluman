@@ -476,6 +476,18 @@ export async function ricalcolaProgettoApi(progettoId: string) {
   return await res.json();
 }
 
+/** Scrive lo sconto concordato sul progetto (centesimi); il server ricalcola e salva il valore. */
+export async function salvaScontoProgettoApi(progettoId: string, scontoCentesimi: number) {
+  const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/sconto`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ scontoCentesimi }),
+  });
+  if (!res.ok) throw new Error(await leggiErroreApi(res, 'Errore nel salvataggio dello sconto'));
+  invalidateCache('progett');
+  return await res.json();
+}
+
 /**
  * Salva su database lo stato del progetto modificato dall'operatore.
  *
@@ -542,7 +554,7 @@ export async function fetchComunicazioniApi(progettoId: string) {
   }
 }
 
-export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any; microvoceProgettoId?: string }) {
+export async function inviaComunicazioneApi(progettoId: string, input: { canale: string; mittente: string; destinatario: string; direzione: string; testo: string; allegatiJson?: any; allegatiProtetti?: Array<{ nome: string; contentBase64: string }>; microvoceProgettoId?: string }) {
   // §3.3 — una comunicazione nel fascicolo cliente è un invio reale: se non viene persistita
   // il messaggio non esiste. L'errore si propaga (i chiamanti fire-and-forget lo catturano).
   const res = await apiFetch(`${API_BASE}/progetti/${progettoId}/comunicazioni`, {

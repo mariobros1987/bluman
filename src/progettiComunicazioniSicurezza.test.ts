@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { decifraTesto } from './services/cifraturaCanale.js';
 
 const chiamate = {
   create: [] as any[],
@@ -29,9 +30,10 @@ vi.mock('./util/prismaClient.js', async importOriginal => {
       },
     },
     progetto: {
-      findUnique: async () => ({
+      findFirst: async () => ({
         id: 'proj-1',
         nome: 'Progetto Cliente',
+        clienteId: 'cli-1',
         cliente: { nome: 'Cliente Verificato' },
       }),
     },
@@ -100,8 +102,12 @@ describe('comunicazioni progetto — confine cliente', () => {
       mittente: 'Cliente Verificato (Cliente)',
       destinatario: 'Studio',
       direzione: 'entrata',
-      testo: 'Messaggio legittimo',
     });
+    // Il messaggio del cliente passa dal canale protetto: a database arriva cifrato, non in chiaro.
+    const scritto = chiamate.create[0].data.testo;
+    expect(scritto).not.toContain('Messaggio legittimo');
+    expect(decifraTesto(TENANT, 'msg:proj-1', scritto)).toBe('Messaggio legittimo');
+    expect(res.json().testo).toBe('Messaggio legittimo');
     await server.close();
   });
 

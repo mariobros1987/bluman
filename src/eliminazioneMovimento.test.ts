@@ -15,6 +15,17 @@ describe('motivoMovimentoNonEliminabile', () => {
     expect(motivo).toMatch(/rata resterebbe «incassata»/);
   });
 
+  it('incasso di una fattura → la frase dice come si annulla davvero (storno, 28/11)', () => {
+    expect(motivoMovimentoNonEliminabile({ tipo: 'entrata', fatturaId: 'f-1' })).toMatch(/«Storna incasso» nello Scadenzario/);
+  });
+
+  it('uscita legata a una fattura emessa (storno o rimborso) → non si elimina: è la traccia', () => {
+    const motivo = motivoMovimentoNonEliminabile({ tipo: 'uscita', fatturaId: 'f-1', fattura: { numero: 'FT-2026/001' } });
+    expect(motivo).toContain('FT-2026/001');
+    expect(motivo).toMatch(/storno o il rimborso/);
+    expect(motivo).not.toMatch(/Storna incasso/);
+  });
+
   it('incasso di una fattura senza numero letto → non si elimina lo stesso', () => {
     expect(motivoMovimentoNonEliminabile({ fatturaId: 'f-1' })).toMatch(/incasso della fattura:/);
   });

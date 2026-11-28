@@ -62,4 +62,31 @@ describe('vociDaFare', () => {
     });
     expect(voci.map((v) => v.tono)).toEqual(['urgente', 'presto', 'info']);
   });
+
+  // Titolare, 28/11/2026 (risposta 9): il canone Retainer non si fattura da solo, lo si ricorda qui.
+  describe('canoni Retainer da fatturare', () => {
+    const contratto = (prossimaFatturazione: string | null, extra: Record<string, unknown> = {}) =>
+      ({ stato: 'attivo', prossimaFatturazione, importoCentesimi: 50000, ...extra });
+
+    it('contratto attivo con la data arrivata (oggi compreso) → una riga che porta ai Retainer', () => {
+      const giornoDiOggi = OGGI.toISOString().slice(0, 10);
+      const voci = vociDaFare({ ...base, contratti: [contratto('2026-10-01T00:00:00.000Z'), contratto(`${giornoDiOggi}T00:00:00.000Z`)] });
+      expect(voci).toHaveLength(1);
+      expect(voci[0]).toMatchObject({
+        chiave: 'canoni_da_fatturare', testo: '2 canoni Retainer da fatturare', importoCentesimi: 100000, vaiA: '/retainers',
+      });
+    });
+
+    it('data futura, contratto non attivo o senza data → niente riga', () => {
+      const voci = vociDaFare({
+        ...base,
+        contratti: [contratto('2099-01-01T00:00:00.000Z'), contratto('2026-10-01T00:00:00.000Z', { stato: 'sospeso' }), contratto(null)],
+      });
+      expect(voci).toEqual([]);
+    });
+
+    it('contratti non letti (null) → la voce manca, non vale «nessun canone»', () => {
+      expect(vociDaFare({ ...base, contratti: null })).toEqual([]);
+    });
+  });
 });

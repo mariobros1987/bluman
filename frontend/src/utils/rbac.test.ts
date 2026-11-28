@@ -74,3 +74,25 @@ describe('getUserPermission — la matrice dello studio vince sui default', () =
     expect(getUserPermission(COLLABORATORE, 'invoices')).toBe('denied');
   });
 });
+
+// Stessa regola del server (`rbacModuli.ts`): la posta dei clienti parte negata ai collaboratori,
+// lo studio può concederla agli interni, e a chi è fuori dallo studio non si apre in nessun caso.
+describe('getUserPermission — posta dei clienti', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('di default la vede solo chi risponde dello studio', () => {
+    expect(getUserPermission({ ruolo: 'advisor', email: 'adv@studio.it' }, 'posta')).toBe('write');
+    expect(getUserPermission(COLLABORATORE, 'posta')).toBe('denied');
+  });
+
+  it('la matrice la apre al collaboratore interno', () => {
+    localStorage.setItem(getTenantStorageKey(`bluman_rbac_permissions_${COLLABORATORE.email}`), JSON.stringify([{ moduloChiave: 'posta', livello: 'read' }]));
+    expect(getUserPermission(COLLABORATORE, 'posta')).toBe('read');
+  });
+
+  it('al collaboratore esterno no, nemmeno con una riga in matrice', () => {
+    const esterno = { ruolo: 'collaboratore_esterno', email: 'esterno@altro.it' };
+    localStorage.setItem(getTenantStorageKey(`bluman_rbac_permissions_${esterno.email}`), JSON.stringify([{ moduloChiave: 'posta', livello: 'write' }]));
+    expect(getUserPermission(esterno, 'posta')).toBe('denied');
+  });
+});

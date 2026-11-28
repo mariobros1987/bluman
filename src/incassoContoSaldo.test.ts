@@ -1,28 +1,34 @@
-// Quale conto riceve il denaro di un incasso, e se il saldo si muove **su quel conto**.
+// Su quale conto entra il denaro di un incasso, e se il saldo si muove **su quel conto**.
 //
-// Il difetto che questi test tengono chiuso: il movimento in Prima Nota prendeva il conto indicato
+// Il difetto che questi test tenevano chiuso: il movimento in Prima Nota prendeva il conto indicato
 // dall'operatore o quello di accredito della fattura, mentre il saldo veniva caricato — quando
 // nessuno dei due c'era — sul **conto predefinito**. Il denaro entrava in un conto che nessuna riga
-// nominava: chi guardava la Prima Nota vedeva un incasso senza conto, chi guardava i saldi vedeva
-// un conto cresciuto, e le due cose non si potevano riconciliare perché nessuna delle due diceva
-// dove fosse il denaro.
+// nominava.
 //
-// La regola ora è una: il conto si decide **una volta**, e il movimento e il saldo lo nominano
-// entrambi. Questi test la seguono nei quattro casi che si presentano davvero.
+// Dal 28/11/2026 (decisione del titolare) il conto è **obbligatorio**: lo indica l'operatore, il
+// server controlla che sia dello studio, e movimento e saldo nominano quello. Il server non sceglie
+// più al suo posto (conto della fattura, predefinito), e senza conti l'incasso non si registra. I
+// tre test che confermavano la scelta automatica sono stati riscritti qui, nello stesso commit.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { creaMovimento, aggiornaSaldo, trovaPredefinito, creaRegistrazione } = vi.hoisted(() => ({
-  creaMovimento: vi.fn(async (args: any) => ({ id: 'mv-1', ...args.data })),
-  creaRegistrazione: vi.fn(async (args: any) => ({ id: 'reg-1', ...args.data })),
-  aggiornaSaldo: vi.fn(async () => ({})),
-  trovaPredefinito: vi.fn(async () => ({ id: 'c-predefinito' })),
-}));
-
 const db = vi.hoisted(() => ({
+  /** I conti dello studio: `findFirst` per id risponde solo per questi. */
+  contiStudio: ['c-scelto', 'c-predefinito'] as string[],
   contoAccreditoFattura: null as string | null,
   statoScadenza: 'in_attesa',
   /** Rate sorelle della stessa fattura, oltre a sc-1. */
   altreRate: [] as Array<{ id: string; stato: string }>,
+}));
+
+const { creaMovimento, aggiornaSaldo, trovaConto, creaRegistrazione } = vi.hoisted(() => ({
+  creaMovimento: vi.fn(async (args: any) => ({ id: 'mv-1', ...args.data })),
+  creaRegistrazione: vi.fn(async (args: any) => ({ id: 'reg-1', ...args.data })),
+  aggiornaSaldo: vi.fn(async () => ({})),
+  trovaConto: vi.fn(async (args: any) => {
+    const id = args?.where?.id;
+    if (id) return db.contiStudio.includes(id) ? { id } : null;
+    return db.contiStudio[0] ? { id: db.contiStudio[0] } : null;
+  }),
 }));
 
 const { aggiornaFattura } = vi.hoisted(() => ({ aggiornaFattura: vi.fn(async () => ({})) }));
@@ -72,7 +78,7 @@ vi.mock('./util/prismaClient.js', () => {
     registrazioneIncasso: { create: creaRegistrazione },
     fattura: { update: aggiornaFattura },
     movimentoPrimaNota: { create: creaMovimento },
-    contoBancario: { findFirst: trovaPredefinito, update: aggiornaSaldo },
+    contoBancario: { findFirst: trovaConto, update: aggiornaSaldo },
     auditLog: { create: async () => ({}) },
   };
   // `attivaContestoTenant` riceve un **contesto**, non una callback, e l'hook la chiama senza
@@ -109,70 +115,81 @@ async function incassa(body: any) {
     url: '/invoices/scadenze/sc-1/incassi',
     headers: { authorization: `Bearer ${token}` },
     // Importo parziale di proposito: la rata resta aperta, quindi non partono notifiche e il test
-    // guarda solo ciò che gli interessa — dove entra il denaro.
-    payload: { importoIncassatoCentesimi: 40000, ...body },
+    // guarda solo ciò che gli interessa — dove entra il denaro. Il conto c'è sempre, salvo nei
+    // test che provano proprio la sua assenza (`contoBancarioId: undefined`).
+    payload: { importoIncassatoCentesimi: 40000, contoBancarioId: 'c-scelto', ...body },
   });
 }
 
-describe('POST /invoices/scadenze/:id/incassi — il movimento e il saldo nominano lo stesso conto', () => {
+describe('POST /invoices/scadenze/:id/incassi — il conto è obbligatorio e lo sceglie l\'operatore', () => {
   beforeEach(() => {
     creaMovimento.mockClear();
+    creaRegistrazione.mockClear();
     aggiornaSaldo.mockClear();
-    trovaPredefinito.mockClear();
+    trovaConto.mockClear();
+    db.contiStudio = ['c-scelto', 'c-predefinito'];
     db.contoAccreditoFattura = null;
     db.statoScadenza = 'in_attesa';
   });
 
-  it('senza conto indicato, il denaro va sul predefinito — e il movimento lo dice', async () => {
-    // Il caso del difetto: prima il movimento usciva **senza conto** e il saldo cresceva sul
-    // predefinito. Il denaro era in un conto che la Prima Nota non nominava.
-    const res = await incassa({});
-
-    expect(res.statusCode).toBe(201);
-    expect(creaMovimento).toHaveBeenCalledTimes(1);
-    expect(creaMovimento.mock.calls[0]![0].data.contoBancarioId).toBe('c-predefinito');
-    expect(aggiornaSaldo).toHaveBeenCalledWith({
-      where: { id: 'c-predefinito' },
-      data: { saldoAttuale: { increment: 40000 } },
-    });
-  });
-
-  it('il conto scelto dall\'operatore vince su tutto, e non si cerca il predefinito', async () => {
+  it('il conto scelto dall\'operatore: movimento e saldo nominano quello', async () => {
     const res = await incassa({ contoBancarioId: 'c-scelto' });
 
     expect(res.statusCode).toBe(201);
+    expect(creaMovimento).toHaveBeenCalledTimes(1);
     expect(creaMovimento.mock.calls[0]![0].data.contoBancarioId).toBe('c-scelto');
     expect(aggiornaSaldo).toHaveBeenCalledWith({
       where: { id: 'c-scelto' },
       data: { saldoAttuale: { increment: 40000 } },
     });
-    // Se il predefinito venisse comunque letto, il conto sarebbe deciso due volte.
-    expect(trovaPredefinito).not.toHaveBeenCalled();
   });
 
-  it('il conto di accredito della fattura vince sul predefinito', async () => {
-    db.contoAccreditoFattura = 'c-fattura';
+  it('senza conto indicato → 400: il server non sceglie più il predefinito', async () => {
+    // Prima questo incasso finiva sul conto predefinito senza che nessuno lo avesse detto.
+    const res = await incassa({ contoBancarioId: undefined });
 
-    await incassa({});
-
-    expect(creaMovimento.mock.calls[0]![0].data.contoBancarioId).toBe('c-fattura');
-    expect(aggiornaSaldo).toHaveBeenCalledWith({
-      where: { id: 'c-fattura' },
-      data: { saldoAttuale: { increment: 40000 } },
-    });
-    expect(trovaPredefinito).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ codice: 'CONTO_OBBLIGATORIO' });
+    expect(creaRegistrazione).not.toHaveBeenCalled();
+    expect(creaMovimento).not.toHaveBeenCalled();
+    expect(aggiornaSaldo).not.toHaveBeenCalled();
   });
 
-  it('senza nessun conto disponibile il movimento resta non attribuito e nessun saldo si muove', async () => {
-    // Non c'è un conto predefinito: non se ne inventa uno. Il movimento resta in elenco senza
-    // conto — visibile come non attribuito — invece di caricare il denaro su una banca a caso.
-    trovaPredefinito.mockResolvedValueOnce(null as any);
+  it('senza conto indicato non vale nemmeno il conto di accredito della fattura', async () => {
+    db.contoAccreditoFattura = 'c-predefinito';
 
+    const res = await incassa({ contoBancarioId: undefined });
+
+    expect(res.statusCode).toBe(400);
+    expect(creaMovimento).not.toHaveBeenCalled();
+  });
+
+  it('studio senza conti → 409 che manda a Banche e conti, e niente viene scritto', async () => {
+    // Prima il movimento restava «senza conto» e non entrava in nessun saldo.
+    db.contiStudio = [];
+
+    const res = await incassa({ contoBancarioId: undefined });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ codice: 'NESSUN_CONTO' });
+    expect(res.json().errore).toMatch(/Banche e conti/);
+    expect(creaRegistrazione).not.toHaveBeenCalled();
+    expect(creaMovimento).not.toHaveBeenCalled();
+  });
+
+  it('un conto che non è dello studio → 400, e nessun saldo si muove', async () => {
+    const res = await incassa({ contoBancarioId: 'c-di-un-altro-studio' });
+
+    expect(res.statusCode).toBe(400);
+    expect(creaRegistrazione).not.toHaveBeenCalled();
+    expect(aggiornaSaldo).not.toHaveBeenCalled();
+  });
+
+  it('il movimento nomina la registrazione da cui nasce (serve allo storno)', async () => {
     const res = await incassa({});
 
     expect(res.statusCode).toBe(201);
-    expect(creaMovimento.mock.calls[0]![0].data.contoBancarioId).toBeNull();
-    expect(aggiornaSaldo).not.toHaveBeenCalled();
+    expect(creaMovimento.mock.calls[0]![0].data.registrazioneIncassoId).toBe('reg-1');
   });
 });
 

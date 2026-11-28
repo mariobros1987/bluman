@@ -90,6 +90,9 @@ export function usePortalNotifiche({ isAuthenticated, setActiveTab }: UsePortalN
     // la conferma di una firma si rivede nell'avanzamento.
     else if (n.link === '/portal/proposal') setActiveTab('proposta');
     else if (n.link === '/portal/avanzamento') setActiveTab('avanzamento');
+    // Canale protetto e richieste dello studio: l'avviso dice solo dove andare a leggere.
+    else if (n.link === '/portal/messaggi') setActiveTab('contatti');
+    else if (n.link === '/portal/richieste') setActiveTab('richieste');
   };
 
   return {

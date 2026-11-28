@@ -59,7 +59,7 @@ export interface ModuloProposta {
   richiedeFirmaFinale?: boolean;
 }
 
-export type PortalTab = 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'fatture' | 'contatti' | 'profilo';
+export type PortalTab = 'riepilogo' | 'richieste' | 'proposta' | 'avanzamento' | 'form' | 'documenti' | 'fatture' | 'contatti' | 'profilo';
 
 /**
  * L'atto che il codice OTP sta autorizzando: la lettera d'incarico o un documento del fascicolo.

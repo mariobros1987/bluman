@@ -28,6 +28,7 @@ import type {
   EsecuzionePort,
 } from '../../services/istanziazionePort.js';
 import { risolviRigheDistinta } from '../../services/distintaTemplate.js';
+import { creaPassaggioDaTemplate, formDegliArticoli } from '../../services/formArticolo.js';
 
 export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePort {
   private readonly tenantIdDefault: string;
@@ -74,7 +75,9 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
           // La traduzione riga di distinta → dati risolti (override sui default dell'articolo,
           // passaggi in ordine) è la stessa che usa il ripristino delle voci di un modulo vuoto:
           // sta in `distintaTemplate.ts`, non qui.
-          const righe = risolviRigheDistinta(template.righeDistinta);
+          // Il form dell'articolo (titolare, 28/11/2026) diventa un passaggio per il cliente.
+          const form = await formDegliArticoli(tx, this.tenantId, template.righeDistinta.map((r) => r.articolo.formMasterId));
+          const righe = risolviRigheDistinta(template.righeDistinta, form);
 
           const result: ModuloTemplateConDistinta = {
             id: template.id,
@@ -150,20 +153,9 @@ export class PrismaIstanziazionePort implements IstanziazionePort, EsecuzionePor
           await tx.microvoceProgetto.update({ where: { id: microvoceProgettoId }, data: { stato } });
         },
 
-        creaPassaggioProgetto: async (input) => {
-          await tx.passaggioProgetto.create({
-            data: {
-              tenantId: this.tenantId,
-              microvoceProgettoId: input.microvoceProgettoId,
-              titolo: input.titolo,
-              tipo: input.tipo,
-              chi: input.chi,
-              ordine: input.ordine,
-              descrizione: input.descrizione,
-              campiFormJson: input.campiFormJson as never,
-              stato: 'pending',
-            },
-          });
+        creaPassaggioProgetto: async ({ microvoceProgettoId, ...passaggio }) => {
+          // Un passaggio nato dal form dell'articolo riprende le risposte già date dal cliente.
+          await creaPassaggioDaTemplate(tx, { tenantId: this.tenantId, microvoceProgettoId }, passaggio);
         },
 
         creaModuloProgettoDipendenza: async (moduloProgettoId, dipendeDaModuloProgettoId) => {

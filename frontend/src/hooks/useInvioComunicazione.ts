@@ -8,6 +8,7 @@ import {
   sendWhatsAppDirectApi,
   uploadFileApi,
 } from '../api/client';
+import { allegatiDelMessaggio } from '../api/canaleProtetto';
 import type { RecapitiCliente } from '../utils/recapitiCliente';
 import { EMAIL_SENZA_RAGIONE_SOCIALE, oggettoEmailCliente } from '../utils/oggettoEmailCliente';
 
@@ -45,6 +46,8 @@ export interface AllegatoInviato {
   url: string;
   dimensione: string;
   mime: string;
+  /** Allegato del canale protetto: si scarica con l'accesso, non da un indirizzo. */
+  protetto?: boolean;
 }
 
 /**
@@ -107,6 +110,12 @@ export interface ParametriInvio {
   onRegistrato?: (idLocale: string) => void;
   /** Com'è andata la consegna, per la riga con quell'id locale. */
   onEsito?: (idLocale: string, esito: EsitoInvio) => void;
+  /**
+   * Gli allegati come li ha registrati il server, per la riga con quell'id locale. Serve al portale:
+   * lì il file viaggia dentro il messaggio e l'indirizzo da cui riscaricarlo esiste solo dopo la
+   * scrittura.
+   */
+  onAllegati?: (idLocale: string, allegati: AllegatoInviato[]) => void;
 }
 
 export interface InvioComunicazione {
@@ -147,7 +156,7 @@ function mittenteCorrente(): string {
 export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicazione {
   const {
     progettoId, nomeCliente, emailCliente, contatto, microvoceProgettoId, canalePredefinito,
-    onFeedback, onInviato, onRegistrato, onEsito,
+    onFeedback, onInviato, onRegistrato, onEsito, onAllegati,
   } = parametri;
 
   const [canale, setCanale] = useState<CanaleInvio>(canalePredefinito ?? 'whatsapp');
@@ -197,8 +206,13 @@ export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicaz
     setInviando(true);
     avvisa(null);
 
+    // Sul portale il file non passa dall'archivio pubblico: viaggia dentro il messaggio e il server
+    // lo cifra insieme al testo (`allegatiProtetti`). Un file caricato a parte resterebbe in chiaro,
+    // dietro un indirizzo che chiunque lo conosca può aprire.
+    const allegatoProtetto = canale === 'portal' && fileAllegato ? fileAllegato : null;
+
     let allegatiCaricati: AllegatoInviato[] | undefined;
-    if (fileAllegato) {
+    if (fileAllegato && !allegatoProtetto) {
       setCaricandoFile(true);
       try {
         const resUpload = await uploadFileApi(fileAllegato.nome, fileAllegato.base64);
@@ -218,7 +232,9 @@ export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicaz
       }
     }
 
-    const testoDaInviare = testo.trim() || (allegatiCaricati ? `[Allegato: ${allegatiCaricati[0].nome}]` : '');
+    const testoDaInviare = testo.trim()
+      || (allegatiCaricati ? `[Allegato: ${allegatiCaricati[0].nome}]` : '')
+      || (allegatoProtetto ? `[Allegato: ${allegatoProtetto.nome}]` : '');
     const mittente = mittenteCorrente();
     const destinatario = destinatarioPer(canale);
 
@@ -230,7 +246,8 @@ export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicaz
       direzione: 'uscita',
       testo: testoDaInviare,
       dataOra: new Date().toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
-      allegati: allegatiCaricati || [],
+      // L'allegato protetto compare col suo nome; l'indirizzo per riscaricarlo arriva con `onAllegati`.
+      allegati: allegatiCaricati || (allegatoProtetto ? [{ nome: allegatoProtetto.nome, url: '', dimensione: allegatoProtetto.sizeStr, mime: allegatoProtetto.mime, protetto: true }] : []),
       // Il portale è l'unico canale che non ha un passo di consegna dopo la scrittura: il messaggio
       // è «arrivato» nell'istante in cui compare nel portale del cliente. Per tutti gli altri la
       // riga nasce in attesa, ed è il dispatch a dire com'è finita.
@@ -254,8 +271,10 @@ export function useInvioComunicazione(parametri: ParametriInvio): InvioComunicaz
         direzione: 'uscita',
         testo: testoDaInviare,
         ...(allegatiCaricati ? { allegatiJson: allegatiCaricati } : {}),
+        ...(allegatoProtetto ? { allegatiProtetti: [{ nome: allegatoProtetto.nome, contentBase64: allegatoProtetto.base64 }] } : {}),
         ...(microvoceProgettoId ? { microvoceProgettoId } : {}),
       });
+      if (allegatoProtetto) onAllegati?.(nuovoMsg.id, allegatiDelMessaggio(riga ?? {}) as AllegatoInviato[]);
 
       // L'id della riga appena creata accompagna ogni dispatch: è ciò che permette al backend di
       // annotare sul fascicolo com'è andata, invece di lasciarlo per sempre in attesa.

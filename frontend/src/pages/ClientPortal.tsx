@@ -5,7 +5,6 @@ import { DigitalSignatureModal } from '../components/DigitalSignatureModal';
 import { getStudioInfoForTenant } from '../utils/tenant';
 import { useToast } from '../components/ui/ToastProvider';
 import {
-  fetchComunicazioniApi,
   scaricaDocumentoClient,
   scaricaDocumentoPortaleApi,
   inviaPropostaDatiApi,
@@ -38,7 +37,11 @@ import { TabForm } from '../components/portal/TabForm';
 import { TabDocumenti } from '../components/portal/TabDocumenti';
 import { DocumentiKycPortale } from '../components/DocumentiKycPortale';
 import { TabFatture } from '../components/portal/TabFatture';
-import { TabContatti } from '../components/portal/TabContatti';
+import { TabMessaggi } from '../components/portal/TabMessaggi';
+import { TabRiepilogo } from '../components/portal/TabRiepilogo';
+import { TabRichieste } from '../components/portal/TabRichieste';
+import { usePortalRiepilogo } from '../components/portal/usePortalRiepilogo';
+import type { SchedaAzione } from '../api/canaleProtetto';
 import { TabProfilo } from '../components/portal/TabProfilo';
 import { livelloFirmaEffettivo } from '../components/portal/livelloFirma';
 import { usePortalAuth } from '../components/portal/usePortalAuth';
@@ -51,7 +54,8 @@ export function ClientPortal() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('magic_token') || '';
 
-  const [activeTab, setActiveTab] = useState<PortalTab>('proposta');
+  // Si entra dal riepilogo: prima cosa da vedere è a che punto sono i lavori e cosa tocca al cliente.
+  const [activeTab, setActiveTab] = useState<PortalTab>('riepilogo');
 
   // Ref bridge per la dipendenza circolare tra i due hook: `loadPortalData` vive in
   // `usePortalData` ma deve poter aggiornare `setIsAuthenticated`/`setAccessoNegato`,
@@ -71,7 +75,7 @@ export function ClientPortal() {
 
   const {
     clientObj, setClientObj, clientName, clientProjects, selectedProjectId, setSelectedProjectId,
-    progettoId, setProgettoId, moduliProposti, setModuliProposti, messaggi, setMessaggi,
+    progettoId, setProgettoId, moduliProposti, setModuliProposti,
     moduleSignatures, signed, eidasSeal, caricaFirmeLettera, addendums, addendumErrore,
     pageLoading, portalDocs, portalDocsErrore, portalDocsCaricamento, formData, bozzaDati,
     setBozzaDati, proposteDati, contattiStudio, anagraficaStudio, riprovaAnagraficaStudio, fatturePortale, fattureCaricamento,
@@ -134,10 +138,6 @@ export function ClientPortal() {
    * cortesia.
    */
   const [mostraDatiSensibili, setMostraDatiSensibili] = useState(false);
-
-  const [nuovoMessaggio, setNuovoMessaggio] = useState('');
-  const [canaleMessaggio, setCanaleMessaggio] = useState<'whatsapp' | 'email' | 'telegram' | 'portal'>('portal');
-  const [inviandoMessaggio, setInviandoMessaggio] = useState(false);
 
   /**
    * Errore della rilettura dopo la firma. Serve per distinguere le due cose davanti al cliente:
@@ -225,12 +225,16 @@ export function ClientPortal() {
     // Si assegna anche quando il progetto non si trova: l'elenco vuoto è il dato corretto.
     // Con `if (foundProj)` un progetto non trovato lasciava a schermo i moduli del precedente.
     setModuliProposti(foundProj ? mapProjectToPortalModules(foundProj) : []);
-    fetchComunicazioniApi(pId).then(msgs => {
-      if (msgs && Array.isArray(msgs)) setMessaggi(msgs);
-    }).catch((err) => {
-      console.error('Messaggi del progetto non letti', err);
-      toast.errore(`Messaggi del progetto non letti: ${err instanceof Error ? err.message : 'errore di rete'}.`);
-    });
+    // I messaggi li rilegge la scheda Messaggi quando cambia l'incarico (`useCanaleProtetto`).
+  };
+
+  // La pagina personale: stato degli incarichi e cose da fare, letti dal server.
+  const paginaPersonale = usePortalRiepilogo({
+    attivo: isAuthenticated, clienteAnteprima: isStudioPreview ? (clientObj?.id ?? null) : null, scheda: activeTab, documenti: portalDocs,
+  });
+  const apriScheda = (pId: string, scheda: SchedaAzione) => {
+    if (String(pId) !== String(selectedProjectId)) handleSelectProject(pId);
+    setActiveTab(scheda);
   };
 
   /**
@@ -523,13 +527,14 @@ export function ClientPortal() {
       />
 
       {/* Portal Tabs Bar */}
-      <PortalTabsBar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-      />
+      <PortalTabsBar activeTab={activeTab} setActiveTab={setActiveTab} conteggi={paginaPersonale.conteggi} />
 
       {/* Main Body Content */}
       <div style={bodyStyle}>
+        {/* La pagina personale e le richieste dello studio */}
+        {activeTab === 'riepilogo' && <TabRiepilogo stato={paginaPersonale.stato} ricarica={paginaPersonale.ricarica} documenti={portalDocs} onApri={apriScheda} />}
+        {activeTab === 'richieste' && <TabRichieste stato={paginaPersonale.stato} ricarica={paginaPersonale.ricarica} anteprima={isStudioPreview} />}
+
         {/* TAB 1: Proposta d'Ordine & Firma */}
         {activeTab === 'proposta' && (
           <TabProposta
@@ -646,19 +651,12 @@ export function ClientPortal() {
 
         {/* TAB 6: Contatto Advisor & Messaggistica Live */}
         {activeTab === 'contatti' && (
-          <TabContatti
+          <TabMessaggi
             contattiStudio={contattiStudio}
-            messaggi={messaggi}
-            setMessaggi={setMessaggi}
-            nuovoMessaggio={nuovoMessaggio}
-            setNuovoMessaggio={setNuovoMessaggio}
-            inviandoMessaggio={inviandoMessaggio}
-            setInviandoMessaggio={setInviandoMessaggio}
-            canaleMessaggio={canaleMessaggio}
-            setCanaleMessaggio={setCanaleMessaggio}
-            clientName={clientName}
-            clientObj={clientObj}
             progettoId={progettoId}
+            nomeProgetto={progettoAttivo?.nome ?? null}
+            cifraturaAttiva={paginaPersonale.cifraturaAttiva}
+            anteprima={isStudioPreview}
           />
         )}
 

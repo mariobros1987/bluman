@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './ui/ToastProvider';
+import { confermaCompletamentoSenzaOre } from '../utils/completamentoSenzaOre';
 import { confirm } from './ui/ConfirmProvider';
 import type { DocumentTemplate } from '../utils/documentTemplates';
 import { nomeFileLeggibile } from '../utils';
+import { livelloFirmaValido } from '../utils/datiDocumentoEditor';
 import { haAccessoComunicazioni } from '../utils/comunicazioniAccesso';
 import {
   salvaDocumentoApi,
@@ -143,7 +145,10 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
     }
   };
 
-  const toggleDone = (id: string) => {
+  const toggleDone = async (id: string) => {
+    // L'ultimo passaggio chiude l'attività: senza ore segnate si chiede conferma (titolare, 28/11/2026).
+    const chiudeAttivita = steps.some(s => s.id === id && s.stato !== 'done') && steps.every(s => s.id === id || s.stato === 'done');
+    if (chiudeAttivita && !(await confermaCompletamentoSenzaOre(voce.hA))) return;
     const nextSteps: Passaggio[] = steps.map(s => s.id === id ? { ...s, stato: (s.stato === 'done' ? 'pending' : 'done') as 'pending' | 'done' } : s);
     setSteps(nextSteps);
     voce.proc = nextSteps;
@@ -250,16 +255,17 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
 
   // Apertura modale configurazione firma per Template
   const apriConfigFirmaTemplate = (tmpl: DocumentTemplate, stepId?: string) => {
-    // Piano firma §3 — il template porta il livello legale che lo studio gli ha etichettato;
-    // l'operatore lo vede nel selettore e può cambiarlo prima di salvare. Default 'ses'.
-    const livelloTemplate = (tmpl as any).livelloFirmaRichiesto as 'ses' | 'fea' | 'feq' | undefined;
+    // Piano firma §3 — il livello del template è quello proposto e anche il minimo: l'operatore
+    // può alzarlo prima di salvare, non abbassarlo (titolare, 28/11/2026). Default 'ses'.
+    const livelloTemplate = livelloFirmaValido((tmpl as any).livelloFirmaRichiesto) ?? 'ses';
     setConfigFirmaModal({
       open: true,
       tmpl,
       stepId,
       titolo: `${tmpl.titolo} — ${project.cl}.pdf`,
       richiedeFirma: true,
-      livelloFirmaRichiesto: livelloTemplate === 'fea' || livelloTemplate === 'feq' ? livelloTemplate : 'ses',
+      livelloFirmaRichiesto: livelloTemplate,
+      livelloFirmaMinimo: livelloTemplate,
       metodoFirma: 'fea_otp',
       statoDoc: 'bozza',
       dataScadenzaDoc: '',
@@ -269,7 +275,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
   // Esecuzione del salvataggio documento con metodo firma configurato
   const eseguiSalvataggioConfigurato = async () => {
     if (!configFirmaModal) return;
-    const { tmpl, file, fileBase64, stepId, titolo, richiedeFirma, livelloFirmaRichiesto, metodoFirma, statoDoc, dataScadenzaDoc } = configFirmaModal;
+    const { tmpl, file, fileBase64, stepId, titolo, richiedeFirma, livelloFirmaRichiesto, livelloFirmaMinimo, metodoFirma, statoDoc, dataScadenzaDoc } = configFirmaModal;
 
     const rawFilename = titolo.trim() || (tmpl ? `${tmpl.titolo} — ${project.cl}.pdf` : file?.name || 'Documento.pdf');
     const formattedName = tmpl ? rawFilename.replace(/\.docx?$/i, '.pdf') : rawFilename;
@@ -312,6 +318,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           // Piano firma §3 — il livello scelto nel selettore viaggia fino al documento:
           // il server lo fa rispettare al momento della firma (409 onesto su OTP se fea/feq).
           livelloFirmaRichiesto,
+          livelloFirmaMinimo,
         });
         dbId = salvato.id;
         savedFileUrl = salvato.fileUrl;
@@ -331,6 +338,7 @@ export function PassaggioModal({ project, mid, vidx, onClose, onSaveVoce, proget
           // Piano firma §3 — vale anche per gli allegati caricati a mano: il livello scelto
           // dal config diventa vincolo del documento, non una speranza del frontend.
           livelloFirmaRichiesto,
+          livelloFirmaMinimo,
         });
         dbId = salvato.id;
         savedFileUrl = salvato.fileUrl;

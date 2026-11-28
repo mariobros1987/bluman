@@ -26,6 +26,7 @@ import { PannelloTag } from '../components/editor/PannelloTag';
 import { LibreriaTemplate } from '../components/editor/LibreriaTemplate';
 import { EditorCanvas } from '../components/editor/EditorCanvas';
 import { ModaleNuovoTemplate } from '../components/editor/ModaleNuovoTemplate';
+import { LivelloFirmaAtto } from '../components/editor/LivelloFirmaAtto';
 export type { DocumentTemplate };
 export { PREBUILT_TEMPLATES };
 
@@ -96,6 +97,15 @@ export function DocumentEditorPage() {
   const [livelloFirmaDoc, setLivelloFirmaDoc] = useState<'ses' | 'fea' | 'feq'>(
     () => livelloFirmaValido(initialTmpl.livelloFirmaRichiesto) ?? 'ses',
   );
+  /**
+   * Il livello del modello è anche il minimo (titolare, 28/11/2026): si alza, non si abbassa.
+   * Segue il modello come `livelloFirmaDoc`; un documento riaperto porta il suo.
+   */
+  const [livelloMinimoDoc, setLivelloMinimoDoc] = useState<'ses' | 'fea' | 'feq'>(
+    () => livelloFirmaValido(initialTmpl.livelloFirmaRichiesto) ?? 'ses',
+  );
+  /** Il modello da cui nasce il documento: il server ne rilegge il livello. `null` = documento riaperto. */
+  const [modelloOrigineId, setModelloOrigineId] = useState<string | null>(initialTmpl.id);
 
   /**
    * §39 — Intestazione e piè di pagina propri di QUESTO documento.
@@ -243,6 +253,9 @@ export function DocumentEditorPage() {
           // non deve riportarlo a quello del modello d'apertura.
           const livelloSalvato = livelloFirmaValido(foundDoc.livelloFirmaRichiesto);
           if (livelloSalvato) setLivelloFirmaDoc(livelloSalvato);
+          // Il suo minimo è quello del modello da cui era nato, non quello del modello d'apertura.
+          setLivelloMinimoDoc(livelloFirmaValido(foundDoc.livelloFirmaMinimo) ?? 'ses');
+          setModelloOrigineId(null);
           if (foundDoc.contenutoHtml) {
             // §39 — l'HTML salvato può portare intestazione e piede propri: si rimettono al loro
             // posto, e nell'area editabile va solo il corpo. Un documento salvato prima di §39 non
@@ -449,6 +462,8 @@ export function DocumentEditorPage() {
     setCategoria(tmpl.categoria);
     // Piano firma §3 — il documento eredita il livello legale richiesto dal template.
     setLivelloFirmaDoc(tmpl.livelloFirmaRichiesto ?? 'ses');
+    setLivelloMinimoDoc(tmpl.livelloFirmaRichiesto ?? 'ses');
+    setModelloOrigineId(tmpl.id);
     // §39 — un modello nato da un documento può portarsi dietro intestazione e piede propri: si
     // adottano insieme al testo, invece di essere scambiati per corpo e stampati due volte.
     const parti = scomponiDocumento(sanitizzaHtmlDocumento(tmpl.contenutoHtml));
@@ -820,6 +835,7 @@ export function DocumentEditorPage() {
         // Piano firma §3 — livello legale (ses|fea|feq) che questo atto esige,
         // ereditato dal template di partenza e modificabile nella strip dedicata.
         livelloFirmaRichiesto: livelloFirmaDoc,
+        livelloFirmaMinimo: livelloMinimoDoc,
         formato: 'word',
         url: `#doc-${Date.now()}`,
       };
@@ -830,6 +846,7 @@ export function DocumentEditorPage() {
       //    cliente non lo vedevano, e non essendoci nulla da cancellare il cestino del Vault
       //    non aveva effetto. Nasce come bozza: pubblicarlo è un gesto dell'operatore (§WF-DOC).
       let salvatoSulServer = false;
+      let motivoNonSalvato = '';
       try {
         const creato = await salvaDocumentoApi({
           progettoId: targetProjId,
@@ -844,6 +861,9 @@ export function DocumentEditorPage() {
           // Piano firma §3 — l'etichetta viaggia con il documento: è quella che il
           // server userà per applicare l'enforcement (409) sulle rotte di firma.
           livelloFirmaRichiesto: livelloFirmaDoc,
+          // Il minimo del modello: per un modello dello studio il server lo rilegge dall'id.
+          livelloFirmaMinimo: livelloMinimoDoc,
+          modelloId: modelloOrigineId ?? undefined,
         });
         // L'id del database diventa l'id del documento anche in locale: è quello che serve per
         // ritrovarlo, pubblicarlo e cancellarlo.
@@ -852,6 +872,7 @@ export function DocumentEditorPage() {
         salvatoSulServer = true;
       } catch (errSalvataggio: any) {
         console.error('Archiviazione documento sul server non riuscita:', errSalvataggio);
+        motivoNonSalvato = errSalvataggio instanceof Error ? errSalvataggio.message : '';
       }
 
       // 2. Copia locale per la scheda Documenti del progetto
@@ -878,7 +899,7 @@ export function DocumentEditorPage() {
         setFeedback(`✓ Documento "${titoloDocumento}" archiviato in bozza nel ${dove}. Per renderlo visibile al cliente pubblicalo dalla micro-voce.`);
       } else {
         setFeedback(
-          `⚠️ "${titoloDocumento}" NON è stato archiviato sul server: la copia è solo su questo browser. ` +
+          `⚠️ "${titoloDocumento}" NON è stato archiviato sul server${motivoNonSalvato ? ` (${motivoNonSalvato})` : ''}: la copia è solo su questo browser. ` +
           'Riprova il salvataggio, altrimenti il cliente e gli altri operatori non lo vedranno.'
         );
       }
@@ -922,64 +943,12 @@ export function DocumentEditorPage() {
         activeProgetto={activeProgetto}
       />
 
-      {/* Piano firma §3.3 — livello legale richiesto all'atto che l'operatore sta
-          componendo. Ereditato dal template di partenza, resta modificabile finché
-          il documento non è firmato (PATCH /documenti/:id/livello-firma). */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px' }}>
-        <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
-          ⚖️ Livello Legale Richiesto all'Atto — "{titoloDocumento}"
-        </label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          {([
-            {
-              id: 'ses' as const,
-              icon: '📱',
-              titolo: 'SES — Semplice',
-              desc: 'Firma elettronica semplice (art. 20 CAD / eIDAS art. 3 n. 10). Il flusso OTP attuale.',
-            },
-            {
-              id: 'fea' as const,
-              icon: '🧠',
-              titolo: 'FEA — Avanzata',
-              desc: 'Firma elettronica avanzata (eIDAS art. 26): il cliente firma dal Portale con flusso certificato — OTP verificato, firma grafica obbligatoria e firmatario verificato in anagrafica.',
-            },
-            {
-              id: 'feq' as const,
-              icon: '🔐',
-              titolo: 'FEQ — Qualificata',
-              desc: 'Firma elettronica qualificata (eIDAS art. 25): solo tramite provider esterno del cliente (file .p7m).',
-            },
-          ]).map((l) => (
-            <button
-              key={l.id}
-              type="button"
-              aria-pressed={livelloFirmaDoc === l.id}
-              onClick={() => setLivelloFirmaDoc(l.id)}
-              style={{
-                background: livelloFirmaDoc === l.id ? 'var(--pill-indigo-bg)' : 'var(--card)',
-                border: `1.5px solid ${livelloFirmaDoc === l.id ? 'var(--indigo)' : 'var(--border)'}`,
-                borderRadius: 10, padding: '9px 10px', textAlign: 'left', cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', gap: 3
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 700, color: livelloFirmaDoc === l.id ? 'var(--pill-indigo-fg)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span>{l.icon}</span> {l.titolo}
-              </div>
-              <div style={{ fontSize: 9.5, color: 'var(--muted)', lineHeight: 1.3 }}>{l.desc}</div>
-            </button>
-          ))}
-        </div>
-        {livelloFirmaDoc === 'fea' && (
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#6366f118', border: '1px solid #6366f150', fontSize: 10, color: 'var(--text)', lineHeight: 1.4 }}>
-            ℹ️ Con livello <strong>FEA (Avanzata)</strong> il cliente firmerà dal Portale con il flusso certificato completo: verifica OTP, firma grafica obbligatoria, firmatario verificato in anagrafica e documento d'identità (eIDAS art. 26 · art. 25 CAD).
-          </div>
-        )}
-        {livelloFirmaDoc === 'feq' && (
-          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: '#f59e0b18', border: '1px solid #f59e0b50', fontSize: 10, color: 'var(--muted)', lineHeight: 1.4 }}>
-            ⚠️ Con livello <strong>FEQ (Qualificata)</strong> il server blocca il flusso OTP: il cliente dovrà firmare con il proprio provider di firma digitale qualificata (es. Aruba, InfoCert, Namirial, SPID/CIE) e caricare il file firmato.
-          </div>
-        )}
-      </div>
+      <LivelloFirmaAtto
+        titoloDocumento={titoloDocumento}
+        livello={livelloFirmaDoc}
+        minimo={livelloMinimoDoc}
+        onScegli={setLivelloFirmaDoc}
+      />
 
       {/* Main Studio Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '290px 1fr', gap: 20, alignItems: 'start' }}>

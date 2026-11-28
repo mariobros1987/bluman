@@ -6,6 +6,9 @@ Il **preventivo** raccoglie i moduli scelti per un cliente e, quando viene **acc
 - Percorso principale: **wizard «Nuovo progetto»** (`NewProjectWizard`) — scegli cliente, moduli
   della Libreria e crei. È l'unico percorso che istanzia davvero i moduli (crea il preventivo **e**
   lo accetta in un colpo).
+- Se scegli un modulo che **di solito viene dopo** un altro non scelto, la procedura lo dice
+  («… di solito viene dopo …: aggiungerlo?») con il pulsante per aggiungerlo. È un **avviso**: il
+  progetto si crea anche senza (deciso dal titolare il 28/11/2026).
 - Nel riepilogo, se una voce compare in **più moduli selezionati**, un avviso invita a condividerla
   dopo la creazione (vedi §01 — «🔗 Voci condivise»).
 

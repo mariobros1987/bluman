@@ -57,6 +57,9 @@ Regola **chi può fare cosa**. Due meccanismi:
   rileggibile. Il campo del token è *write-only* per costruzione, non per convenzione: vedi §19.
 - **Tutti i moduli**: comunicazioni (invio **e** lettura della casella), documenti, library, clients,
   invoices… passano dalla matrice.
+- **Posta dei clienti** (§15): voce propria della matrice, che parte **negata** per i collaboratori
+  interni (dentro c'è tutta la posta di un cliente, non la sua conversazione con lo studio) e non si
+  apre in nessun caso ai collaboratori esterni. Caselle e inoltri li configura solo il responsabile.
 - **Comunicazioni**: la matrice governa l'intero modulo — invio, casella in arrivo, fascicolo del
   progetto e chat della micro-voce. `read` = «consulta la conversazione senza poter scrivere», e vale
   identico per la posta in arrivo e per l'invio. Unica eccezione: `PATCH

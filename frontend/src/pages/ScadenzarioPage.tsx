@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { fetchScadenzarioIncassiApi, registraIncassoApi, fetchClienti, fetchContiBancariApi } from '../api/client';
-import { oggi } from '../utils/calendarioDate';
+import { useState, useEffect } from 'react';
+import { fetchScadenzarioIncassiApi, fetchClienti } from '../api/client';
 import { fmt } from '../utils';
 import { InviaSollecitoModal } from '../components/solleciti/InviaSollecitoModal';
+import { RegistraIncassoModal } from '../components/contabilita/RegistraIncassoModal';
+import { StornaIncassoModal } from '../components/contabilita/StornaIncassoModal';
+import { incassiStornabili } from '../../../src/domain/stornoIncasso';
 import { useToast } from '../components/ui/ToastProvider';
-import { Modal } from '../components/ui/Modal';
 import { FiltroPeriodo } from '../components/ui/FiltroPeriodo';
 import { usePeriodo } from '../context/PeriodoContext';
 
@@ -25,30 +26,9 @@ export function ScadenzarioPage() {
   // Modal Sollecito
   const [scadenzaDaSollecitare, setScadenzaDaSollecitare] = useState<any>(null);
 
-  // Modal Registrazione Incasso
+  // Registrazione e storno dell'incasso: i due modali leggono e scrivono da soli, la pagina rilegge.
   const [selectedScadenza, setSelectedScadenza] = useState<any>(null);
-  const [importoIncasso, setImportoIncasso] = useState('');
-  const [metodoPagamento, setMetodoPagamento] = useState('bonifico');
-  const [riferimentoTransazione, setRiferimentoTransazione] = useState('');
-  const [noteOperatore, setNoteOperatore] = useState('');
-  const [savingIncasso, setSavingIncasso] = useState(false);
-  // Quando è entrato il denaro e su quale conto: il server li accettava già, ma il modale non li
-  // chiedeva. Ogni incasso prendeva la data di oggi e, senza conti, restava fuori da ogni saldo.
-  const [dataIncasso, setDataIncasso] = useState(oggi());
-  const [contoIncassoId, setContoIncassoId] = useState('');
-  const [conti, setConti] = useState<any[]>([]);
-  /** `null` = conti letti; una stringa = lettura fallita (non «nessun conto»). */
-  const [erroreConti, setErroreConti] = useState<string | null>(null);
-
-  const apriIncasso = (scadenza: any) => {
-    setSelectedScadenza(scadenza);
-    setImportoIncasso(((scadenza.importoCentesimi || 0) / 100).toFixed(2));
-    setDataIncasso(oggi());
-    // Stessa precedenza del server: il conto indicato sulla fattura, altrimenti il predefinito.
-    const proposto =
-      conti.find((c) => c.id === scadenza.fattura?.contoAccreditoId) || conti.find((c) => c.isDefault);
-    setContoIncassoId(proposto?.id || '');
-  };
+  const [scadenzaDaStornare, setScadenzaDaStornare] = useState<any>(null);
 
   // F6 — una lettura fallita è un errore da dichiarare, non «nessuna scadenza».
   const [erroreCaricamento, setErroreCaricamento] = useState<string | null>(null);
@@ -75,12 +55,6 @@ export function ScadenzarioPage() {
     loadData();
   }, [dataDa, dataA]);
 
-  useEffect(() => {
-    fetchContiBancariApi({ rigettaSuErrore: true })
-      .then((elenco) => { setConti(Array.isArray(elenco) ? elenco : []); setErroreConti(null); })
-      .catch((err) => { setConti([]); setErroreConti(err instanceof Error ? err.message : 'Errore di rete'); });
-  }, []);
-
   const totalSospeso = scadenze
     .filter((s) => s.stato !== 'incassato' && s.stato !== 'stornata')
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
@@ -92,34 +66,6 @@ export function ScadenzarioPage() {
   const totalIncassato = scadenze
     .filter((s) => s.stato === 'incassato')
     .reduce((a, b) => a + (b.importoCentesimi || 0), 0);
-
-  const handleSaveIncasso = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedScadenza || !importoIncasso) return;
-    setSavingIncasso(true);
-    const importoCentesimi = Math.round(parseFloat(importoIncasso) * 100);
-
-    try {
-      await registraIncassoApi(selectedScadenza.id, {
-        importoIncassatoCentesimi: importoCentesimi,
-        dataIncasso,
-        contoBancarioId: contoIncassoId || undefined,
-        metodoPagamento,
-        riferimentoTransazione: riferimentoTransazione || undefined,
-        noteOperatore: noteOperatore || undefined,
-      });
-      toast.successo('Incasso registrato: lo trovi anche in Prima Nota.');
-      setSelectedScadenza(null);
-      setImportoIncasso('');
-      setRiferimentoTransazione('');
-      setNoteOperatore('');
-      await loadData();
-    } catch (err: any) {
-      toast.errore(`Errore registrazione incasso: ${err.message}`);
-    } finally {
-      setSavingIncasso(false);
-    }
-  };
 
   const filteredScadenze = scadenze.filter((s) => {
     if (filterStato !== 'tutte' && s.stato !== filterStato) return false;
@@ -261,26 +207,40 @@ export function ScadenzarioPage() {
                             color: isStornata ? 'var(--pill-blue-fg)' : isIncassata ? 'var(--pill-green-fg)' : isScaduta ? 'var(--pill-red-fg)' : 'var(--pill-amber-fg)',
                           }}
                         >
-                          {isStornata ? '↩︎ STORNATA' : isIncassata ? 'SALDATA' : isScaduta ? 'SCADUTA' : 'IN ATTESA'}
+                          {isStornata ? '↩︎ STORNATA' : isIncassata ? 'SALDATA' : isScaduta ? 'SCADUTA' : s.stato === 'parziale' ? 'PARZIALE' : 'IN ATTESA'}
                         </span>
                       </td>
                       <td style={{ padding: '14px 8px', textAlign: 'right' }}>
-                        {!isIncassata && !isStornata && (
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-secondary"
-                              onClick={() => setScadenzaDaSollecitare(s)}
-                            >
-                              📩 Sollecita
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm btn-success"
-                              onClick={() => apriIncasso(s)}
-                            >
-                              📥 Registra Incasso
-                            </button>
+                        {!isStornata && (
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, flexWrap: 'wrap' }}>
+                            {!isIncassata && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-secondary"
+                                  onClick={() => setScadenzaDaSollecitare(s)}
+                                >
+                                  📩 Sollecita
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-sm btn-success"
+                                  onClick={() => setSelectedScadenza(s)}
+                                >
+                                  📥 Registra Incasso
+                                </button>
+                              </>
+                            )}
+                            {incassiStornabili(s.registrazioniRegistrate ?? []).length > 0 && (
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                title="Annulla un incasso registrato per errore: riga contraria, la rata torna da incassare"
+                                onClick={() => setScadenzaDaStornare(s)}
+                              >
+                                ↩ Storna incasso
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>
@@ -293,130 +253,11 @@ export function ScadenzarioPage() {
         )}
       </div>
 
-      {/* MODAL REGISTRA INCASSO */}
       {selectedScadenza && (
-        <Modal onClose={() => setSelectedScadenza(null)} overlayBackground="rgba(0,0,0,0.7)" zIndex={1000} labelledBy="titolo-incasso-scadenza">
-          {(richiediChiusura) => (
-          <div style={{ background: 'var(--card)', borderRadius: 16, padding: '2rem', width: '100%', maxWidth: 480, border: '1px solid var(--border)' }}>
-            <h3 id="titolo-incasso-scadenza" style={{ margin: '0 0 1rem 0' }}>Registrazione Incasso Rata #{selectedScadenza.numeroRata}</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 1.25rem 0' }}>
-              Fattura: <strong>{selectedScadenza.fattura?.numero}</strong> | Importo Rata: <strong>{fmt((selectedScadenza.importoCentesimi || 0) / 100)}</strong>
-            </p>
-
-            <form onSubmit={handleSaveIncasso} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Importo Incassato Effettivo (€) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={importoIncasso}
-                  onChange={(e) => setImportoIncasso(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 16, fontWeight: 700 }}
-                />
-              </div>
-
-              <div>
-                <label htmlFor="incasso-data" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data dell'incasso *</label>
-                <input
-                  id="incasso-data"
-                  type="date"
-                  required
-                  max={oggi()}
-                  value={dataIncasso}
-                  onChange={(e) => setDataIncasso(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                />
-                <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 4 }}>
-                  Il giorno in cui il denaro è arrivato: è la data che finisce in Prima Nota.
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="incasso-conto" style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Conto su cui è entrato il denaro</label>
-                <select
-                  id="incasso-conto"
-                  value={contoIncassoId}
-                  onChange={(e) => setContoIncassoId(e.target.value)}
-                  disabled={conti.length === 0}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                >
-                  <option value="">{conti.length === 0 ? 'Nessun conto disponibile' : 'Non indicato (conto della fattura o predefinito)'}</option>
-                  {conti.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nomeConto}{c.banca ? ` — ${c.banca}` : ''}{c.isDefault ? ' (predefinito)' : ''}</option>
-                  ))}
-                </select>
-                {erroreConti ? (
-                  <div role="alert" style={{ fontSize: 11, color: 'var(--pill-red-fg)', marginTop: 4 }}>
-                    Elenco dei conti non letto ({erroreConti}): l'incasso si può registrare, ma senza scegliere il conto.
-                  </div>
-                ) : conti.length === 0 ? (
-                  <div style={{ fontSize: 11, color: 'var(--pill-amber-fg)', marginTop: 4 }}>
-                    Lo studio non ha conti in Banche &amp; Conti: l'incasso viene scritto in Prima Nota ma non entra nel saldo di nessun conto.
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 4 }}>
-                    Il saldo di questo conto sale dell'importo incassato.
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Metodo Pagamento</label>
-                <select
-                  value={metodoPagamento}
-                  onChange={(e) => setMetodoPagamento(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                >
-                  <option value="bonifico">Bonifico Bancario</option>
-                  <option value="carta">Carta di Credito</option>
-                  <option value="contanti">Contanti</option>
-                  <option value="assegno">Assegno</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>CRO / Riferimento Transazione Bancaria</label>
-                <input
-                  type="text"
-                  placeholder="Es. CRO-987654321"
-                  value={riferimentoTransazione}
-                  onChange={(e) => setRiferimentoTransazione(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ fontSize: 12, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Note Operatore (Opzionale)</label>
-                <input
-                  type="text"
-                  placeholder="Note interne dell'operatore..."
-                  value={noteOperatore}
-                  onChange={(e) => setNoteOperatore(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={richiediChiusura}
-                >
-                  Annulla
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-success"
-                  disabled={savingIncasso}
-                >
-                  {savingIncasso ? 'Registrazione...' : 'Conferma & Scrivi in Prima Nota'}
-                </button>
-              </div>
-            </form>
-          </div>
-          )}
-        </Modal>
+        <RegistraIncassoModal rata={selectedScadenza} onClose={() => setSelectedScadenza(null)} onRegistrato={loadData} />
+      )}
+      {scadenzaDaStornare && (
+        <StornaIncassoModal rata={scadenzaDaStornare} onClose={() => setScadenzaDaStornare(null)} onStornato={loadData} />
       )}
       {/* MODAL SOLLECITO */}
       <InviaSollecitoModal

@@ -57,6 +57,10 @@ export function ModaleFormPassaggio({
 
   const salvate = Object.values(risposte).filter((v) => v.trim() !== '').length;
 
+  // Ciò che il cliente ha scritto dal portale: si propone, e lo fa suo l'operatore («Usa»).
+  const delCliente = step.risposteCliente ?? {};
+  const proposte = campi.filter((campo) => (delCliente[campo] ?? '').trim() !== '' && delCliente[campo] !== (risposte[campo] ?? ''));
+
   return (
     <Modal
       onClose={onChiudi}
@@ -83,6 +87,24 @@ export function ModaleFormPassaggio({
             riapertura.
           </div>
 
+          {step.rispostaClienteAt && (
+            <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: 'var(--text)' }}>
+                📨 Il cliente ha risposto dal portale il {new Date(step.rispostaClienteAt).toLocaleDateString('it-IT')}.{' '}
+                {proposte.length > 0 ? 'Le sue risposte sono sotto ogni campo: restano una proposta finché non le usi e salvi.' : 'Le sue risposte sono già nei campi.'}
+              </span>
+              {proposte.length > 0 && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setRisposte((prev) => ({ ...prev, ...Object.fromEntries(proposte.map((campo) => [campo, delCliente[campo]!])) }))}
+                >
+                  Usa tutte le risposte del cliente
+                </button>
+              )}
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20, maxHeight: 300, overflowY: 'auto' }}>
             {campi.map((campo, i) => (
               <div key={`${campo}-${i}`} style={{ background: 'var(--card2)', border: '1px solid var(--border)', borderRadius: 8, padding: 10 }}>
@@ -100,6 +122,14 @@ export function ModaleFormPassaggio({
                   placeholder={`Valore per ${campo}…`}
                   style={{ fontSize: 12, padding: 6, width: '100%' }}
                 />
+                {proposte.includes(campo) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 6, fontSize: 11, color: 'var(--muted)' }}>
+                    <span style={{ overflowWrap: 'anywhere' }}>Dal cliente: <strong style={{ color: 'var(--text)' }}>{delCliente[campo]}</strong></span>
+                    <button type="button" className="btn btn-sm" aria-label={`Usa la risposta del cliente per ${campo}`} onClick={() => setRisposte((prev) => ({ ...prev, [campo]: delCliente[campo]! }))}>
+                      Usa
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

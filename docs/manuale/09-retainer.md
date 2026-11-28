@@ -8,6 +8,9 @@ fattura a cadenza fissa (mensile, trimestrale, annuale).
 - Alla scadenza **generi la fattura** del periodo con un'azione esplicita (pulsante «genera fattura»,
   non un automatismo): la fattura prende la numerazione del registro (§05), **entra nello
   Scadenzario Incassi** (§06) e la **prossima data** avanza secondo la frequenza.
+- Quando un canone arriva alla data, la Dashboard lo ricorda in **Da fare oggi** («N canoni Retainer
+  da fatturare», §21) con il pulsante che porta qui. La fattura resta un gesto dell'operatore
+  (deciso dal titolare il 28/11/2026).
 
 ## 📐 Calcoli & logica
 - `prossimaFatturazione` avanza secondo la **frequenza**; l'importo è fisso salvo modifica del
@@ -23,7 +26,7 @@ fattura a cadenza fissa (mensile, trimestrale, annuale).
 
 ## ⚠️ Stati limite & errori
 - Contratto senza cliente/importo → non creabile.
-- La generazione fattura segue le stesse guardie del registro (numerazione, IVA).
+- La generazione fattura segue le stesse guardie del registro (numerazione, IVA), compreso il blocco se al cliente mancano i dati fiscali (§05).
 
 ## 🔧 Nota tecnica
 - Rotte: `src/routes/contabilitaContratti.ts` — `GET /contratti-ricorrenti`, `POST /contratti-ricorrenti`,

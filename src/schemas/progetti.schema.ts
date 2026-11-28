@@ -43,5 +43,13 @@ export const NuovaComunicazioneSchema = z.object({
     .union([z.string().max(100_000), z.record(z.string(), z.unknown()), z.array(z.unknown())])
     .optional()
     .nullable(),
+  // Solo canale protetto: i file viaggiano col messaggio e il server li cifra prima di archiviarli
+  // (`canaleProtetto.ts`). Il tetto vero per file (15 MB) lo applica il servizio sul contenuto
+  // decodificato; qui si ferma ciò che è palesemente fuori misura.
+  allegatiProtetti: z
+    .array(z.object({ nome: z.string().min(1).max(200), contentBase64: z.string().max(21_000_000) }))
+    .max(5)
+    .optional()
+    .nullable(),
 }).passthrough();
 

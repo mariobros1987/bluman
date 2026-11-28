@@ -160,3 +160,37 @@ describe('ModaleFormPassaggio — il conteggio dice una cosa vera', () => {
     expect(screen.getByText(/usa il ✓ sulla scheda/i)).toBeInTheDocument();
   });
 });
+
+describe('ModaleFormPassaggio — le risposte del cliente dal portale', () => {
+  const conRisposta = () => passaggio({
+    fields: ['Ragione Sociale', 'P.IVA / VAT'],
+    risposte: { 'Ragione Sociale': 'Bluecode Ltd' },
+    risposteCliente: { 'Ragione Sociale': 'Bluecode Limited', 'P.IVA / VAT': 'MT12345678' },
+    rispostaClienteAt: '2026-11-20T10:00:00.000Z',
+  });
+
+  it('si propongono sotto il campo, e non entrano nei dati dello studio da sole', () => {
+    const onSalva = apri(conRisposta());
+
+    expect(screen.getByText(/Il cliente ha risposto dal portale il 20\/11\/2026/)).toBeTruthy();
+    expect(screen.getByText('MT12345678')).toBeTruthy();
+    expect(campi().map((c) => c.value)).toEqual(['Bluecode Ltd', '']);
+
+    salva();
+    expect(onSalva).toHaveBeenCalledWith({ 'Ragione Sociale': 'Bluecode Ltd' });
+  });
+
+  it('«Usa» porta nel campo la risposta del cliente, una o tutte', () => {
+    const onSalva = apri(conRisposta());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Usa la risposta del cliente per P.IVA / VAT' }));
+    expect(campi().map((c) => c.value)).toEqual(['Bluecode Ltd', 'MT12345678']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Usa tutte le risposte del cliente' }));
+    expect(campi().map((c) => c.value)).toEqual(['Bluecode Limited', 'MT12345678']);
+    expect(screen.getByText(/Le sue risposte sono già nei campi/)).toBeTruthy();
+
+    salva();
+    expect(onSalva).toHaveBeenCalledWith({ 'Ragione Sociale': 'Bluecode Limited', 'P.IVA / VAT': 'MT12345678' });
+  });
+});

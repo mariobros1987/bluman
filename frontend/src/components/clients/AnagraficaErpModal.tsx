@@ -14,6 +14,7 @@ import { PannelloScreening } from '../kyc/PannelloScreening';
 import { PannelloAnomalie } from '../kyc/PannelloAnomalie';
 import { PannelloSegnalazioniFiau } from '../kyc/PannelloSegnalazioniFiau';
 import { PannelloRetention } from '../kyc/PannelloRetention';
+import { ETICHETTE_RISCHIO_AML, RISCHIO_AML_NON_VALUTATO, rischioAmlDichiarato } from '../../../../src/domain/rischioAml';
 
 // ─── Componente Anagrafica Completa Cliente ERP ────────────────────
 export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Cliente; onClose: () => void; onSaved: () => void }) {
@@ -144,7 +145,9 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
   const [iban, setIban] = useState(client.iban || refJson.iban || '');
 
   // Tab 4: Compliance & KYC
-  const [rischioAml, setRischioAml] = useState<'basso' | 'medio' | 'alto'>(client.rischioAml || refJson.rischioAml || 'basso');
+  // Senza una classe scritta il cliente è «non valutato» (titolare, 28/11/2026): prima la scheda
+  // proponeva «basso», e salvando un'altra scheda lo scriveva come se qualcuno l'avesse deciso.
+  const [rischioAml, setRischioAml] = useState<string>(() => rischioAmlDichiarato(client.rischioAml, refJson.rischioAml));
   const [ubo, setUbo] = useState(client.ubo || refJson.ubo || '');
   const [fontePatrimonio, setFontePatrimonio] = useState(client.fontePatrimonio || refJson.fontePatrimonio || '');
   const [dataKyc, setDataKyc] = useState(client.dataKyc || refJson.dataKyc || '');
@@ -747,11 +750,17 @@ export function AnagraficaErpModal({ client, onClose, onSaved }: { client: Clien
             <div style={{ display: 'flex', gap: 12 }}>
               <div style={{ flex: 1 }}>
                 <label htmlFor="cli-rischio" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Classe di Rischio Antiriciclaggio (AML) *</label>
-                <select id="cli-rischio" value={rischioAml} onChange={e => setRischioAml(e.target.value as any)}>
-                  <option value="basso">🟢 Basso Rischio</option>
-                  <option value="medio">🟡 Medio Rischio</option>
-                  <option value="alto">🔴 Alto Rischio / Persona Politicamente Esposta (PEP)</option>
+                <select id="cli-rischio" value={rischioAml} onChange={e => setRischioAml(e.target.value)}>
+                  <option value="non_valutato">⚪ {ETICHETTE_RISCHIO_AML.non_valutato}</option>
+                  <option value="basso">🟢 {ETICHETTE_RISCHIO_AML.basso}</option>
+                  <option value="medio">🟡 {ETICHETTE_RISCHIO_AML.medio}</option>
+                  <option value="alto">🔴 {ETICHETTE_RISCHIO_AML.alto}</option>
                 </select>
+                {rischioAml === RISCHIO_AML_NON_VALUTATO && (
+                  <div style={{ fontSize: 11, color: 'var(--hint)', marginTop: 4 }}>
+                    Nessuno ha ancora scelto la classe: il programma non ne propone una.
+                  </div>
+                )}
               </div>
               <div style={{ flex: 1 }}>
                 <label htmlFor="cli-datakyc" style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Data Ultimo Rinnovo KYC</label>

@@ -57,6 +57,7 @@ import { registraRotteClienti } from './routes/clienti.js';
 // Rotte progetti ed esecuzione (split dei monoliti): la registrazione avviene
 // dentro il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteProgetti } from './routes/progetti.js';
+import { registraRotteCanaleProtetto } from './routes/canaleProtetto.js';
 // Rotte contabilità (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteContabilita } from './routes/contabilita.js';
@@ -91,6 +92,7 @@ import { registraRotteServiziEsterni } from './routes/serviziEsterni.js';
 // Rotte portale cliente (split dei monoliti): la registrazione avviene dentro
 // il wrapper register di buildServer, nello stesso punto di prima.
 import { registraRottePortale } from './routes/portale.js';
+import { registraRottePortaleRiepilogo } from './routes/portaleRiepilogo.js';
 // Rotte firma FEA+OTP (split dei monoliti): la registrazione avviene dentro il
 // wrapper register di buildServer, nello stesso punto di prima.
 import { registraRotteFirma } from './routes/firma.js';
@@ -107,6 +109,8 @@ import { registraRotteWebhooks } from './routes/webhooks.js';
 // studio lette dal database: prima le faceva il browser chiamando le funzioni
 // serverless con la password SMTP presa da localStorage.
 import { registraRotteComunicazioni } from './routes/comunicazioni.js';
+import { registraRottePosta } from './routes/posta.js';
+import { registraRottePostaConfigurazione } from './routes/postaConfigurazione.js';
 // Il link che collega la chat di un cliente alla sua pratica. Registrato dentro il
 // wrapper register di buildServer, accanto alle rotte progetti: richiede un JWT.
 import { registraRotteCollegamentoChat } from './routes/collegamentoChat.js';
@@ -722,6 +726,9 @@ export function buildServer(app: AppPort): FastifyInstance {
   // `localStorage`. Registrate dentro questo wrapper e assenti da
   // ROTTE_PUBBLICHE: richiedono un JWT come tutto il resto.
   await registraRotteComunicazioni(server);
+  // Accentratore delle mail: messaggi raccolti dalle caselle dei clienti, e la loro configurazione.
+  await registraRottePosta(server);
+  await registraRottePostaConfigurazione(server);
 
   // ─── WEBHOOK COMUNICAZIONI: META WHATSAPP & TELEGRAM ──────────────
   // Rotte webhook (Meta WhatsApp verify+ingestion eventi, Telegram bot
@@ -743,6 +750,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // estratte in src/routes/progetti.ts: stessa registrazione, sempre dentro
   // questo wrapper.
   await registraRotteProgetti(server, app);
+  // Scarico autenticato degli allegati del canale protetto (cifrati in archivio).
+  await registraRotteCanaleProtetto(server);
 
   // ─── COLLEGAMENTO CHAT → PRATICA (LINK TELEGRAM) ──────────────────
   // Rotte in src/routes/collegamentoChat.ts: il link firmato per agganciare la chat
@@ -842,6 +851,8 @@ export function buildServer(app: AppPort): FastifyInstance {
   // Rotte portale cliente estratte in src/routes/portale.ts: stessa
   // registrazione, sempre dentro questo wrapper.
   await registraRottePortale(server);
+  // La pagina personale del cliente (stato degli incarichi, «tocca a te») e le richieste per fase.
+  await registraRottePortaleRiepilogo(server);
 
   // ── FIRMA: CANALI, RICHIESTA/VERIFICA OTP, FIRMA CON FILE, ELENCO, GRAFOMETRICA ──
   // Rotte estratte in src/routes/firma.ts, registrata nella sezione FEA/firma (più sopra).
