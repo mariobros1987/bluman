@@ -50,6 +50,11 @@ jobs:
           git remote add upstream https://github.com/mariobros1987/bluman.git
           git remote set-url --push upstream NO_PUSH
           uscita="$(mktemp)"
+          # Il passo gira con `bash -e`: con `pipefail` un'uscita diversa da 0 di pubblica.sh lo
+          # chiuderebbe qui, prima di leggere l'esito. L'uscita 3 («porta migrazioni, aspetta
+          # Fabio») diventava un job rosso senza avviso, e un guasto vero restava muto (28/11).
+          # Da qui l'esito del passo lo decide solo l'ultima riga.
+          set +e
           bash scripts/pubblica.sh --automatico 2>&1 | tee "$uscita"
           esito="${PIPESTATUS[0]}"
           # Solo le righe [pubblica] dello script: commit, numero della PR, migrazioni. Niente token.

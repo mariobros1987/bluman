@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import path from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import path, { join } from 'node:path';
 
 /**
  * Presidio dell'infrastruttura di deployment (`docker-compose.prod.yml`, `nginx/default.conf`,
@@ -393,5 +395,67 @@ describe('🔄 aggiornamento automatico — pubblicazione dal fork e cron di blu
   it('l installatore non scrive sopra un cron che non è riuscito a leggere', () => {
     expect(installa).toContain("grep -qi 'no crontab'");
     expect(installa).toContain('le altre righe del cron sono cambiate');
+  });
+});
+
+// Il passo di deploy.yml eseguito davvero, con `pubblica.sh` e `ci-notify.sh` finti: il 28/11 la
+// prima pubblicazione con migrazioni (uscita 3, «aspetta il backup e Fabio») ha chiuso il job in
+// rosso e senza avviso, perché il passo gira con `bash -e` e la pipe si fermava prima di leggere
+// l'esito. Leggere il file non bastava a vederlo: si vede solo lanciandolo.
+describe.skipIf(spawnSync('bash', ['-c', 'git --version']).status !== 0)('🔄 deploy.yml — il passo «Pubblica» letto dal suo esito', () => {
+  const deploy = leggi('.github', 'workflows', 'deploy.yml');
+  const inizio = deploy.indexOf('        run: |\n', deploy.indexOf('- name: Pubblica verso il repo del titolare'));
+  const passo = deploy
+    .slice(inizio + '        run: |\n'.length)
+    .split('\n')
+    .map((riga) => riga.replace(/^ {10}/, ''))
+    .join('\n');
+
+  function lancia(esitoPubblica: number, righe: string[]): { stato: number | null; avviso: string } {
+    const dir = mkdtempSync(join(tmpdir(), 'bluman-deploy-'));
+    try {
+      mkdirSync(join(dir, 'scripts'));
+      writeFileSync(join(dir, 'scripts', 'pubblica.sh'), `${righe.map((r) => `echo '[pubblica] ${r}'`).join('\n')}\nexit ${esitoPubblica}\n`);
+      writeFileSync(join(dir, 'scripts', 'ci-notify.sh'), 'printf "%s" "$1" > avviso.txt\n');
+      writeFileSync(join(dir, 'passo.sh'), passo);
+      spawnSync('git', ['init', '-q'], { cwd: dir });
+      // Come lo lancia GitHub Actions quando il passo non dichiara una shell: `bash -e`.
+      const esito = spawnSync('bash', ['-e', 'passo.sh'], { cwd: dir, env: { ...process.env, GH_TOKEN: 'finto', CI_TELEGRAM_TOKEN: '', CI_TELEGRAM_CHAT: '' }, encoding: 'utf8' });
+      const fileAvviso = join(dir, 'avviso.txt');
+      return { stato: esito.status, avviso: existsSync(fileAvviso) ? readFileSync(fileAvviso, 'utf8') : '' };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it('il passo si trova nel file, ed è quello che lancia pubblica.sh', () => {
+    expect(inizio).toBeGreaterThan(-1);
+    expect(passo).toContain('bash scripts/pubblica.sh --automatico');
+  });
+
+  it('con migrazioni (uscita 3) il job resta verde e avvisa che aspetta il backup e «pubblica»', () => {
+    const { stato, avviso } = lancia(3, ['PR aperta: https://example.org/pull/4', 'NON unita: porta migrazioni']);
+    expect(stato).toBe(0);
+    expect(avviso).toContain('porta migrazioni dello schema e NON è stata unita');
+    expect(avviso).toContain('PR aperta: https://example.org/pull/4');
+  });
+
+  it('pubblicazione riuscita (uscita 0): verde, con le righe dello script', () => {
+    const { stato, avviso } = lancia(0, ['PR unita']);
+    expect(stato).toBe(0);
+    expect(avviso).toContain('bluman pubblicato');
+    expect(avviso).toContain('PR unita');
+  });
+
+  it('un guasto vero (uscita 1) resta rosso, e lo dice con il numero', () => {
+    const { stato, avviso } = lancia(1, ['il titolare ha pubblicato altro']);
+    expect(stato).not.toBe(0);
+    expect(avviso).toContain('non riuscita (uscita 1)');
+  });
+
+  it('senza nessuna riga [pubblica] l’avviso parte lo stesso', () => {
+    const { stato, avviso } = lancia(3, []);
+    expect(stato).toBe(0);
+    expect(avviso).toContain('porta migrazioni');
   });
 });
